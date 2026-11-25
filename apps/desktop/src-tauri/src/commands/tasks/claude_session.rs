@@ -1,25 +1,20 @@
 //! Claude Code launch options, the warm stream-json process that keeps one Claude Code
 //! session per live conversation, and the SDK hook callbacks Jackalope answers inside it.
 //!
-//! A warm process belongs to the attempt running its turn: it is registered in the
-//! runtime's process table for that turn, so stopping the attempt kills it. Between turns it
-//! is parked here, keyed by Claude's session ID and a fingerprint of its launch command,
-//! and it is discarded after [`IDLE`], when the launch would differ, when its turn did not
-//! finish cleanly, on app exit, or when the account changes. A follow-up that finds no
-//! matching warm process resumes the session from disk with `--resume`, as before.
+//! The warm process is parked between turns in a [`super::warm_session::Pool`], keyed by
+//! Claude's session ID and a fingerprint of its launch command; it is also discarded when
+//! its turn did not finish cleanly. A follow-up that finds no matching warm process
+//! resumes the session from disk with `--resume`, as before.
 
 use super::agent_process::{self, AgentProcess};
 use super::*;
 use crate::commands::knowledge::tool_rules::{self, RuleAction, ToolCall, ToolRules};
 use serde_json::json;
-use sha2::{Digest, Sha256};
 use std::process::ChildStdin;
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::mpsc;
 use std::time::Instant;
 
-const IDLE: Duration = Duration::from_secs(600);
-const MAX_WARM: usize = 4;
 const STOP_ROUNDS: u32 = 3;
 const EDIT_CHECK_LIMIT: Duration = Duration::from_secs(60);
 const INITIALIZE_LIMIT: Duration = Duration::from_secs(30);
@@ -224,36 +219,6 @@ fn write_line(stdin: &Mutex<ChildStdin>, value: &Value) -> std::io::Result<()> {
     stdin.flush()
 }
 
-/// The launch identity a warm process must share with a follow-up: program, arguments,
-/// explicit environment and working directory. The bridge token differs per attempt and is
-/// aliased instead (see [`bridge_token`]).
-fn identity(cmd: &Command, hooks: &Hooks) -> [u8; 32] {
-    let mut hash = Sha256::new();
-    let mut add = |value: &std::ffi::OsStr| {
-        let bytes = value.as_encoded_bytes();
-        hash.update(bytes.len().to_le_bytes());
-        hash.update(bytes);
-    };
-    add(cmd.get_program());
-    for arg in cmd.get_args() {
-        add(arg);
-    }
-    if let Some(path) = cmd.get_current_dir() {
-        add(path.as_os_str());
-    }
-    let mut envs: Vec<_> = cmd
-        .get_envs()
-        .filter(|(name, _)| *name != "JACKALOPE_BRIDGE_TOKEN")
-        .collect();
-    envs.sort();
-    for (name, value) in envs {
-        add(name);
-        add(value.unwrap_or_default());
-    }
-    add(format!("{hooks:?}").as_ref());
-    hash.finalize().into()
-}
-
 fn aliases() -> &'static Mutex<HashMap<String, String>> {
     static ALIASES: std::sync::OnceLock<Mutex<HashMap<String, String>>> =
         std::sync::OnceLock::new();
@@ -271,6 +236,21 @@ pub(in crate::commands) fn bridge_token(token: &str) -> String {
         .get(token)
         .cloned()
         .unwrap_or_else(|| token.to_string())
+}
+
+/// Lets the bridge token `own` a warm process was launched with act as `current`, the
+/// token of the attempt now running a turn in it.
+pub(super) fn alias_bridge_token(own: &str, current: &str) {
+    if own != current {
+        aliases()
+            .lock()
+            .unwrap()
+            .insert(own.to_string(), current.to_string());
+    }
+}
+
+pub(super) fn release_bridge_token(own: &str) {
+    aliases().lock().unwrap().remove(own);
 }
 
 enum Output {
@@ -299,122 +279,39 @@ impl Session {
 
     fn release_alias(&self) {
         if let Some(token) = &self.bridge_token {
-            aliases().lock().unwrap().remove(token);
+            release_bridge_token(token);
         }
     }
 }
+
+impl super::warm_session::Warm for Session {
+    fn conversation(&self) -> Option<&str> {
+        self.session_id.as_deref()
+    }
+
+    fn key(&self) -> &[u8; 32] {
+        &self.key
+    }
+
+    fn workspace(&self) -> &str {
+        &self.workspace
+    }
+
+    fn account(&self) -> Option<&Path> {
+        self.account.as_deref()
+    }
+
+    fn alive(&self) -> bool {
+        self.process.alive()
+    }
+}
+
+pub(super) type Pool = super::warm_session::Pool<Session>;
 
 impl Drop for Session {
     fn drop(&mut self) {
         self.release_alias();
         let _ = self.process.finish();
-    }
-}
-
-struct Parked {
-    session: Session,
-    since: Instant,
-}
-
-#[derive(Default)]
-pub(super) struct Pool {
-    entries: Arc<Mutex<Vec<Parked>>>,
-    reaper: std::sync::OnceLock<()>,
-    #[cfg(test)]
-    idle: Mutex<Option<Duration>>,
-}
-
-impl Pool {
-    fn idle(&self) -> Duration {
-        #[cfg(test)]
-        if let Some(idle) = *self.idle.lock().unwrap() {
-            return idle;
-        }
-        IDLE
-    }
-
-    fn expired(entries: &mut Vec<Parked>, idle: Duration) -> Vec<Parked> {
-        let (keep, gone) = std::mem::take(entries)
-            .into_iter()
-            .partition(|entry| entry.since.elapsed() < idle && entry.session.alive());
-        *entries = keep;
-        gone
-    }
-
-    fn take(&self, session_id: &str, key: &[u8; 32], workspace: &str) -> Option<Session> {
-        let (found, gone) = {
-            let mut entries = self.entries.lock().unwrap();
-            let gone = Self::expired(&mut entries, self.idle());
-            let found = entries
-                .iter()
-                .position(|entry| entry.session.session_id.as_deref() == Some(session_id))
-                .map(|index| entries.remove(index).session);
-            (found, gone)
-        };
-        drop(gone);
-        // A mismatched process is dropped, which stops it; the caller resumes from disk.
-        found.filter(|session| &session.key == key && session.workspace == workspace)
-    }
-
-    fn park(&self, session: Session) {
-        let gone = {
-            let mut entries = self.entries.lock().unwrap();
-            let mut gone = Self::expired(&mut entries, self.idle());
-            if let Some(index) = entries
-                .iter()
-                .position(|entry| entry.session.session_id == session.session_id)
-            {
-                gone.push(entries.remove(index));
-            }
-            entries.push(Parked {
-                session,
-                since: Instant::now(),
-            });
-            while entries.len() > MAX_WARM {
-                gone.push(entries.remove(0));
-            }
-            gone
-        };
-        drop(gone);
-        self.reaper.get_or_init(|| {
-            let entries = Arc::downgrade(&self.entries);
-            let idle = self.idle();
-            std::thread::spawn(move || loop {
-                std::thread::sleep(idle.min(Duration::from_secs(15)));
-                let Some(entries) = entries.upgrade() else {
-                    return;
-                };
-                let gone = Self::expired(&mut entries.lock().unwrap(), idle);
-                drop(gone);
-            });
-        });
-    }
-
-    pub(super) fn clear(&self) {
-        let gone = std::mem::take(&mut *self.entries.lock().unwrap());
-        drop(gone);
-    }
-
-    pub(super) fn invalidate_account(&self, directory: &Path) {
-        let gone: Vec<_> = {
-            let mut entries = self.entries.lock().unwrap();
-            let (keep, gone) = std::mem::take(&mut *entries)
-                .into_iter()
-                .partition(|entry| entry.session.account.as_deref() != Some(directory));
-            *entries = keep;
-            gone
-        };
-        drop(gone);
-    }
-
-    #[cfg(test)]
-    pub(super) fn warm(&self) -> usize {
-        self.entries.lock().unwrap().len()
-    }
-
-    #[cfg(test)]
-    pub(super) fn set_idle(&self, idle: Duration) {
-        *self.idle.lock().unwrap() = Some(idle);
     }
 }
 
@@ -459,29 +356,52 @@ impl Partials {
         }
         let inner = &event["event"];
         match inner["type"].as_str() {
-            Some("message_start") if !self.text.is_empty() => {
-                self.text.clear();
-                self.pending = true;
-            }
+            Some("message_start") => self.message_start(),
             Some("content_block_delta") if inner["delta"]["type"] == "text_delta" => {
-                let delta = inner["delta"]["text"].as_str().unwrap_or_default();
-                if delta.is_empty() {
-                    return true;
-                }
-                if self.text.is_empty() {
-                    let elapsed = self.started.elapsed();
-                    runtime.update(id, |run| run.efficiency.first_token(elapsed));
-                }
-                let room = STREAM_CHARS.saturating_sub(self.text.chars().count());
-                self.text.extend(delta.chars().take(room));
-                self.pending = true;
+                self.delta(
+                    runtime,
+                    id,
+                    inner["delta"]["text"].as_str().unwrap_or_default(),
+                );
+                return true;
             }
             _ => {}
         }
+        self.flush(runtime, id);
+        true
+    }
+
+    /// A new message starts, replacing any text streamed for the previous one.
+    pub(super) fn message_start(&mut self) {
+        if !self.text.is_empty() {
+            self.text.clear();
+            self.pending = true;
+        }
+    }
+
+    /// Adds streamed text and publishes it once [`STREAM_FLUSH`] has passed since the
+    /// last publication, so a fast stream is coalesced into bounded updates.
+    pub(super) fn delta(&mut self, runtime: &TaskRuntime, id: &str, delta: &str) {
+        if !delta.is_empty() {
+            if self.text.is_empty() {
+                let elapsed = self.started.elapsed();
+                runtime.update(id, |run| run.efficiency.first_token(elapsed));
+            }
+            let room = STREAM_CHARS.saturating_sub(self.text.chars().count());
+            self.text.extend(delta.chars().take(room));
+            self.pending = true;
+        }
+        self.flush(runtime, id);
+    }
+
+    fn flush(&mut self, runtime: &TaskRuntime, id: &str) {
         if self.pending && self.published.elapsed() >= STREAM_FLUSH {
             self.publish(runtime, id);
         }
-        true
+    }
+
+    pub(super) fn started(&self) -> Instant {
+        self.started
     }
 
     pub(super) fn complete(&mut self, runtime: &TaskRuntime, id: &str) {
@@ -891,7 +811,7 @@ impl TaskRuntime {
         } = launch;
         let context_by_hook = settings.hooks.context;
         cmd.current_dir(&workspace);
-        let key = identity(&cmd, &settings.hooks);
+        let key = super::warm_session::identity(&cmd, &format!("{:?}", settings.hooks));
         let warm = previous_session
             .as_deref()
             .and_then(|session| self.claude_sessions.take(session, &key, &workspace));
@@ -963,12 +883,7 @@ impl TaskRuntime {
             run.efficiency.claude_transport = Some(transport.into());
         })?;
         if let (Some(own), Some(current)) = (&session.bridge_token, &bridge_token) {
-            if own != current {
-                aliases()
-                    .lock()
-                    .unwrap()
-                    .insert(own.clone(), current.clone());
-            }
+            alias_bridge_token(own, current);
         }
         let turn = Arc::new(Turn {
             runtime: self.clone(),

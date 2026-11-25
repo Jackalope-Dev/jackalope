@@ -112,6 +112,19 @@ fn names_file(directory: &Path, needle: &str, depth: usize, budget: &mut usize) 
     Some(false)
 }
 
+/// The failure of a turn after a rewind whose conversation the CLI no longer has.
+pub(super) fn rewind_gone(previous: &TaskRun) -> String {
+    format!(
+        "{} no longer has the conversation this rewind returns to, so this turn did not run. Start new work with the relevant context.",
+        crate::commands::agents::name(
+            previous
+                .account_binding
+                .as_ref()
+                .map_or(previous.agent.as_str(), |binding| binding.adapter.as_str())
+        )
+    )
+}
+
 /// The failure of a continuation of a session from outside Jackalope that is gone.
 pub(super) fn gone(previous: &TaskRun) -> String {
     format!(

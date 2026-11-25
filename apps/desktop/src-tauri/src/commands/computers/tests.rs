@@ -450,11 +450,20 @@ fn open_viewers_hold_a_computer_until_released() {
 fn quit_preferences_default_to_stopping_sandboxes() {
     let root = root();
     assert!(!usage::preferences(&root).keep_running_on_quit);
+    assert!(!usage::preferences(&root).keep_api_keys_on_device);
     let keep = ComputerPreferences {
         keep_running_on_quit: true,
+        keep_api_keys_on_device: true,
     };
     usage::save_preferences(&root, &keep).unwrap();
     assert_eq!(usage::preferences(&root), keep);
+    // Preferences saved before the API key setting keep it off.
+    std::fs::write(
+        root.join("preferences.json"),
+        br#"{"keepRunningOnQuit":true}"#,
+    )
+    .unwrap();
+    assert!(!usage::preferences(&root).keep_api_keys_on_device);
     std::fs::write(root.join("preferences.json"), b"{not json").unwrap();
     assert!(!usage::preferences(&root).keep_running_on_quit);
 }
@@ -565,7 +574,7 @@ fn local_docker_computer_round_trip() {
         let (mut stdout, mut stderr) = (Vec::new(), Vec::new());
         let mut relayed = 0;
         let exit = loop {
-            let page = session.read(&mut out, &mut err, false)?;
+            let page = session.read(&mut out, &mut err, false, super::runs::READ_WAIT_MS)?;
             stdout.extend(page.stdout);
             stderr.extend(page.stderr);
             for call in &page.bridge {
@@ -576,6 +585,7 @@ fn local_docker_computer_round_trip() {
                     status: 200,
                     content_type: "application/json".into(),
                     body: b"{\"relayed\":true}".to_vec(),
+                    piece: None,
                 })?;
             }
             if let Some(exit) = page.exit {

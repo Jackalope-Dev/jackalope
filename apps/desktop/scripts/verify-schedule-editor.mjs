@@ -32,8 +32,6 @@ try {
       transformCallback: () => 0,
       invoke: async (command, args) => {
         window.scheduleFixture.calls.push(command);
-        if (command === 'app_execution_access')
-          return { required: true, allowed: false, validUntil: null };
         if (command === 'helper_snapshot')
           return { turns: [], actions: [], connected: false, error: null };
         if (command === 'schedule_list' && window.scheduleFixture.loading)

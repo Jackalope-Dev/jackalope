@@ -79,7 +79,7 @@ export function syncsLessons(project: { preferences?: { syncLessons?: boolean } 
 export function lessonSyncStatus(view: LessonSyncView, busy: boolean): string {
   if (view.reset)
     return 'Synced lessons were deleted from another desktop, so lesson sync turned off here.';
-  if (!view.available) return 'Sign in to sync learned lessons.';
+  if (!view.available) return 'Connect your Jackalope account to sync learned lessons.';
   if (!view.settingsSync) return 'Turn on settings sync to include learned lessons.';
   if (!view.enabled) return 'Learned lessons stay on this desktop.';
   if (busy) return 'Syncing learned lessons…';

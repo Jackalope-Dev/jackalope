@@ -594,7 +594,7 @@ fn real_simulator_preview_and_review_captures() {
         serde_json::to_vec(&record).unwrap(),
     )
     .unwrap();
-    let runtime = TaskRuntime::with_test_access(history).unwrap();
+    let runtime = TaskRuntime::new(history).unwrap();
     simulators::initialize(root.join("simulators"), runtime.clone());
     let workspace_text = workspace.to_string_lossy().into_owned();
     let _cleanup = simulators::ReleaseOnDrop(simulators::workspace_identity(&workspace_text));

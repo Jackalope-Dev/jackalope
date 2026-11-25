@@ -289,7 +289,7 @@ fn fixture() -> (TaskRuntime, PathBuf, String) {
         serde_json::to_vec(&record).unwrap(),
     )
     .unwrap();
-    let runtime = TaskRuntime::with_test_access(history).unwrap();
+    let runtime = TaskRuntime::new(history).unwrap();
     (runtime, root, id)
 }
 

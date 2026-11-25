@@ -2,6 +2,68 @@ use std::path::{Path, PathBuf};
 
 pub use crate::cli_protocol::profile::home_dir;
 
+/// Home folders macOS guards with a permission prompt. `Library` holds iCloud Drive
+/// (`Mobile Documents`) and other apps' data.
+const PROTECTED_FOLDERS: [&str; 8] = [
+    "Desktop",
+    "Documents",
+    "Downloads",
+    "Library",
+    "Pictures",
+    "Movies",
+    "Music",
+    "Public",
+];
+
+/// Whether `path` must not be looked inside unless the person asks: a relative path anywhere,
+/// since where it points is unknown (on Windows that includes `\Users\x`, which has no drive),
+/// and on macOS a place [`macos_guarded_in`] names. Windows and Linux ask nothing for those
+/// folders, so there an absolute path is never protected; skipping them would hide repositories
+/// in `Documents\GitHub`, GitHub Desktop's default on Windows. Decided from the path text alone,
+/// so a caller can skip the folder without touching it.
+pub(crate) fn protected_location_in(path: &Path, home: &Path) -> bool {
+    !path.is_absolute() || (cfg!(target_os = "macos") && macos_guarded_in(path, home))
+}
+
+/// Whether looking inside `path` could make macOS ask the person for permission: a guarded
+/// home folder, iCloud Drive or a mounted volume, judged from the path text on any platform.
+/// The home folder matches whatever its case, as macOS disks ignore case and an agent records
+/// the folder as the person typed it.
+pub(crate) fn macos_guarded_in(path: &Path, home: &Path) -> bool {
+    if path.starts_with("/Volumes")
+        || path.starts_with("/System")
+        || path
+            .components()
+            .any(|part| part.as_os_str() == "Mobile Documents")
+    {
+        return true;
+    }
+    let mut inside = path.components();
+    for part in home.components() {
+        let same = inside.next().is_some_and(|other| {
+            other
+                .as_os_str()
+                .to_string_lossy()
+                .eq_ignore_ascii_case(&part.as_os_str().to_string_lossy())
+        });
+        if !same {
+            return false;
+        }
+    }
+    let Some(first) = inside.next() else {
+        return false;
+    };
+    let first = first.as_os_str().to_string_lossy();
+    PROTECTED_FOLDERS
+        .iter()
+        .any(|folder| first.eq_ignore_ascii_case(folder))
+}
+
+/// [`protected_location_in`] for this computer's home folder.
+pub(crate) fn protected_location(path: &Path) -> bool {
+    protected_location_in(path, &home_dir().unwrap_or_default())
+}
+
 /// Reads `path` when it holds at most `limit` bytes, without reading further.
 /// `None` when it does not exist; an `InvalidData` error when it is larger.
 pub(crate) fn read_capped(path: &Path, limit: u64) -> std::io::Result<Option<Vec<u8>>> {
@@ -197,6 +259,17 @@ pub fn poll_until<T, E>(
             return Ok(None);
         }
         std::thread::sleep(interval.min(deadline - now));
+    }
+}
+
+/// `path`, written from the root with `/`, as an absolute path on this platform: on the `C:`
+/// drive on Windows, where a path without a drive is relative to the current one.
+#[cfg(test)]
+pub(crate) fn absolute_fixture(path: &str) -> PathBuf {
+    if cfg!(windows) {
+        PathBuf::from(format!("C:{path}"))
+    } else {
+        PathBuf::from(path)
     }
 }
 

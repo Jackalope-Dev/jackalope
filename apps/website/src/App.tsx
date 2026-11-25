@@ -52,11 +52,11 @@ const faqs = [
   ],
   [
     'How do I get access?',
-    'Sign up with your email and confirm the link we send. Your account is ready as soon as you confirm; then sign in to the desktop app with the same address. No payment is needed.',
+    'Download the app and start right away with your own agent CLIs. An account is optional and free: sign up with your email, confirm the link we send, then connect the app to sync settings, lessons and skills across computers. No payment is needed.',
   ],
   [
     'Can I download Jackalope now?',
-    `Yes. Builds for ${platforms} are on the download page. Signing in to the app needs a free account with a confirmed email.`,
+    `Yes. Builds for ${platforms} are on the download page. You can use the app without an account; a free account adds sync across your computers, invitations and the Microsoft Store beta.`,
   ],
   [
     'Why use it instead of more terminal tabs?',

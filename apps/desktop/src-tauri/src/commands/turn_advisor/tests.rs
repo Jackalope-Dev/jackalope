@@ -586,7 +586,7 @@ fn the_review_is_saved_on_the_attempt_in_camel_case() {
 fn fixture(name: &str) -> (PathBuf, Coordinator) {
     let directory =
         std::env::temp_dir().join(format!("jackalope-advisor-{name}-{}", Uuid::new_v4()));
-    let runtime = TaskRuntime::with_test_access(directory.join("history")).unwrap();
+    let runtime = TaskRuntime::new(directory.join("history")).unwrap();
     let coordinator = Coordinator::new(directory.join("coordination"), runtime).unwrap();
     (directory, coordinator)
 }
@@ -799,7 +799,7 @@ fn quitting_cancels_reviews_in_progress() {
 fn the_task_state_tracks_newer_attempts_and_stops() {
     let directory =
         std::env::temp_dir().join(format!("jackalope-advisor-state-{}", Uuid::new_v4()));
-    let runtime = TaskRuntime::with_test_access(directory.join("history")).unwrap();
+    let runtime = TaskRuntime::new(directory.join("history")).unwrap();
     let reviewed = TaskRun {
         started_at: "2026-11-24T10:00:00Z".into(),
         ..turn("reviewed-run", "x")

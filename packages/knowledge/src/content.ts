@@ -156,7 +156,7 @@ export const knowledgeGuides: KnowledgeGuide[] = [
     title: 'Get started with Jackalope',
     shortTitle: 'Getting started',
     description:
-      'Install Jackalope, create a free account, find your way around and send feedback.',
+      'Install Jackalope, optionally connect a free account, find your way around and send feedback.',
     readingTime: '3 min read',
     sections: [
       {
@@ -170,10 +170,10 @@ export const knowledgeGuides: KnowledgeGuide[] = [
       },
       {
         id: 'connect',
-        question: 'How do I connect my account?',
+        question: 'Do I need a Jackalope account?',
         paragraphs: [
-          'Running tasks needs a Jackalope account. Anyone can create one for free. Choose Connect account; your browser opens and the app shows a code. Sign in or create your account, check that the code matches and confirm. The app then shows your email and Signed in.',
-          'Saved work stays readable without a connection. After you connect, new tasks keep working offline for up to 72 hours.',
+          'No. Tasks, conversations, terminals and the jackalope command run with your own agent CLIs without one. Choose Continue without an account on the welcome screen, and connect later from Settings → Jackalope account or the sidebar.',
+          'A free account syncs settings, lessons and skills across your computers and adds invitations and the Microsoft Store beta. To connect, choose Connect account; your browser opens and the app shows a code. Sign in or create your account, check that the code matches and confirm. Account features keep working offline for up to 72 hours.',
         ],
       },
       {
@@ -223,6 +223,15 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         ],
       },
       {
+        id: 'keyboard',
+        question: 'Which keyboard shortcuts can I use?',
+        paragraphs: [
+          'Press ? outside a text field to see every shortcut with your own keys. These use Cmd on macOS; use Ctrl on Windows and Linux.',
+          'In the new-work composer, Cmd+Shift+M opens the agent and model picker and Cmd+Shift+P turns plan mode on or off. Cmd+Shift+E opens the effort picker wherever the agent offers effort levels, Cmd+I puts the cursor in the composer and Cmd+Enter sends from any composer. Cmd+Shift+G opens the branch menu. In an open picker the arrow keys move, Enter chooses and Escape closes; in the agent picker, Left and Right move between the agents and their models.',
+          'Change a shortcut in Settings → Keyboard shortcuts: record new keys, clear it or reset it. Keys another action already uses are named, with the option to swap. Copy as JSON and Import move your shortcuts to another computer.',
+        ],
+      },
+      {
         id: 'favorites-and-folders',
         question: 'How do I keep important work close?',
         paragraphs: [
@@ -243,8 +252,17 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         question: 'What is the Inbox?',
         paragraphs: [
           'Inbox, at the top of the sidebar, gathers what needs you across every project. Its count shows how many items are waiting on you.',
-          'Needs you lists questions, results ready to review, failed checks and work that needs recovery. Each card shows how risky the decision is and, when the evidence is clear, a suggested next step. New results shows what finished recently, with screenshots first. Alerts collects app notices, including an agent allowance that is running low or used up. Running now and Waiting on others show work in progress and pull requests waiting on someone else.',
+          'Needs you lists questions, results ready to review, failed checks and work that needs recovery. Each card shows how risky the decision is and, when the evidence is clear, a suggested next step. New results shows what finished recently, with screenshots first. Alerts collects app notices, including an agent allowance that is running low or used up. Running now and Waiting on others show work in progress and pull requests waiting on someone else; See overview opens the full list.',
           'Filter by Everything, Needs you, Alerts or Activity, or pick one project. Mark all read clears the new markers on results or alerts. Open any item to go straight to it.',
+        ],
+      },
+      {
+        id: 'overview',
+        question: 'Where can I see everything that is running?',
+        paragraphs: [
+          'Overview, below Inbox in the sidebar, shows every project at once. Open it with Command+Shift+O on a Mac or Ctrl+Shift+O on Windows and Linux, or from See overview under Running now in Inbox.',
+          'Running now lists every task, conversation, planned task, bot reply and agent review that is running, with its project, agent and model, the step it is on and how long it has run. Work waiting for your answer comes first. Projects gives each project a card with what needs you, what is ready to review, what is running and its drafts, plus its target branch, open pull requests and their checks, the last project check and any running preview. Projects that need you come first.',
+          'Usage at a glance lists accounts that are near or at their limit, and Recently finished shows the last few results and merges. Select anything to open it.',
         ],
       },
       {
@@ -448,7 +466,7 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         id: 'start-chat',
         question: 'How do I start a conversation in Jackalope?',
         paragraphs: [
-          'Open Work, choose your project and agent account, and send the first message. The conversation keeps its messages and successive batches in one isolated Git workspace. You need a Jackalope account, a supported installed agent, and a usable provider account to run work.',
+          'Open Work, choose your project and agent account, and send the first message. The conversation keeps its messages and successive batches in one isolated Git workspace. You need a supported installed agent and a usable provider account to run work; a Jackalope account is optional.',
           'Describe one observable change and how it should be checked. Use New task for a structured brief or a reviewed plan when the work needs separate assignments. A conversation processes batches in order; it is not a parallel plan. Each row in the work list shows its shape: Conversation, Task, Planned task or Draft.',
         ],
         links: [
@@ -1566,7 +1584,7 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         question: 'How do I discuss specific changes or start from an issue?',
         paragraphs: [
           'In Review, use the line gutter or Add comment to attach feedback to a file and line. Add the unresolved comments to one follow-up, then review and send it. Earlier-patch comments retain their original location and ask the agent to recheck it. Show conversation keeps the result alongside Review or Preview; smaller windows stack the panes.',
-          'Open Start from an issue on Project, or Browse issues and pull requests in task workflows. GitHub uses your signed-in GitHub CLI. Connect Linear or Jira Cloud in Settings → Connected work. Choose an issue to prepare an editable task draft; Linked work opens its source later. Browsing does not update the issue or publish code.',
+          'Open Start from an issue on Project, or Browse issues and pull requests in task workflows. GitHub uses your signed-in GitHub CLI, GitLab your signed-in GitLab CLI (glab), and Bitbucket Cloud the API token you connect in Settings → Connected work. Connect Linear or Jira Cloud there too. Choose an issue to prepare an editable task draft; Linked work opens its source later. Browsing does not update the issue or publish code.',
         ],
       },
       {
@@ -1596,7 +1614,7 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         id: 'delivery-state',
         question: 'Are my changes published after a local merge?',
         paragraphs: [
-          'A local merge integrates changes into your target branch. It does not push, publish or deploy them. Delivery can inspect the local branch and, through your installed and signed-in GitHub CLI, read the PR and its checks. A PR with a different head does not verify your current local result.',
+          'A local merge integrates changes into your target branch. It does not push, publish or deploy them. Delivery can inspect the local branch and read the PR and its checks: through your signed-in GitHub CLI, through the GitLab CLI (glab) for a merge request and its pipeline, or with your Bitbucket API token. A PR with a different head does not verify your current local result.',
           'Prepare a PR, CI verification or deployment to create an editable handoff with the result and recorded checks. Review the draft before starting it. The handoff asks for concrete destinations and effects before any publishing action. Deployment stays unverified until behavior is checked in the intended environment.',
         ],
       },

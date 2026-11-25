@@ -57,7 +57,7 @@ mod tests {
             .unwrap();
             runs.push(run);
         }
-        let runtime = TaskRuntime::with_test_access(history).unwrap();
+        let runtime = TaskRuntime::new(history).unwrap();
         let service = Coordinator::new(repo.root.join("queue"), runtime).unwrap();
         {
             let mut inner = service.state();
@@ -279,7 +279,7 @@ mod tests {
             serde_json::to_vec(&run).unwrap(),
         )
         .unwrap();
-        let runtime = TaskRuntime::with_test_access(history).unwrap();
+        let runtime = TaskRuntime::new(history).unwrap();
         let service = Coordinator::new(repo.root.join("queue"), runtime).unwrap();
         let mut inner = service.state();
         let _guard = service.execution(&inner).map_err(String::from).unwrap();
@@ -393,7 +393,7 @@ mod tests {
             serde_json::to_vec(&other).unwrap(),
         )
         .unwrap();
-        let runtime = TaskRuntime::with_test_access(history).unwrap();
+        let runtime = TaskRuntime::new(history).unwrap();
         let service = Coordinator::new(repo.root.join("queue"), runtime).unwrap();
         let mut inner = service.state();
         let _guard = service.execution(&inner).map_err(String::from).unwrap();

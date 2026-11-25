@@ -482,7 +482,7 @@ mod tests {
     fn project_policy_applies_to_new_work_and_keeps_continuation_account_binding() {
         let root =
             std::env::temp_dir().join(format!("jackalope-project-policy-{}", uuid::Uuid::new_v4()));
-        let runtime = TaskRuntime::with_test_access(root.join("history")).unwrap();
+        let runtime = TaskRuntime::new(root.join("history")).unwrap();
         let policy: AgentPolicy = serde_json::from_value(serde_json::json!({
             "defaultMetaAgent": "codex",
             "runnerOptions": {"claude": {"command": std::env::current_exe().unwrap()}},

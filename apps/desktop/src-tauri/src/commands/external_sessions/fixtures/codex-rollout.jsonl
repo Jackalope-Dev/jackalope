@@ -1,0 +1,19 @@
+{"timestamp": "2026-11-10T15:57:20.000Z", "type": "session_meta", "payload": {"id": "01a1c7ae-226e-7643-b0e2-7533cacde529", "session_id": "01a1c7ae-226e-7643-b0e2-7533cacde529", "cwd": "{{CWD}}", "git": {"branch": "main", "commit_hash": "abc"}, "timestamp": "2026-11-10T15:57:20.000Z", "cli_version": "0.156.0", "originator": "codex_cli_rs", "source": "cli", "base_instructions": {"text": "You are Codex."}}}
+{"timestamp": "2026-11-10T15:57:20.100Z", "type": "event_msg", "payload": {"type": "task_started"}}
+{"timestamp":"2026-11-10T15:57:20.200Z","type":"response_item","payload":{"type":"message","role":"developer","content":[{"type":"input_text","text":"<permissions instructions>\nwrite\n</permissions instructions>"}]}}
+{"timestamp":"2026-11-10T15:57:20.300Z","type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"# AGENTS.md instructions for /repo\n\nUse pnpm."}]}}
+{"timestamp":"2026-11-10T15:57:21.000Z","type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"<environment_context>\n  <cwd>/repo</cwd>\n</environment_context>"},{"type":"input_text","text":"Add pagination defaults to the list endpoint"}]}}
+{"timestamp": "2026-11-10T15:57:21.500Z", "type": "world_state", "payload": {"cwd": "/repo"}}
+{"timestamp":"2026-11-10T15:57:22.000Z","type":"response_item","payload":{"type":"reasoning","summary":[],"encrypted_content":"gAAAA"}}
+{"timestamp":"2026-11-10T15:57:23.000Z","type":"response_item","payload":{"type":"function_call","name":"exec_command","arguments":"{\"cmd\":\"rg -n pagination src\",\"max_output_tokens\":6000}","call_id":"c1"}}
+{"timestamp":"2026-11-10T15:57:24.000Z","type":"response_item","payload":{"type":"function_call_output","call_id":"c1","output":"src/list.rs:1: fn list()"}}
+not json at all
+{"timestamp":"2026-11-10T15:57:25.000Z","type":"response_item","payload":{"type":"custom_tool_call","name":"apply_patch","input":"*** Begin Patch\n*** Update File: src/list.rs\n@@\n-fn list()\n+fn list(limit: usize)\n*** Add File: src/page.rs\n+pub struct Page;\n*** End Patch","call_id":"c2"}}
+{"timestamp":"2026-11-10T15:57:26.000Z","type":"response_item","payload":{"type":"custom_tool_call_output","call_id":"c2","output":"Success"}}
+{"timestamp": "2026-11-10T15:57:26.500Z", "type": "token_usage_record", "payload": {"input": 10}}
+{"timestamp":"2026-11-10T15:57:27.000Z","type":"response_item","payload":{"type":"brand_new_item","data":{"x":1}}}
+{"timestamp":"2026-11-10T15:57:28.000Z","type":"response_item","payload":{"type":"message","role":"assistant","content":[{"type":"output_text","text":"Added the pagination defaults."}]}}
+{"timestamp":"2026-11-10T15:58:00.000Z","type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"\n# Files mentioned by the user:\n\n## screenshot.png: /tmp/codex-clipboard-1.png\n"},{"type":"input_text","text":"<image name=[Image #1] path=\"/tmp/codex-clipboard-1.png\">"},{"type":"input_image","image_url":"data:image/png;base64,iVBORw0KGgo="},{"type":"input_text","text":"</image>"},{"type":"input_text","text":"The page size looks wrong here"}]}}
+{"timestamp":"2026-11-10T15:58:01.000Z","type":"response_item","payload":{"type":"local_shell_call","call_id":"c3","status":"completed","action":{"type":"exec","command":["bash","-lc","cargo test"]}}}
+{"timestamp":"2026-11-10T15:58:02.000Z","type":"response_item","payload":{"type":"message","role":"assistant","content":[{"type":"output_text","text":"Set the default page size to 50."}]}}
+{"timestamp":"2026-11-10T15:58:03.000Z","type":"re

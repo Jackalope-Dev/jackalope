@@ -264,6 +264,139 @@ class RunProtocol(Harness):
         self.assertIn("nothing ran", answer["result"]["content"][0]["text"])
         self.assertEqual(self.call(action="run_read", run="r9", out=0, err=0)["bridge"], [])
 
+    def start_provider_run(self, run, script):
+        self.upload(run, archive({"a.txt": b"x"}))
+        self.call(action="run_start", run=run, argv=[sys.executable, "-c", script],
+                  env={"ANTHROPIC_BASE_URL": self.agent.RELAY_URL + "/provider/anthropic",
+                       "ANTHROPIC_API_KEY": "jkp-run-token"},
+                  relay=True)
+
+    def provider_calls(self, run):
+        deadline = time.time() + 20
+        while time.time() < deadline:
+            calls = self.call(action="run_read", run=run, out=0, err=0, wait_ms=500)["bridge"]
+            if calls:
+                return calls
+        self.fail("No provider request arrived.")
+
+    def piece(self, run, call, offset, data, last=False, headers=None):
+        return self.agent.respond({
+            "action": "run_answer", "run": run, "call": call, "status": 200,
+            "contentType": "text/event-stream", "body": base64.b64encode(data).decode(),
+            "piece": {"offset": offset, "last": last, "headers": headers or []},
+        })
+
+    def test_provider_requests_stream_through_the_relay(self):
+        script = (
+            "import http.client,os,urllib.parse;"
+            "base=urllib.parse.urlsplit(os.environ['ANTHROPIC_BASE_URL']);"
+            "key=os.environ['ANTHROPIC_API_KEY'];"
+            "c=http.client.HTTPConnection(base.netloc);"
+            "c.request('POST',base.path+'/v1/messages',body=iter([b'{\"stream\":',b'true}']),"
+            "headers={'x-api-key':key,'content-type':'application/json','cookie':'a=b'},"
+            "encode_chunked=True);"
+            "r=c.getresponse();"
+            "print(r.status,r.getheader('request-id'),r.getheader('set-cookie'),"
+            "r.getheader('transfer-encoding'),r.getheader('content-type'));"
+            "print(repr(r.read()));"
+            "c2=http.client.HTTPConnection(base.netloc);"
+            "c2.request('POST',base.path+'/v1/messages',body=b'{}');"
+            "print('anonymous',c2.getresponse().status)"
+        )
+        self.start_provider_run("p1", script)
+        calls = self.provider_calls("p1")
+        self.assertEqual(len(calls), 1)
+        call = calls[0]
+        self.assertEqual((call["method"], call["path"]),
+                         ("POST", "/provider/anthropic/v1/messages"))
+        # The chunked body arrives whole, with the token for Jackalope to check
+        # and without headers the provider never sees.
+        self.assertEqual(base64.b64decode(call["body"]), b'{"stream":true}')
+        headers = {name.lower(): value for name, value in call["headers"].items()}
+        self.assertEqual(headers["x-api-key"], "jkp-run-token")
+        self.assertNotIn("cookie", headers)
+        self.assertNotIn("transfer-encoding", headers)
+        identifier = call["id"]
+        head = [["request-id", "req_1"], ["set-cookie", "a=b"], ["x-other", "1"]]
+        self.assertTrue(self.piece("p1", identifier, 0, b"", headers=head)["result"]["delivered"])
+        self.assertTrue(self.piece("p1", identifier, 0, b"event: a\n\n")["result"]["delivered"])
+        # A piece sent again is not stored twice; one past a gap is refused.
+        self.assertTrue(self.piece("p1", identifier, 0, b"event: a\n\n")["result"]["delivered"])
+        gap = self.piece("p1", identifier, 99, b"x")
+        self.assertFalse(gap["ok"])
+        self.assertIn("missing", gap["error"])
+        # Not handed over again while it streams, even when reclaimed.
+        self.assertEqual(self.call(action="run_read", run="p1", out=0, err=0,
+                                   reclaim=True)["bridge"], [])
+        self.assertTrue(self.piece("p1", identifier, 7, b"a\n\nevent: b\n\n",
+                                   last=True)["result"]["delivered"])
+        exit, stdout, _ = self.finish("p1")
+        self.assertEqual(exit["code"], 0, stdout)
+        lines = stdout.decode().splitlines()
+        self.assertEqual(lines[0], "200 req_1 None chunked text/event-stream")
+        self.assertEqual(lines[1], repr(b"event: a\n\nevent: b\n\n"))
+        # A request without a token is refused on the computer.
+        self.assertEqual(lines[2], "anonymous 401")
+        self.assertFalse(self.piece("p1", identifier, 25, b"", last=True)["result"]["delivered"])
+        queue = os.listdir(os.path.join(self.temp.name, "p1", "bridge"))
+        self.assertEqual([name for name in queue if name.startswith(identifier)], [])
+
+    def test_a_provider_stream_the_agent_left_is_forgotten(self):
+        script = (
+            "import http.client,os,urllib.parse;"
+            "base=urllib.parse.urlsplit(os.environ['ANTHROPIC_BASE_URL']);"
+            "c=http.client.HTTPConnection(base.netloc);"
+            "c.request('POST',base.path+'/v1/messages',body=b'{}',"
+            "headers={'authorization':'Bearer '+os.environ['ANTHROPIC_API_KEY']});"
+            "r=c.getresponse();print(r.status,r.readline().decode().strip(),flush=True);"
+            "c.close();open('left','w').close();"
+            "import time;time.sleep(3)"
+        )
+        self.start_provider_run("p2", script)
+        identifier = self.provider_calls("p2")[0]["id"]
+        self.assertTrue(self.piece("p2", identifier, 0, b"first\n")["result"]["delivered"])
+        left = os.path.join(self.temp.name, "p2", "workspace", "left")
+        deadline = time.time() + 20
+        delivered = True
+        offset = 6
+        while delivered and time.time() < deadline:
+            time.sleep(0.1)
+            if not os.path.exists(left):
+                continue
+            delivered = self.piece("p2", identifier, offset, b"more\n")["result"]["delivered"]
+            offset += 5
+        self.assertFalse(delivered, "Jackalope is told to stop sending the answer.")
+        exit, stdout, _ = self.finish("p2")
+        self.assertEqual(stdout, b"200 first\n")
+
+    def test_provider_requests_are_bounded_and_answered_whole_when_refused(self):
+        script = (
+            "import http.client,os,socket,urllib.parse;"
+            "base=urllib.parse.urlsplit(os.environ['ANTHROPIC_BASE_URL']);"
+            "host,port=base.netloc.split(':');"
+            "s=socket.create_connection((host,int(port)));"
+            "s.sendall(('POST '+base.path+'/v1/messages HTTP/1.1\\r\\nHost: x\\r\\n'"
+            "'x-api-key: t\\r\\nContent-Length: 999999999\\r\\n\\r\\n').encode());"
+            "print(s.recv(100).split(b' ')[1].decode());s.close();"
+            "c=http.client.HTTPConnection(base.netloc);"
+            "c.request('GET',base.path+'/v1/models',headers={'x-api-key':'t','Origin':'http://x'});"
+            "print(c.getresponse().status);"
+            "c=http.client.HTTPConnection(base.netloc);"
+            "c.request('GET',base.path+'/v1/models',headers={'x-api-key':'t'});"
+            "r=c.getresponse();print(r.status,r.read().decode())"
+        )
+        self.start_provider_run("p3", script)
+        calls = self.provider_calls("p3")
+        self.assertEqual([(call["method"], call["path"]) for call in calls],
+                         [("GET", "/provider/anthropic/v1/models")])
+        self.call(action="run_answer", run="p3", call=calls[0]["id"], status=401,
+                  contentType="application/json",
+                  body=base64.b64encode(b'{"type":"error"}').decode())
+        exit, stdout, _ = self.finish("p3")
+        self.assertEqual(exit["code"], 0, stdout)
+        self.assertEqual(stdout.decode().splitlines(),
+                         ["413", "403", '401 {"type":"error"}'])
+
     def test_status_reports_a_run_whose_supervisor_died(self):
         self.assertEqual(self.call(action="run_status", run="r8"),
                          {"exists": False, "runs": self.agent.RUNS_PROTOCOL,

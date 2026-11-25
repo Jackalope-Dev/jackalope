@@ -3,17 +3,20 @@ import { Zap } from 'lucide-react';
 
 import { useEffect, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
-import { getAgentMetadata } from '../../lib/agent-catalog';
-import { capacityWindowName } from '../../lib/capacity-display';
+import {
+  capacityAgentName as agentName,
+  capacityWindowName,
+  shortAccount,
+} from '../../lib/capacity-display';
 import { isTauriEnvironment, openExternalUrl } from '../../lib/native/env';
+import { countdown, limitName, observedLimits, resetTime } from '../../lib/usage-limit';
 import { type CapacityWindow, useCapacityStore } from '../../stores/capacityStore';
+import { useExecutionStore } from '../../stores/executionStore';
 import { WorkspaceSectionHeading } from '../ui/WorkspaceSectionHeading';
 import './capacity-panel.css';
 import { ProviderMark } from '../agents/ProviderMark';
 import { ActionError } from '../ui/ActionError';
 
-const agentName = (agent: string) =>
-  agent === 'jev' ? 'TypeSafe Jev' : (getAgentMetadata(agent)?.name ?? agent);
 const windowExpired = (window: CapacityWindow, now: number) =>
   window.resetsAt != null && window.resetsAt * 1000 <= now;
 /** Single-line reset text; the tiles ellipsize, so the full wording lives in `resetDetail`. */
@@ -85,6 +88,8 @@ export function CapacityPanel() {
     })),
   );
   const [now, setNow] = useState(Date.now());
+  const runs = useExecutionStore((state) => state.runs);
+  const limited = observedLimits(runs, now);
   const nextRefresh = lastFetched ? lastFetched + 60_000 : 0;
   const refresh = () => void fetch(true);
   useEffect(() => {
@@ -228,6 +233,28 @@ export function CapacityPanel() {
           })}
         </div>
       )}
+      {limited.length > 0 && (
+        <div className="capacity-limited">
+          <h3 className="text-sm">Limited by recent work</h3>
+          <ul>
+            {limited.map((limit) => (
+              <li key={`${limit.agent}:${limit.profileId ?? limit.account}`}>
+                <ProviderMark provider={limit.agent} size={20} />
+                <span className="capacity-limited-name">
+                  {agentName(limit.agent)}
+                  {limit.account ? ` · ${limit.account}` : ''}
+                </span>
+                <Badge variant="warning">{limitName(limit.kind)}</Badge>
+                <span className="capacity-limited-reset">
+                  {limit.resetsAt
+                    ? `Limited until ${resetTime(limit.resetsAt, now)} · in ${countdown(limit.resetsAt, now)}`
+                    : `Reset time not reported · hit at ${resetTime(limit.observedAt, now)}`}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
       {nextRefresh > now && !loading && (
         <p className="task-muted text-xs">
           Refresh available in {Math.ceil((nextRefresh - now) / 1000)}s.
@@ -235,10 +262,4 @@ export function CapacityPanel() {
       )}
     </section>
   );
-}
-
-/** Shortens opaque account identifiers; the full value stays in the tooltip. */
-function shortAccount(account: string) {
-  const match = /^(.*?)\s*([0-9a-f]{8}-[0-9a-f-]{20,})$/i.exec(account);
-  return match ? `${match[1] || 'Account'} …${match[2].slice(-6)}` : account;
 }

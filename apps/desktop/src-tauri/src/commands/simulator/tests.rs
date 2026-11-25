@@ -556,7 +556,7 @@ fn running_attempt(
     let directory = scratch(label);
     let workspace = directory.join("workspace");
     std::fs::create_dir_all(&workspace).unwrap();
-    let runtime = TaskRuntime::with_test_access(directory.join("runs")).unwrap();
+    let runtime = TaskRuntime::new(directory.join("runs")).unwrap();
     let run = TaskRun {
         id: format!("simulator-{label}"),
         workspace: workspace.to_string_lossy().into_owned(),

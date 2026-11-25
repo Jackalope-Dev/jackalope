@@ -1,0 +1,48 @@
+/* The sidebar entry sits above Settings and takes over pushing both to the bottom. */
+.workspace-shell .workspace-account {
+  margin-top: auto;
+  flex-shrink: 0;
+  border-radius: var(--radius-lg);
+  color: var(--color-text-secondary);
+}
+.workspace-shell .workspace-account ~ .workspace-settings {
+  margin-top: 0;
+}
+@media (max-width: 760px) {
+  .workspace-shell .workspace-account {
+    margin-top: 0;
+  }
+}
+
+.account-suggestion {
+  display: flex;
+  flex-wrap: wrap;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 8px 12px;
+  margin: 4px 0 8px;
+  padding: 8px 8px 8px 16px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-elevated);
+  color: var(--color-text-primary);
+  font-size: var(--text-sm);
+}
+.account-suggestion > svg {
+  flex-shrink: 0;
+  color: var(--color-accent-ink);
+}
+.account-suggestion-text {
+  flex: 1 1 280px;
+  min-width: 0;
+}
+.account-suggestion-text [role="alert"] {
+  margin-top: 4px;
+  color: var(--color-danger);
+}
+.account-suggestion-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}

@@ -949,6 +949,35 @@ mod tests {
     }
 
     #[test]
+    fn pr_names_the_change_request_as_its_code_host_does() {
+        let mut harness = Harness::new();
+        finished_login_fix(&mut harness);
+        // A host that does not know the request keeps GitHub's words.
+        harness.submit("/pr");
+        let screen = harness.render(100, 34);
+        assert!(
+            screen.contains("open a pull request") && screen.contains("Open a draft pull request"),
+            "{screen}"
+        );
+        harness.key(KeyCode::Esc);
+
+        harness.host.lock().unwrap().reply = Some(Box::new(|request| match request {
+            Request::CodeHost { .. } => Some(Response::CodeHost {
+                kind: "gitlab".into(),
+            }),
+            _ => None,
+        }));
+        harness.submit("/pr");
+        let screen = harness.render(100, 34);
+        assert!(
+            screen.contains("open a merge request")
+                && screen.contains("Open a draft merge request"),
+            "{screen}"
+        );
+        assert!(!screen.contains("pull request"), "{screen}");
+    }
+
+    #[test]
     fn switching_tabs_never_flashes_the_start_screen() {
         let mut harness = Harness::new();
         harness.add(conversation(

@@ -644,7 +644,6 @@ impl BotHub {
             let message = self.sessions.post(session, text, origin)?;
             return Ok((session.to_owned(), message));
         }
-        self.runtime.access.ensure()?;
         let id = Uuid::new_v4().to_string();
         let message = Uuid::new_v4().to_string();
         let mut request = bot.request_in(project_id).clone();
@@ -657,6 +656,7 @@ impl BotHub {
                 id: message.clone(),
                 text: clip(text, 12_000),
                 origin: Some(origin),
+                reasoning_effort: None,
             }),
             SessionLimits {
                 max_batches: Some(AUTONOMOUS_BATCHES),
@@ -945,9 +945,7 @@ impl BotHub {
                 persona.name == bot.name && persona.instructions == bot.instructions.trim()
             })
         });
-        let blocked = if self.runtime.access.ensure().is_err() {
-            Some("Skipped: sign in to Jackalope to start new work")
-        } else if state.1.as_deref().is_some_and(|id| self.sessions.busy(id)) {
+        let blocked = if state.1.as_deref().is_some_and(|id| self.sessions.busy(id)) {
             Some("Skipped: the previous wake-up is still working")
         } else if !manual && state.0 >= HOURLY_WAKES {
             Some("Skipped: this bot reached its hourly wake-up limit")

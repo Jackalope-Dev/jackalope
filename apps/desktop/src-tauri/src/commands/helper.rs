@@ -436,7 +436,6 @@ impl Helper {
     /// installed helper-capable agent, each with all its usable accounts. Ask
     /// Jackalope and generated text share this, so both pick agents the same way.
     pub(super) fn candidates(&self) -> Result<Vec<Candidate>, String> {
-        self.runtime.access.ensure()?;
         let policy = self.runtime.policy()?;
         let root = self.runtime.profiles_root();
         let mut agents = vec![policy.default_meta_agent.clone()];

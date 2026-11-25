@@ -87,6 +87,7 @@ fn request(
     RunRequest {
         retry_of: None,
         handoff_focus: None,
+        reasoning_effort: None,
         continues: None,
         live_session_id: None,
         effort: None,
@@ -171,7 +172,7 @@ impl Fixture {
             }
             path
         };
-        let runtime = TaskRuntime::with_test_access(folder.join("history")).unwrap();
+        let runtime = TaskRuntime::new(folder.join("history")).unwrap();
         let mut policy = AgentPolicy::default();
         policy.default_meta_agent = "claude-fixture".into();
         policy.custom_agents.push(CustomAgent {
@@ -606,7 +607,7 @@ process.stdin.on('end', () => {
 #[test]
 fn partial_text_accumulates_and_clears_when_the_message_completes() {
     let folder = std::env::temp_dir().join(format!("jackalope-partials-{}", uuid::Uuid::new_v4()));
-    let runtime = TaskRuntime::with_test_access(folder.clone()).unwrap();
+    let runtime = TaskRuntime::new(folder.clone()).unwrap();
     let run = super::super::tests::sample("claude");
     let id = run.id.clone();
     runtime.inner.lock().unwrap().runs.insert(id.clone(), run);
@@ -759,7 +760,7 @@ fn the_context_hook_delivers_selected_context_once() {
     let folder =
         std::env::temp_dir().join(format!("jackalope-context-hook-{}", uuid::Uuid::new_v4()));
     std::fs::create_dir_all(&folder).unwrap();
-    let runtime = TaskRuntime::with_test_access(folder.join("history")).unwrap();
+    let runtime = TaskRuntime::new(folder.join("history")).unwrap();
     let entry: crate::commands::knowledge::KnowledgeEntry = serde_json::from_value(json!({
         "id":"lesson-1","projectId":"context-project","projectPath":folder.to_string_lossy(),
         "kind":"memory","title":"Run the linter","content":"Use pnpm lint before finishing.",
@@ -1016,7 +1017,7 @@ fn a_session_from_outside_jackalope_that_is_gone_never_starts_over() {
 fn the_answers_hook_delivers_a_late_answer_once() {
     let folder =
         std::env::temp_dir().join(format!("jackalope-answers-hook-{}", uuid::Uuid::new_v4()));
-    let runtime = TaskRuntime::with_test_access(folder.join("history")).unwrap();
+    let runtime = TaskRuntime::new(folder.join("history")).unwrap();
     let mut run = super::super::tests::sample("claude");
     run.id = "answers-run".into();
     runtime
@@ -1115,4 +1116,94 @@ fn non_code_work_starts_in_the_checkout_and_never_prepares_or_checks() {
         git(&fixture.root, &["branch", "--show-current"]).unwrap(),
         "master"
     );
+}
+
+#[test]
+fn a_new_worktree_copies_included_files_then_runs_worktree_commands() {
+    use crate::commands::project_registry::{ProjectRecord, WorktreeCommand};
+    let project = "claude-session-worktree-setup";
+    let fixture = Fixture::new(project, persistent());
+    std::fs::write(
+        fixture.folder.join("mark.cjs"),
+        "require('node:fs').writeFileSync(process.argv[2], 'ran');",
+    )
+    .unwrap();
+    std::fs::write(
+        fixture.folder.join("fail.cjs"),
+        "console.error('install broke'); process.exit(3);",
+    )
+    .unwrap();
+    std::fs::write(fixture.folder.join("local.json"), "{\"local\":true}").unwrap();
+    std::fs::write(
+        fixture.folder.join(".worktreeinclude"),
+        "*.cjs\nlocal.json\n",
+    )
+    .unwrap();
+    std::fs::create_dir_all(fixture.runtime.preferences_directory()).unwrap();
+    let register = |command: &str| {
+        crate::commands::project_registry::save(
+            &fixture.runtime,
+            vec![ProjectRecord {
+                id: project.into(),
+                name: "Fixture".into(),
+                path: fixture.root.clone(),
+                worktree_commands: vec![WorktreeCommand {
+                    name: "Install".into(),
+                    command: command.into(),
+                }],
+                ..Default::default()
+            }],
+        )
+        .unwrap();
+    };
+    let isolated = |id: &str, prompt: &str| {
+        let mut request = fixture.request(project, id, prompt, None);
+        request.isolated = true;
+        request.workspace_mode = Some(crate::cli_protocol::WorkspaceMode::Worktree);
+        request
+    };
+
+    register("node mark.cjs installed.json");
+    let run = fixture.finish(isolated("claude-worktree-setup", "Say hello"));
+    assert_eq!(run.status, RunStatus::Review, "{:?}", run.error);
+    let workspace = Path::new(&run.workspace);
+    assert!(dunce::canonicalize(workspace).unwrap().starts_with(
+        dunce::canonicalize(&fixture.folder)
+            .unwrap()
+            .join(".worktrees")
+    ));
+    assert_eq!(
+        std::fs::read_to_string(workspace.join("installed.json")).unwrap(),
+        "ran",
+        "the command ran in the new worktree, after the include copied its script"
+    );
+    assert_eq!(
+        std::fs::read_to_string(workspace.join("local.json")).unwrap(),
+        "{\"local\":true}"
+    );
+    assert!(
+        run.activity
+            .iter()
+            .any(|line| line.contains(".worktreeinclude") && line.contains("local.json")),
+        "{:?}",
+        run.activity
+    );
+    assert!(run
+        .activity
+        .iter()
+        .any(|line| line.starts_with("Running Install")));
+
+    register("node fail.cjs");
+    let run = fixture.finish(isolated("claude-worktree-setup-fails", "Say goodbye"));
+    assert_eq!(run.status, RunStatus::Failed);
+    let error = run.error.unwrap();
+    assert!(
+        error.contains("Install") && error.contains("exit code 3"),
+        "{error}"
+    );
+    assert!(run
+        .preparation
+        .unwrap()
+        .output_tail
+        .contains("install broke"));
 }

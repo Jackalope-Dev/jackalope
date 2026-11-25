@@ -437,6 +437,9 @@ pub(in crate::commands) fn prepare_with_message(
             }
         });
     check_message(&message)?;
+    // Merging finishes the selected tasks. Their terminals that ran a command marked to stop
+    // then are stopped here, before the source checks a running terminal would fail.
+    super::work_terminal::stop_when_finished(selected.iter().map(|run| run.task_id.as_str()));
     let mut agents: Vec<_> = selected
         .iter()
         .flat_map(super::project_git::contributors)

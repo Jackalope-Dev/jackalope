@@ -69,11 +69,14 @@ pub struct RoutingDecision {
     pub usage: Usage,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct QuotaFailure {
     pub model_only: bool,
     pub message: String,
+    /// When the provider said the limit resets, in Unix seconds; absent when it did not say.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub resets_at: Option<i64>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -200,10 +203,12 @@ const QUOTA_CODES: [&str; 7] = [
 
 pub(super) fn quota_failure(event: &Value) -> Option<QuotaFailure> {
     let kind = event["type"].as_str().or(event["event"].as_str());
+    let now = Utc::now();
     if kind == Some("rate_limit_event") && event["rate_limit_info"]["status"] == "rejected" {
         return Some(QuotaFailure {
             model_only: false,
             message: used_up(&event["rate_limit_info"]),
+            resets_at: super::usage_limit::structured_reset(event, now),
         });
     }
     let provider_error = matches!(kind, Some("error" | "turn.failed"))
@@ -311,6 +316,8 @@ pub(super) fn quota_failure(event: &Value) -> Option<QuotaFailure> {
     }
     Some(QuotaFailure {
         model_only: error["scope"] == "model",
+        resets_at: super::usage_limit::structured_reset(event, now)
+            .or_else(|| super::usage_limit::reset_at(&text)),
         message: if text.trim().is_empty() {
             "The provider reported that its usage or rate limit was reached.".into()
         } else {

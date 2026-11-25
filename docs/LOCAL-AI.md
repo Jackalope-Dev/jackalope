@@ -3,7 +3,7 @@
 Local setup is implemented in source and awaits installed-app acceptance with real
 models. No inference runtime, weights or tokenizer are bundled with Jackalope.
 The optional setup uses OpenCode and Ollama; it does not require an AI provider
-subscription. Jackalope's account-access requirement remains separate.
+subscription or a Jackalope account.
 
 ## Guided setup
 

@@ -23,7 +23,6 @@ pub(in crate::commands) fn run(
     canceled: &AtomicBool,
     timeout: Duration,
 ) -> Result<TaskRun, String> {
-    runtime.access.ensure()?;
     let policy = runtime.policy()?;
     let (adapter, executable) = policy.resolve(agent)?;
     let model = policy.model_for_account(&runtime.profiles_root(), agent, model, binding)?;
@@ -173,6 +172,17 @@ impl Turn<'_> {
             .transpose()
             .map_err(|e| e.to_string())?;
         self.answer(runtime, cmd, configuration.input, canceled, started)
+    }
+
+    /// Runs a command the caller built in full, with the prompt on stdin, in the turn's
+    /// directory. Used where an agent needs a subcommand the tool-free flags rule out.
+    pub(super) fn run_command(
+        self,
+        runtime: &TaskRuntime,
+        cmd: Command,
+        canceled: &dyn Fn() -> bool,
+    ) -> Result<Answer, String> {
+        self.answer(runtime, cmd, Input::Stdin, canceled, |_| Ok(()))
     }
 
     fn answer(

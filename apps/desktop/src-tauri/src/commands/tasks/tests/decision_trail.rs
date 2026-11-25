@@ -14,7 +14,7 @@ fn decision(supersedes: Option<&str>, evidence: &[&str]) -> RecordDecisionInput 
 fn decision_trail_is_append_only_checked_at_the_end_and_survives_restart_and_export() {
     let folder = std::env::temp_dir().join(format!("jackalope-trail-{}", uuid::Uuid::new_v4()));
     let directory = folder.join("history");
-    let runtime = TaskRuntime::with_test_access(directory.clone()).unwrap();
+    let runtime = TaskRuntime::new(directory.clone()).unwrap();
     let mut run = sample("codex");
     run.status = RunStatus::Running;
     run.workspace = folder.to_string_lossy().into();
@@ -82,7 +82,7 @@ fn decision_trail_is_append_only_checked_at_the_end_and_survives_restart_and_exp
     );
 
     drop(runtime);
-    let restarted = TaskRuntime::with_test_access(directory).unwrap();
+    let restarted = TaskRuntime::new(directory).unwrap();
     let loaded = restarted.run_snapshot(&run.id).unwrap();
     assert_eq!(loaded.decisions, saved.decisions);
     drop(restarted);

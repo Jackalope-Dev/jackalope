@@ -95,7 +95,14 @@ export function useTaskFollowUps({
       const prompt = reply.trim();
       const { drafts, draft } = useExecutionStore.getState();
       const connectionIds = drafts[draftKey]?.connectionIds;
-      const requestKey = JSON.stringify([run.id, prompt, connectionIds, interrupt]);
+      const reasoningEffort = drafts[draftKey]?.reasoningEffort ?? null;
+      const requestKey = JSON.stringify([
+        run.id,
+        prompt,
+        connectionIds,
+        interrupt,
+        reasoningEffort,
+      ]);
       if (queueRequest.current?.key !== requestKey)
         queueRequest.current = { key: requestKey, id: crypto.randomUUID() };
       try {
@@ -105,6 +112,7 @@ export function useTaskFollowUps({
           prompt,
           connectionIds: connectionIds ?? null,
           interrupt,
+          reasoningEffort,
         });
         queuedHere.current = true;
         if (useExecutionStore.getState().drafts[draftKey]?.prompt.trim() === prompt)

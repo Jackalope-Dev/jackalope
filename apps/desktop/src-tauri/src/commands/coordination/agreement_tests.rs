@@ -118,7 +118,7 @@ fn persisted_interface_gate_blocks_dispatch_and_integration_until_agreed() {
         serde_json::to_vec(&run).unwrap(),
     )
     .unwrap();
-    let runtime = TaskRuntime::with_test_access(history).unwrap();
+    let runtime = TaskRuntime::new(history).unwrap();
     let mut a = item("api", &["api"]);
     a.run_id = Some(run.id.clone());
     let b = item("web", &["web"]);
@@ -309,7 +309,7 @@ async fn concurrent_authenticated_claims_have_one_durable_winner_and_fail_closed
         )
         .unwrap();
     }
-    let runtime = TaskRuntime::with_test_access(history).unwrap();
+    let runtime = TaskRuntime::new(history).unwrap();
     let service = Coordinator::new(repo.root.join("queue"), runtime.clone()).unwrap();
     for id in ["grok-run", "claude-run"] {
         runtime.update(id, |r| r.status = RunStatus::Running);

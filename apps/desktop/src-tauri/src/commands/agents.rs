@@ -90,6 +90,9 @@ pub struct AgentSpec {
     pub orchestrates: bool,
     /// Whether the agent runs on computers.
     pub remote: bool,
+    /// Whether a side question can fork the agent's saved session read-only
+    /// (`tasks/side_chat.rs`).
+    pub side_questions: bool,
     pub model_catalog: bool,
     pub quota_source: Option<String>,
     /// Where the agent keeps its MCP servers: relative to its account

@@ -33,6 +33,7 @@ mod eligibility;
 mod evaluation_trial;
 pub mod followups;
 pub mod hosts;
+mod limit_resume;
 #[cfg(test)]
 mod native_mcp_trial;
 #[cfg(test)]

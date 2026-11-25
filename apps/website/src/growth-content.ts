@@ -363,7 +363,7 @@ export const growthPost = {
     {
       title: 'Bring someone who would use it.',
       paragraphs: [
-        'Signup is open, so anyone can create a free account with their email and download Jackalope for Windows, macOS or Linux.',
+        'Anyone can download Jackalope for Windows, macOS or Linux and start without an account. Signup is open for a free account that syncs settings across computers.',
         'Share it with people who would find the workflow useful.',
       ],
     },

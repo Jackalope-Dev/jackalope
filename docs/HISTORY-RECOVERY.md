@@ -11,7 +11,8 @@ tasks** and **Archive finished**. Bulk actions apply only to tasks matching the 
 project, search and status filters. **Archived** in the status filter lists manually
 archived tasks and saved ideas with restore actions; Undo restores the last successful
 archive batch. Results, usage, queue references and workspaces remain available.
-Archiving does not accept a result, remove a worktree or delete history.
+Archiving does not accept a result, remove a worktree or delete history. With **Remove
+finished worktrees** on, a clean archived worktree is removed after the chosen period.
 
 Manual archive state is saved on the latest native attempt, or on an unstarted
 saved idea. A new attempt brings its task back into the current list. Active,
@@ -52,6 +53,8 @@ Git registrations. For recoverable local changes, **Archive & remove** saves a G
 bundle, tracked patch, untracked nonignored files and manifest under `.worktrees/.archive`
 before removing the worktree and its task branch. **Prune missing worktrees** removes
 registrations only for folders already absent.
+[Automatic cleanup](PARALLEL-WORKFLOWS.md#commit-ownership-and-cleanup) uses the same
+checks, skips unsaved or live history, keeps branches and logs each removal.
 
 An integrated commit, equivalent file content and a clean working tree are different
 facts. Preserve source work until the integration receipt and cleanup checks agree.

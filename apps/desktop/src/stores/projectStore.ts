@@ -8,7 +8,7 @@ import { isTauriEnvironment } from '../lib/native/env.ts';
 import { invokeNative } from '../lib/native/transport.ts';
 import { reviewPagesForRegistry } from '../lib/review-captures.ts';
 import type { SimulatorBase } from '../lib/simulators.ts';
-import type { TerminalCommand } from '../lib/terminal-commands.ts';
+import { type TerminalCommand, worktreeCommandsForRegistry } from '../lib/terminal-commands.ts';
 import { WORKSPACE_MODES, type WorkspaceMode } from '../lib/workspace-mode.ts';
 import { readWorktrees } from '../lib/worktree-reads.ts';
 
@@ -61,6 +61,11 @@ export interface ProjectPreferences {
   /** Extra commands offered as buttons in a task's terminal, beside the ones above. */
   terminalCommands?: TerminalCommand[];
   setupFiles?: string[];
+  /**
+   * Days after a task is merged or archived before its worktree is removed automatically.
+   * Undefined means off.
+   */
+  worktreeRetentionDays?: number;
   autoVerify?: boolean;
   /** Superseded by `workspaceMode`; `false` still means current-branch work. */
   isolatedByDefault?: boolean;
@@ -394,6 +399,8 @@ interface ProjectRecord {
   prepareCommand?: string;
   timeLimits?: ProjectTimeLimits;
   setupFiles?: string[];
+  /** Saved commands marked to run in each new task worktree. */
+  worktreeCommands?: { name: string; command: string }[];
   previewCommand?: string;
   simulatorPreview?: string;
   developmentTeam?: string;
@@ -445,6 +452,7 @@ function projectRecords(projects: Project[]): ProjectRecord[] {
     prepareCommand: preferences?.prepareCommand?.trim() || undefined,
     timeLimits: preferences?.timeLimits,
     setupFiles: preferences?.setupFiles?.length ? preferences.setupFiles : undefined,
+    worktreeCommands: worktreeCommandsForRegistry(preferences?.terminalCommands),
     previewCommand: preferences?.previewCommand?.trim() || undefined,
     simulatorPreview: preferences?.simulatorPreview?.trim() || undefined,
     developmentTeam: preferences?.developmentTeam?.trim() || undefined,
@@ -551,6 +559,14 @@ function mirrorProjects(projects: Project[]) {
       if (requestedMirror === encoded) requestedMirror = null;
     });
 }
+/** Waits until the native mirror has the current project list, for work that reads it there. */
+export async function projectMirrorSaved() {
+  mirrorProjects(useProjectStore.getState().projects);
+  await mirrorSync;
+  if (isTauriEnvironment() && requestedMirror !== mirrored)
+    throw new Error('Jackalope could not save the project list. Try again.');
+}
+
 // Subscribing rather than writing from each mutator means a future action
 // cannot forget to mirror.
 useProjectStore.subscribe((state) => mirrorProjects(state.projects));

@@ -61,6 +61,10 @@ pub struct ProjectRecord {
     /// Untracked files copied into fresh workspaces.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub setup_files: Vec<String>,
+    /// Saved terminal commands marked to run in each new task worktree, in order, after the
+    /// preparation command.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub worktree_commands: Vec<WorktreeCommand>,
     /// The project's preview command, with `{port}` for the local port.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub preview_command: Option<String>,
@@ -91,6 +95,22 @@ pub struct ProjectRecord {
     /// uses the newest iOS runtime's standard iPhone.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub simulator: Option<super::simulators::SimulatorBase>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
+pub struct WorktreeCommand {
+    pub name: String,
+    pub command: String,
+}
+
+/// The project's commands that run when a task worktree is created, with blank ones dropped.
+pub fn worktree_commands(runtime: &TaskRuntime, project_id: &str) -> Vec<WorktreeCommand> {
+    record(runtime, project_id)
+        .map(|project| project.worktree_commands)
+        .unwrap_or_default()
+        .into_iter()
+        .filter(|item| !item.command.trim().is_empty())
+        .collect()
 }
 
 #[derive(Default, Serialize, Deserialize)]
@@ -396,6 +416,18 @@ mod tests {
         assert_eq!(legacy.accent, None);
         assert_eq!(legacy.verify_command, None);
         assert!(legacy.setup_files.is_empty());
+        assert!(legacy.worktree_commands.is_empty());
+        let commands: ProjectRecord = serde_json::from_str(
+            r#"{"id":"c","name":"C","path":"/c","worktreeCommands":[{"name":"Install","command":"pnpm install"}]}"#,
+        )
+        .unwrap();
+        assert_eq!(
+            commands.worktree_commands,
+            [WorktreeCommand {
+                name: "Install".into(),
+                command: "pnpm install".into()
+            }]
+        );
         assert_eq!(legacy.settings.resolve(), ProjectSettings::default());
         assert!(legacy.settings.resolve().learn_automatically);
         assert_eq!(

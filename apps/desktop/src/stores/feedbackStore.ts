@@ -1,7 +1,9 @@
 import { describeError } from '@jackalope/contracts/errors';
 import { create } from 'zustand';
+import { accountAccess } from '../lib/account';
 import { isTauriEnvironment } from '../lib/native/env';
 import { invokeNative } from '../lib/native/transport';
+import { useAccountStore } from './accountStore';
 
 export interface FeedbackView {
   enabled: boolean;
@@ -30,7 +32,10 @@ export const useFeedbackStore = create<State>((set) => ({
   error: '',
   busy: false,
   request: (action) => {
-    if (!isTauriEnvironment()) return Promise.resolve(null);
+    // Feedback invitations are an account feature; without an approved account
+    // there is nothing to coordinate, so nothing is asked of the service.
+    if (!isTauriEnvironment() || accountAccess(useAccountStore.getState().status) !== 'approved')
+      return Promise.resolve(null);
     pending++;
     set({ busy: true });
     if (

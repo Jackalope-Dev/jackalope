@@ -29,6 +29,25 @@ pub(super) fn preparation_failure(record: &PreparationRecord) -> String {
     }
 }
 
+pub(super) fn worktree_command_failure(name: &str, record: &PreparationRecord) -> String {
+    let command = &record.command;
+    match (&record.reason, record.exit_code) {
+        (Some(reason), _) => format!(
+            "{name} ({command}), which runs when a worktree is created, {reason}. Its output is \
+             recorded below; fix the command in Project settings → Commands, then retry."
+        ),
+        (None, Some(code)) => format!(
+            "{name} ({command}), which runs when a worktree is created, failed with exit code \
+             {code}. Its output is recorded below; fix the command in Project settings → \
+             Commands, then retry."
+        ),
+        (None, None) => format!(
+            "{name} ({command}), which runs when a worktree is created, did not complete. Its \
+             output is recorded below; fix the command in Project settings → Commands, then retry."
+        ),
+    }
+}
+
 impl crate::services::Service for TaskRuntime {
     fn shutdown(&self) {
         TaskRuntime::stop_all(self)
@@ -101,6 +120,7 @@ impl TaskRuntime {
     pub fn stop_all(&self) {
         self.warm_helpers.clear();
         self.claude_sessions.clear();
+        self.codex_sessions.clear();
         let ids: Vec<_> = self
             .inner
             .lock()
@@ -111,11 +131,19 @@ impl TaskRuntime {
             .map(|r| r.id.clone())
             .collect();
         for id in ids {
-            let _ = self.stop(&id);
+            let _ = self.stop_attempt(&id, false);
         }
     }
 
     pub(in crate::commands) fn stop(&self, id: &str) -> Result<(), String> {
+        self.stop_attempt(id, true)
+    }
+
+    /// Stops attempt `id`. A `graceful` stop of a Codex app-server turn asks Codex to
+    /// interrupt it first, so the conversation records the interruption and its process
+    /// stays ready for the next message; the process tree still ends if the turn does not
+    /// settle in time. Quitting stops at once.
+    fn stop_attempt(&self, id: &str, graceful: bool) -> Result<(), String> {
         let process = {
             let mut inner = self.inner.lock().unwrap();
             let run = inner.runs.get_mut(id).ok_or("Attempt not found")?;
@@ -137,7 +165,11 @@ impl TaskRuntime {
         crate::commands::simulator::attempt_ended(id);
         crate::commands::computers::release_run(id);
         if let Some(process) = process {
-            process.terminate();
+            if graceful && self.codex_sessions.interrupt(id) {
+                super::codex_session::terminate_later(self, id, process);
+            } else {
+                process.terminate();
+            }
         }
         crate::commands::project_secrets::release(&self.secret_files_root(), id);
         Ok(())
@@ -186,6 +218,7 @@ impl TaskRuntime {
             self.prepare_workspace(id, req, previous.clone())
         })?;
         self.provide_context(id, req);
+        self.capture_turn_checkpoint(id);
         self.update(id, |run| run.progress = None);
         if req.agent == "auto" && !early.is_finished() && self.is_running(id) {
             self.stage(id, Some("routing"));
@@ -205,7 +238,13 @@ impl TaskRuntime {
         }
         let mut request =
             early.map_err(|_| "Agent selection stopped unexpectedly.".to_string())??;
-        let mut resume = previous;
+        // A rewind kept on the previous attempt decides which conversation this turn
+        // continues. Like a session from outside Jackalope, that conversation is the point,
+        // so if it is gone the turn fails instead of starting over with the undone turns.
+        let rewound = previous
+            .as_ref()
+            .is_some_and(|old| old.rewind.pending().is_some());
+        let mut resume = previous.and_then(|old| self.rewound_resume(id, old));
         // A session from outside Jackalope is the point of its continuation, so a lost one
         // is never replaced by a new conversation.
         let continues = self
@@ -217,6 +256,9 @@ impl TaskRuntime {
         if let Some(old) = resume.as_ref().filter(|old| super::resume::lost(old)) {
             if continues {
                 return Err(super::resume::gone(old));
+            }
+            if rewound {
+                return Err(super::resume::rewind_gone(old));
             }
             let adapter = old
                 .account_binding
@@ -237,7 +279,7 @@ impl TaskRuntime {
             }
         }
         // A session the CLI itself refuses to resume starts over the same way, once.
-        let mut refusable = resume.clone().filter(|_| !continues);
+        let mut refusable = resume.clone().filter(|_| !continues && !rewound);
         let mut routed = true;
         loop {
             if !self.is_running(id) {
@@ -311,6 +353,7 @@ impl TaskRuntime {
         self.update_checked(id, |run| {
             change(run);
             run.session_id = None;
+            run.rewind.mark = None;
             run.result.clear();
             run.error = None;
             run.quota_failure = None;
@@ -321,6 +364,7 @@ impl TaskRuntime {
             run.model_reported = false;
             run.usage = Usage::default();
             run.usage_observations.clear();
+            run.context = None;
             run.exit_code = None;
             run.ended_at = None;
             run.status = RunStatus::Starting;
@@ -611,16 +655,27 @@ impl TaskRuntime {
                     )
                 });
             }
-            let command = req
+            let worktree_commands = if fresh_worktree {
+                self.copy_worktree_include(id, &root, &workspace)?;
+                crate::commands::project_registry::worktree_commands(self, &req.project_id)
+            } else {
+                Vec::new()
+            };
+            let prepare = req
                 .prepare_command
                 .as_deref()
                 .filter(|command| !command.trim().is_empty());
             if fresh_worktree {
-                self.clone_dependencies(id, &root, &workspace, command)?;
+                self.clone_dependencies(
+                    id,
+                    &root,
+                    &workspace,
+                    prepare.or(worktree_commands.first().map(|item| item.command.as_str())),
+                )?;
             }
             // Xcode builds write `.jackalope/DerivedData` through `JACKALOPE_DERIVED_DATA`.
             crate::commands::tasks::preparation::exclude_marker(Path::new(&workspace));
-            if let Some(command) = command {
+            if let Some(command) = prepare {
                 let record = crate::commands::verification::prepare(self, id, command, &workspace)?;
                 if !self.is_running(id) {
                     self.mark_stopped(id);
@@ -630,7 +685,54 @@ impl TaskRuntime {
                     return Err(preparation_failure(&record));
                 }
             }
+            for item in &worktree_commands {
+                let record = crate::commands::verification::run_worktree_command(
+                    self,
+                    id,
+                    &item.name,
+                    &item.command,
+                    &workspace,
+                )?;
+                if !self.is_running(id) {
+                    self.mark_stopped(id);
+                    return Ok(());
+                }
+                if !record.success {
+                    return Err(worktree_command_failure(&item.name, &record));
+                }
+            }
         }
+        Ok(())
+    }
+
+    /// Copies the Git-ignored files the project's `.worktreeinclude` names into a new worktree
+    /// and records what was copied and skipped in the attempt's activity.
+    fn copy_worktree_include(&self, id: &str, root: &str, workspace: &str) -> Result<(), String> {
+        let outcome = self.timed(id, "worktreeInclude", || {
+            Ok(crate::commands::worktree_include::copy_included(
+                root, workspace,
+            ))
+        })?;
+        if !outcome.present {
+            return Ok(());
+        }
+        let lines = crate::commands::worktree_include::summary(&outcome);
+        self.update(id, |run| {
+            for line in &lines {
+                activity(run, line);
+            }
+            if outcome.copied.len() > 20 || outcome.skipped.len() > 10 {
+                let mut detail = format!(
+                    "{} copied paths:\n{}",
+                    crate::commands::worktree_include::FILE,
+                    outcome.copied.join("\n")
+                );
+                for (path, reason) in &outcome.skipped {
+                    detail.push_str(&format!("\nskipped {path}: {reason}"));
+                }
+                run.diagnostics.push(detail);
+            }
+        });
         Ok(())
     }
 
@@ -1045,6 +1147,12 @@ impl TaskRuntime {
                 if !persistent {
                     cmd.args(["--resume", old.session_id.as_deref().unwrap()]);
                 }
+                // After a rewind: the session up to that message, saved as a new session so
+                // the original stays as it was. The changed launch also keeps a warm process
+                // that remembers the undone turns from being reused.
+                if let Some(at) = &old.rewind.resume_at {
+                    cmd.args(["--resume-session-at", at, "--fork-session"]);
+                }
             }
         } else if adapter == "kimi" {
             cmd.arg("acp");
@@ -1125,9 +1233,23 @@ impl TaskRuntime {
         } else {
             return Err(format!("Jackalope cannot launch {} tasks yet.", spec.name));
         }
-        let reasoning_effort =
-            super::effort::configure(&mut cmd, &adapter, selected_model.as_deref(), req.effort);
+        let reasoning_effort = super::effort::configure_requested(
+            &mut cmd,
+            &adapter,
+            selected_model.as_deref(),
+            req.effort,
+            req.reasoning_effort.as_deref(),
+        );
         let tier = super::speed::configure(&mut cmd, &adapter, req.codex_speed);
+        let codex = (adapter == "codex"
+            && remote.is_none()
+            && super::codex_session::enabled(&req.project_id))
+        .then(|| super::codex_session::Settings {
+            read_only,
+            model: selected_model.clone(),
+            effort: reasoning_effort.clone(),
+            service_tier: tier.clone(),
+        });
         self.update_checked(id, |run| {
             run.reasoning_effort = reasoning_effort;
             run.requested_service_tier = tier;
@@ -1652,6 +1774,7 @@ impl TaskRuntime {
                     settings: claude.unwrap_or_default(),
                     final_check,
                 }),
+                codex,
                 runner_lease,
             )),
         };
@@ -2065,6 +2188,16 @@ impl TaskRuntime {
                         source.kind == crate::commands::challenge_review::ReviewKind::Review
                     })
                     .map(|source| source.run_id.clone()),
+                limit: run
+                    .failure_kind
+                    .filter(|kind| kind.is_limit() && run.status == RunStatus::Failed)
+                    .map(|kind| {
+                        super::usage_limit::headline(
+                            kind,
+                            run.quota_failure.as_ref().and_then(|f| f.resets_at),
+                            chrono::Utc::now(),
+                        )
+                    }),
             })
             .collect()
     }
@@ -2188,6 +2321,13 @@ impl TaskRuntime {
         if crate::commands::integration::applied_run_ids(self)?.contains(&run.id) {
             return Err("This attempt has already been integrated. Add a new task instead.".into());
         }
+        // A retry would carry the undone turn's work back to the agent and end the rewind.
+        if run.rewind.rewound.is_some() {
+            return Err(
+                "A rewind undid this turn. Send the edited message, or undo the rewind first."
+                    .into(),
+            );
+        }
         // Routing chose the concrete agent, so retry the same way the task was requested.
         let automatic = run.routing.is_some();
         Ok(RunRequest {
@@ -2225,6 +2365,7 @@ impl TaskRuntime {
             previous_run_id: None,
             retry_of: Some(run.id.clone()),
             handoff_focus: None,
+            reasoning_effort: None,
             continues: None,
             connection_ids: run.connection_ids.clone(),
             coordination: None,
@@ -2243,7 +2384,6 @@ impl TaskRuntime {
         _guard: &crate::commands::integration::ExecutionGuard,
         mut request: RunRequest,
     ) -> Result<String, String> {
-        self.access.ensure()?;
         self.ensure_history_saved()?;
         if crate::commands::release::installing() {
             return Err(
@@ -2589,10 +2729,13 @@ impl TaskRuntime {
                     .unwrap_or_else(|| request.dependency_snapshot.clone()),
                 checkpoint: None,
                 checkpoint_error: None,
+                rewind: Default::default(),
                 routing: (request.agent == "auto").then(super::routing::RoutingHistory::default),
                 quota_failure: None,
                 failure_kind: None,
                 provider_error: None,
+                limit_snapshot_reset: None,
+                resume_at_reset: None,
                 session_refused: None,
                 handoff_context: None,
                 contract,
@@ -2643,6 +2786,7 @@ impl TaskRuntime {
                 session_id: None,
                 result: String::new(),
                 streaming: String::new(),
+                steerable: false,
                 pending_tools: Default::default(),
                 details_omitted: false,
                 activity: notes,
@@ -2653,6 +2797,7 @@ impl TaskRuntime {
                 usage: Usage::default(),
                 mcp_usage: None,
                 usage_observations: vec![],
+                context: None,
                 prompts: vec![],
                 awaiting_answers: Vec::new(),
                 validation_steps: vec![],

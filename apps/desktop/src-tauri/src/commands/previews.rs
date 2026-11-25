@@ -276,7 +276,6 @@ fn start_preview(
     command: String,
     port: u16,
 ) -> Result<PreviewView, String> {
-    runtime.access.ensure()?;
     let _guard = integration::execution_guard()?;
     if command.trim().is_empty()
         || command.len() > 4000
@@ -453,7 +452,6 @@ async fn inspect_preview(
     narrow: bool,
 ) -> Result<PreviewInspection, String> {
     use super::harness::{BrowserConfigureRequest, BrowserInspectRequest, BrowserSnapshotRequest};
-    runtime.access.ensure()?;
     uuid::Uuid::parse_str(&request_id).map_err(|_| "Invalid preview inspection")?;
     if !path.starts_with('/')
         || path.starts_with("//")
@@ -621,7 +619,6 @@ fn start_simulator_preview(
     id: String,
     command: Option<String>,
 ) -> Result<PreviewView, String> {
-    runtime.access.ensure()?;
     let _guard = integration::execution_guard()?;
     let custom = command
         .as_deref()
@@ -715,11 +712,7 @@ async fn blocking<T: Send + 'static>(
 
 /// Builds, installs and launches the app again, for changes made since.
 #[tauri::command]
-pub async fn task_preview_simulator_reload(
-    id: String,
-    state: State<'_, TaskRuntime>,
-) -> Result<(), String> {
-    state.access.ensure()?;
+pub async fn task_preview_simulator_reload(id: String) -> Result<(), String> {
     blocking(move || {
         let _guard = integration::execution_guard()?;
         let (session, _) = simulator_session(&id)?;
@@ -740,9 +733,7 @@ pub async fn task_preview_simulator_frame(id: String) -> Result<simulator::Frame
 pub async fn task_preview_simulator_act(
     id: String,
     action: simulator::Action,
-    state: State<'_, TaskRuntime>,
 ) -> Result<(), String> {
-    state.access.ensure()?;
     blocking(move || simulator_session(&id)?.0.act(&action)).await
 }
 
@@ -770,7 +761,6 @@ pub async fn task_preview_simulator_select(
     state: State<'_, TaskRuntime>,
 ) -> Result<SimulatorSelection, String> {
     let runtime = state.inner().clone();
-    runtime.access.ensure()?;
     blocking(move || select_simulator_element(&runtime, &id, x, y)).await
 }
 
@@ -954,7 +944,7 @@ mod tests {
             serde_json::to_vec(&record).unwrap(),
         )
         .unwrap();
-        let runtime = TaskRuntime::with_test_access(history).unwrap();
+        let runtime = TaskRuntime::new(history).unwrap();
         (runtime, root, id)
     }
 

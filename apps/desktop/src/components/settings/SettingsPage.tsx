@@ -30,6 +30,7 @@ import { WorkspacePage } from '../ui/WorkspacePage';
 import { WorkspaceSectionHeading } from '../ui/WorkspaceSectionHeading';
 import { AppearancePreferences } from './AppearancePreferences';
 import { ArchivedHistory } from './ArchivedHistory';
+import { HistoryImportSetting } from './HistoryImportSetting';
 import { JackalopeAccount } from './JackalopeAccount';
 import { KeyboardShortcuts } from './KeyboardShortcuts';
 import { NotificationSettings } from './NotificationSettings';
@@ -49,6 +50,7 @@ import {
   sidebarCategory,
 } from '../../lib/settings-categories';
 import { ArtifactsConnection } from './ArtifactsConnection';
+import { CodeHosts } from './CodeHosts';
 import { ComputersSettings } from './ComputersSettings';
 import { DesktopPreferences } from './DesktopPreferences';
 import { IssueConnections } from './IssueConnections';
@@ -264,7 +266,12 @@ export function SettingsPage({
                   {c === 'Jackalope account' && (
                     <JackalopeAccount onInvitations={() => select('Invitations')} />
                   )}
-                  {c === 'Connected work' && <IssueConnections />}
+                  {c === 'Connected work' && (
+                    <>
+                      <CodeHosts />
+                      <IssueConnections />
+                    </>
+                  )}
                   {c === 'Computers' && <ComputersSettings />}
                   {c === 'Cloudflare' && <ArtifactsConnection />}
                   {c === 'Swarm' && <SwarmSettings />}
@@ -316,6 +323,7 @@ export function SettingsPage({
                         </SettingRow>
                       </SettingGroup>
                       <ArchivedHistory />
+                      {isTauriEnvironment() && <HistoryImportSetting />}
                       <SettingGroup
                         tone="danger"
                         title="Reset Jackalope"

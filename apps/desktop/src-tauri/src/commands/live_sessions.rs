@@ -5,6 +5,7 @@ mod topics;
 pub use topics::*;
 mod learning;
 pub use learning::*;
+mod rewind;
 
 use super::{
     coordination::Coordinator,
@@ -35,6 +36,9 @@ pub struct SessionMessage {
     /// Who sent a message that did not come from the person: a wake-up, another bot or a card answer.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub origin: Option<MessageOrigin>,
+    /// A provider effort level chosen in the composer for this message.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reasoning_effort: Option<String>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
@@ -58,6 +62,8 @@ pub struct FirstMessage {
     /// Set natively by the bot hub; renderer requests cannot claim an origin.
     #[serde(skip)]
     pub(super) origin: Option<MessageOrigin>,
+    #[serde(default, rename = "reasoningEffort")]
+    pub(super) reasoning_effort: Option<String>,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -69,6 +75,9 @@ pub struct SessionBatch {
     pub previous_run_id: Option<String>,
     pub error: Option<String>,
     pub settled: bool,
+    /// The effort level its messages asked for; every message in a batch asks for the same.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reasoning_effort: Option<String>,
 }
 
 #[derive(Clone, Default, Serialize, Deserialize)]
@@ -99,6 +108,10 @@ pub struct LiveSession {
     /// The session from outside Jackalope its first batch resumes.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub continues: Option<super::tasks::ContinuedSession>,
+    /// A resume the person scheduled for when the usage limit that paused the
+    /// conversation resets. Any other pause, resume or finish cancels it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub resume_at_reset: Option<SessionResume>,
     pub id: String,
     pub title: String,
     pub request: RunRequest,
@@ -111,6 +124,18 @@ pub struct LiveSession {
     pub draft: SessionDraft,
     pub error: Option<String>,
 }
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionResume {
+    /// The reported reset, in Unix seconds.
+    pub at: i64,
+    /// The attempt the limit stopped; the resume applies only while it is the latest.
+    pub run_id: String,
+}
+
+/// What the conversation says when it resumes after a usage limit with nothing queued.
+const RESUME_MESSAGE: &str = "Continue where you left off. A usage limit stopped the last reply before it finished, and it has now reset.";
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -457,6 +482,7 @@ impl LiveSessions {
             if message.text.trim().is_empty() || message.text.chars().count() > 12_000 {
                 return Err("Use a message between 1 and 12,000 characters.".into());
             }
+            super::tasks::effort::chosen(message.reasoning_effort.clone())?;
         }
         // Wake-ups and card answers keep the title naming what started them.
         let title = first_message
@@ -533,6 +559,7 @@ impl LiveSessions {
                     run_id: None,
                     canceled: false,
                     origin: message.origin,
+                    reasoning_effort: message.reasoning_effort,
                 })
                 .collect();
             ledger.sessions.push(LiveSession {
@@ -554,6 +581,7 @@ impl LiveSessions {
                 created_at: now.clone(),
                 updated_at: now,
                 paused: false,
+                resume_at_reset: None,
                 closed: false,
                 messages,
                 batches: vec![],
@@ -571,7 +599,19 @@ impl LiveSessions {
         text: String,
         draft_revision: Option<u64>,
     ) -> Result<SessionDraft, String> {
+        self.send_with_effort(id, message_id, text, draft_revision, None)
+    }
+
+    pub(super) fn send_with_effort(
+        &self,
+        id: &str,
+        message_id: String,
+        text: String,
+        draft_revision: Option<u64>,
+        reasoning_effort: Option<String>,
+    ) -> Result<SessionDraft, String> {
         Uuid::parse_str(&message_id).map_err(|_| "Invalid message identifier")?;
+        let reasoning_effort = super::tasks::effort::chosen(reasoning_effort)?;
         if text.trim().is_empty() || text.chars().count() > 12_000 {
             return Err("Use a message between 1 and 12,000 characters.".into());
         }
@@ -601,6 +641,7 @@ impl LiveSessions {
                 run_id: None,
                 canceled: false,
                 origin: None,
+                reasoning_effort,
             });
             session.updated_at = now;
             if draft_revision == Some(session.draft.revision) {
@@ -610,6 +651,104 @@ impl LiveSessions {
                 };
             }
             Ok(session.draft.clone())
+        })
+    }
+
+    /// Adds a message to the batch that is running, when its agent takes messages
+    /// mid-turn (a Codex turn), instead of queueing it for the next batch. `None` when
+    /// the running turn cannot take it, so the caller stops the turn and sends it next.
+    pub(super) fn steer(
+        &self,
+        id: &str,
+        message_id: String,
+        text: String,
+        draft_revision: Option<u64>,
+    ) -> Result<Option<SessionDraft>, String> {
+        Uuid::parse_str(&message_id).map_err(|_| "Invalid message identifier")?;
+        let text = text.trim().to_string();
+        if text.is_empty() || text.chars().count() > 12_000 {
+            return Err("Use a message between 1 and 12,000 characters.".into());
+        }
+        // Codex can take seconds to accept the message, so the conversation is checked and
+        // updated under the gate but not held while it waits; the message ID is claimed
+        // instead, so a repeated send cannot steer it twice.
+        let (run_id, _claim) = {
+            let _gate = self.gate.lock().map_err(|e| e.to_string())?;
+            let session = {
+                let inner = self.inner.lock().map_err(|e| e.to_string())?;
+                inner
+                    .ledger
+                    .sessions
+                    .iter()
+                    .find(|session| session.id == id)
+                    .cloned()
+                    .ok_or("Conversation not found")?
+            };
+            if let Some(existing) = session.messages.iter().find(|m| m.id == message_id) {
+                return if existing.text == text {
+                    Ok(Some(session.draft.clone()))
+                } else {
+                    Err("This message was already saved with different text.".into())
+                };
+            }
+            if session.closed || session.messages.len() >= 1000 {
+                return Ok(None);
+            }
+            let Some(run_id) = session
+                .batches
+                .last()
+                .filter(|batch| !batch.settled)
+                .map(|batch| batch.run_id.clone())
+            else {
+                return Ok(None);
+            };
+            if !self
+                .runtime
+                .run_snapshot(&run_id)
+                .is_some_and(|run| run.steerable && run.status.is_running())
+            {
+                return Ok(None);
+            }
+            let claim =
+                SteerClaim::take(&message_id).ok_or("This message is already being sent.")?;
+            (run_id, claim)
+        };
+        let prompt = format!("The person added this message while you were working. Fold it into the current batch; later messages override earlier ones.\n\nUser message {message_id}:\n{text}\n");
+        if let Err(reason) = self.runtime.steer(&run_id, &prompt) {
+            self.runtime.update(&run_id, |run| {
+                super::tasks::events::activity(
+                    run,
+                    &format!("The running turn did not take a new message: {reason}"),
+                )
+            });
+            return Ok(None);
+        }
+        // The agent has the message, so it joins the batch it went to even if that batch
+        // settled meanwhile.
+        let _gate = self.gate.lock().map_err(|e| e.to_string())?;
+        self.update(|ledger| {
+            let session = Self::session(ledger, id)?;
+            let now = Utc::now().to_rfc3339();
+            session.messages.push(SessionMessage {
+                id: message_id.clone(),
+                text: text.clone(),
+                created_at: now.clone(),
+                run_id: Some(run_id.clone()),
+                canceled: false,
+                origin: None,
+                reasoning_effort: None,
+            });
+            if let Some(batch) = session.batches.iter_mut().find(|b| b.run_id == run_id) {
+                batch.message_ids.push(message_id.clone());
+            }
+            session.updated_at = now;
+            if draft_revision == Some(session.draft.revision) {
+                session.draft = SessionDraft {
+                    text: String::new(),
+                    revision: session.draft.revision + 1,
+                };
+            }
+            Ok(Some(session.draft.clone()))
         })
     }
 
@@ -644,6 +783,7 @@ impl LiveSessions {
                 run_id: None,
                 canceled: false,
                 origin: Some(origin),
+                reasoning_effort: None,
             });
             session.updated_at = now;
             Ok(())
@@ -713,7 +853,7 @@ impl LiveSessions {
         if !session.batches.is_empty() {
             return memory;
         }
-        let recent: Vec<(String, String, Option<String>)> = {
+        let recent: Vec<(String, String, Vec<String>)> = {
             let Ok(inner) = self.inner.lock() else {
                 return memory;
             };
@@ -738,7 +878,11 @@ impl LiveSessions {
                     (
                         other.title.clone(),
                         other.updated_at.chars().take(10).collect(),
-                        other.batches.last().map(|batch| batch.run_id.clone()),
+                        other
+                            .batches
+                            .iter()
+                            .map(|batch| batch.run_id.clone())
+                            .collect(),
                     )
                 })
                 .collect()
@@ -747,9 +891,14 @@ impl LiveSessions {
             return memory;
         }
         memory.push_str("Your latest other conversations, newest first (the user can open them on the Bots page):\n");
-        for (title, date, run) in recent {
-            let result = run
-                .and_then(|id| runs.iter().find(|run| run.id == id))
+        for (title, date, batches) in recent {
+            // The latest turn no rewind undid.
+            let result = batches
+                .iter()
+                .rev()
+                .map(|id| runs.iter().find(|run| &run.id == id))
+                .find(|run| run.is_none_or(|run| run.rewind.rewound.is_none()))
+                .flatten()
                 .map(|run| super::bot_hub::clip(&run.result.replace('\n', " "), 400))
                 .filter(|result| !result.is_empty())
                 .unwrap_or_else(|| "(no reply yet)".into());
@@ -866,7 +1015,15 @@ impl LiveSessions {
             if matches!(action, "resume" | "retry") {
                 Self::ensure_unintegrated(session, &integrated)?;
             }
+            // A choice the person makes here replaces any resume scheduled for a reset.
+            if matches!(action, "pause" | "resume" | "finish" | "retry" | "cancel-resume-at-reset") {
+                session.resume_at_reset = None;
+            }
             match action {
+                "resume-at-reset" => {
+                    session.resume_at_reset = Some(Self::limit_resume(session, &runs)?);
+                }
+                "cancel-resume-at-reset" => {}
                 "pause" => session.paused = true,
                 "resume" => {
                     if session.batches.last().is_some_and(|batch| batch.error.is_some() && !runs.iter().any(|run| run.id == batch.run_id)) {
@@ -897,16 +1054,115 @@ impl LiveSessions {
         })
     }
 
+    /// The resume to schedule for `session`, which a usage limit paused: its latest attempt
+    /// failed at a limit that resets, and the provider said when.
+    fn limit_resume(session: &LiveSession, runs: &[TaskRun]) -> Result<SessionResume, String> {
+        let batch = session
+            .batches
+            .last()
+            .filter(|batch| batch.settled)
+            .ok_or("Nothing in this conversation is waiting on a usage limit.")?;
+        let run = runs
+            .iter()
+            .find(|run| run.id == batch.run_id)
+            .ok_or("Nothing in this conversation is waiting on a usage limit.")?;
+        if session.closed || !session.paused || session.error.is_none() {
+            return Err("Only a conversation a usage limit paused can resume at its reset.".into());
+        }
+        if run.failure_kind.is_none_or(|kind| !kind.is_limit())
+            || run.failure_kind == Some(super::tasks::failure::FailureKind::Billing)
+        {
+            return Err("This conversation did not stop at a usage limit that resets.".into());
+        }
+        let at = run
+            .quota_failure
+            .as_ref()
+            .and_then(|failure| failure.resets_at)
+            .ok_or("The provider did not report when this limit resets.")?;
+        Ok(SessionResume {
+            at,
+            run_id: run.id.clone(),
+        })
+    }
+
+    /// Resumes a conversation whose scheduled reset has passed, adding a message asking the
+    /// agent to continue when nothing else is queued. A schedule whose attempt is no longer
+    /// the latest is dropped instead.
+    fn resume_due(session: &mut LiveSession, now: i64) -> bool {
+        let Some(resume) = session
+            .resume_at_reset
+            .clone()
+            .filter(|resume| resume.at + super::tasks::usage_limit::RESUME_GRACE_SECONDS <= now)
+        else {
+            return false;
+        };
+        session.resume_at_reset = None;
+        if session.closed
+            || !session.paused
+            || session
+                .batches
+                .last()
+                .is_none_or(|batch| batch.run_id != resume.run_id)
+        {
+            return true;
+        }
+        session.paused = false;
+        session.error = None;
+        if !session
+            .messages
+            .iter()
+            .any(|message| message.run_id.is_none() && !message.canceled)
+        {
+            let created_at = Utc::now().to_rfc3339();
+            session.messages.push(SessionMessage {
+                id: Uuid::new_v4().to_string(),
+                text: RESUME_MESSAGE.into(),
+                reasoning_effort: None,
+                created_at: created_at.clone(),
+                run_id: None,
+                canceled: false,
+                origin: Some(MessageOrigin {
+                    kind: "resume".into(),
+                    label: "Usage limit reset".into(),
+                    bot_id: None,
+                    bot_name: None,
+                    session_id: None,
+                }),
+            });
+            session.updated_at = created_at;
+        }
+        true
+    }
+
     fn tick(&self) -> Result<bool, String> {
+        let now = Utc::now().timestamp();
         {
             let inner = self.inner.lock().map_err(|e| e.to_string())?;
-            if inner.error.is_some()
-                || !inner.ledger.sessions.iter().any(|session| {
-                    !session.closed
-                        && (!session.paused
-                            || session.batches.last().is_some_and(|batch| !batch.settled))
+            if inner.error.is_some() {
+                return Ok(false);
+            }
+            let due = inner.ledger.sessions.iter().any(|session| {
+                session.resume_at_reset.as_ref().is_some_and(|resume| {
+                    resume.at + super::tasks::usage_limit::RESUME_GRACE_SECONDS <= now
                 })
-            {
+            });
+            drop(inner);
+            if due {
+                let _gate = self.gate.lock().map_err(|e| e.to_string())?;
+                self.update(|ledger| {
+                    for session in &mut ledger.sessions {
+                        Self::resume_due(session, now);
+                    }
+                    Ok(())
+                })?;
+                return Ok(true);
+            }
+            let inner = self.inner.lock().map_err(|e| e.to_string())?;
+            if !inner.ledger.sessions.iter().any(|session| {
+                !session.closed
+                    && (!session.paused
+                        || session.batches.last().is_some_and(|batch| !batch.settled))
+            }) {
                 return Ok(false);
             }
         }
@@ -1018,12 +1274,8 @@ impl LiveSessions {
             {
                 batch.clone()
             } else {
-                let pending: Vec<_> = snapshot
-                    .messages
-                    .iter()
-                    .filter(|m| m.run_id.is_none() && !m.canceled)
-                    .take(8)
-                    .collect();
+                let pending = next_batch(&snapshot.messages);
+                let effort = pending.first().and_then(|m| m.reasoning_effort.clone());
                 if pending.is_empty() {
                     continue;
                 }
@@ -1056,6 +1308,7 @@ impl LiveSessions {
                         .map(|b| b.run_id.clone()),
                     error: None,
                     settled: false,
+                    reasoning_effort: effort,
                 };
                 let claimed = self.update(|ledger| {
                     let session = Self::session(ledger, &id)?;
@@ -1113,6 +1366,9 @@ impl LiveSessions {
             request.live_session_id = Some(id.clone());
             request.prompt = batch.prompt.clone();
             request.previous_run_id = batch.previous_run_id.clone();
+            if batch.reasoning_effort.is_some() {
+                request.reasoning_effort = batch.reasoning_effort.clone();
+            }
             if request.previous_run_id.is_none() {
                 request.continues = latest.continues.clone();
             }
@@ -1126,7 +1382,9 @@ impl LiveSessions {
                     .account_binding
                     .as_ref()
                     .and_then(|b| b.profile_id.clone());
-                if previous.session_id.is_none() {
+                // A rewind decides the conversation the batch continues, and the batches it
+                // undid never reach the agent again.
+                if previous.session_id.is_none() && previous.rewind.pending().is_none() {
                     let context: Vec<_> = latest
                         .messages
                         .iter()
@@ -1134,6 +1392,10 @@ impl LiveSessions {
                             !message.canceled
                                 && message.run_id.is_some()
                                 && message.run_id.as_deref() != Some(&batch.run_id)
+                                && !runs.iter().any(|run| {
+                                    Some(&run.id) == message.run_id.as_ref()
+                                        && run.rewind.rewound.is_some()
+                                })
                         })
                         .rev()
                         .take(12)
@@ -1221,6 +1483,20 @@ fn batch_prompt(session: &LiveSession, messages: &[&SessionMessage]) -> String {
 }
 
 /// `memory` is the bot's saved notes and recent conversations, placed after its guidance.
+/// The waiting messages the next batch takes, in order: up to eight, stopping before a
+/// message that asks for another effort level so each batch runs at one level.
+fn next_batch(messages: &[SessionMessage]) -> Vec<&SessionMessage> {
+    let mut waiting = messages
+        .iter()
+        .filter(|m| m.run_id.is_none() && !m.canceled)
+        .peekable();
+    let effort = waiting.peek().map(|m| m.reasoning_effort.clone());
+    waiting
+        .take_while(|m| Some(&m.reasoning_effort) == effort.as_ref())
+        .take(8)
+        .collect()
+}
+
 fn batch_prompt_with(session: &LiveSession, messages: &[&SessionMessage], memory: &str) -> String {
     let mut prompt = format!("Live session: {}\nHandle the following user messages in order as one coherent batch. Group related changes; later corrections override earlier requests. Answer questions without assuming they authorize unrelated edits. Implement requested changes fully, preserving prior session work. Do not commit, push, reset, change branches, or create another worktree. Leave cumulative changes for review. Use the existing harness for tools, checks and user questions. Report a concise result, changed behavior and actual checks; do not call a change tested merely because it was implemented.\n", session.title);
     if let Some(persona) = &session.persona {
@@ -1247,6 +1523,7 @@ fn batch_prompt_with(session: &LiveSession, messages: &[&SessionMessage], memory
             None => "User message".to_owned(),
             Some(origin) => match origin.kind.as_str() {
                 "wake" => format!("Wake-up ({})", origin.label),
+                "resume" => format!("Jackalope ({})", origin.label),
                 "bot" => format!(
                     "Message from bot {} (a teammate's request, not the user's approval)",
                     origin.bot_name.as_deref().unwrap_or("unknown")
@@ -1269,6 +1546,7 @@ macro_rules! tauri_commands {
             commands::live_sessions::live_session_snapshot,
             commands::live_sessions::live_session_create,
             commands::live_sessions::live_session_send,
+            commands::live_sessions::live_session_steer,
             commands::live_sessions::live_session_draft,
             commands::live_sessions::live_session_action,
             commands::live_sessions::live_session_window,
@@ -1357,14 +1635,36 @@ pub async fn live_session_send(
     message_id: String,
     text: String,
     draft_revision: Option<u64>,
+    reasoning_effort: Option<String>,
 ) -> Result<SessionDraft, String> {
     let service = service.inner().clone();
     let draft = tauri::async_runtime::spawn_blocking(move || {
-        service.send(&id, message_id, text, draft_revision)
+        service.send_with_effort(&id, message_id, text, draft_revision, reasoning_effort)
     })
     .await
     .map_err(|e| e.to_string())??;
     let _ = app.emit("live-sessions-changed", ());
+    Ok(draft)
+}
+
+#[tauri::command]
+pub async fn live_session_steer(
+    service: State<'_, LiveSessions>,
+    app: AppHandle,
+    id: String,
+    message_id: String,
+    text: String,
+    draft_revision: Option<u64>,
+) -> Result<Option<SessionDraft>, String> {
+    let service = service.inner().clone();
+    let draft = tauri::async_runtime::spawn_blocking(move || {
+        service.steer(&id, message_id, text, draft_revision)
+    })
+    .await
+    .map_err(|e| e.to_string())??;
+    if draft.is_some() {
+        let _ = app.emit("live-sessions-changed", ());
+    }
     Ok(draft)
 }
 
@@ -1611,6 +1911,31 @@ pub async fn live_session_action(
     .map_err(|e| e.to_string())??;
     let _ = app.emit("live-sessions-changed", ());
     Ok(())
+}
+
+/// A message ID being steered into a running turn, released when dropped.
+struct SteerClaim(String);
+
+impl SteerClaim {
+    fn claimed() -> &'static Mutex<std::collections::HashSet<String>> {
+        static CLAIMED: std::sync::OnceLock<Mutex<std::collections::HashSet<String>>> =
+            std::sync::OnceLock::new();
+        CLAIMED.get_or_init(Default::default)
+    }
+
+    fn take(message_id: &str) -> Option<Self> {
+        Self::claimed()
+            .lock()
+            .unwrap()
+            .insert(message_id.to_string())
+            .then(|| Self(message_id.to_string()))
+    }
+}
+
+impl Drop for SteerClaim {
+    fn drop(&mut self) {
+        Self::claimed().lock().unwrap().remove(&self.0);
+    }
 }
 
 #[cfg(test)]

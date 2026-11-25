@@ -18,11 +18,20 @@ import { openInBrowser } from '../../lib/native/env';
 import { invokeNative } from '../../lib/native/transport';
 import { useMascotStore } from '../../stores/mascotStore';
 import { useReferralStore } from '../../stores/referralStore';
+import { RequiresAccount } from '../account/RequiresAccount';
 
 const invitationMessage =
   'I’ve been trying Jackalope, a local desktop workspace for running coding agents in isolated Git worktrees and reviewing their changes. I have an Instant Access Pass for you to skip the waitlist after email verification, while a pass is available.';
 
 export function ReferralSettings({ onAccount }: { onAccount: () => void }) {
+  return (
+    <RequiresAccount feature="invitations">
+      <Invitations onAccount={onAccount} />
+    </RequiresAccount>
+  );
+}
+
+function Invitations({ onAccount }: { onAccount: () => void }) {
   const {
     referrals,
     loading,

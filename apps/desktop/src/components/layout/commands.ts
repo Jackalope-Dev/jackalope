@@ -1,5 +1,8 @@
 import {
+  FolderSearch,
+  History,
   Keyboard,
+  LayoutDashboard,
   LifeBuoy,
   type LucideIcon,
   Megaphone,
@@ -10,12 +13,17 @@ import {
   Settings2,
   SquareTerminal,
 } from 'lucide-react';
-import { openFeedback, openShortcuts } from '../../lib/app-events';
+import {
+  openFeedback,
+  openHistoryImport,
+  openProjectDiscovery,
+  openShortcuts,
+} from '../../lib/app-events';
 import { openCliTerminal } from '../../lib/cli-terminal';
 import { DISCORD_URL } from '../../lib/community';
-import { openExternalUrl } from '../../lib/native/env';
+import type { KeybindingId } from '../../lib/keybindings';
+import { isTauriEnvironment, openExternalUrl } from '../../lib/native/env';
 import { openHelp } from '../../lib/navigation';
-import type { ShortcutAction } from '../../lib/shortcuts';
 import type { Project } from '../../stores/projectStore';
 
 /** What commands act on; Shell provides it. */
@@ -23,6 +31,7 @@ export interface CommandContext {
   focusComposer: () => void;
   setSearchOpen: (open: boolean | ((open: boolean) => boolean)) => void;
   openSettings: () => void;
+  openOverview: () => void;
   /** Settings, or back to the previous view when Settings is already open. */
   toggleSettings: () => void;
   toggleSidebar: () => void;
@@ -31,15 +40,13 @@ export interface CommandContext {
 }
 
 export interface Command {
-  id: ShortcutAction | 'shortcuts' | 'help' | 'feedback' | 'discord';
+  id: KeybindingId | 'help' | 'feedback' | 'discord' | 'importHistory' | 'findProjects';
   /** The label in command search. */
   label: (ctx: CommandContext) => string;
   icon: LucideIcon;
   keywords: string;
-  /** The configurable keyboard shortcut that runs it. */
-  shortcut?: ShortcutAction;
-  /** A fixed key shown beside it. */
-  key?: string;
+  /** The keyboard shortcut action that runs it. */
+  shortcut?: KeybindingId;
   /** Left out of command search (the search itself, sidebar layout). */
   hidden?: boolean;
   available?: (ctx: CommandContext) => boolean;
@@ -67,6 +74,16 @@ export const COMMANDS: readonly Command[] = [
     keywords: 'work task conversation capture idea',
     shortcut: 'newWork',
     run: (ctx) => ctx.focusComposer(),
+  },
+  {
+    // Command search lists Overview as a page, so the command only carries the shortcut.
+    id: 'overview',
+    label: () => 'Open overview',
+    icon: LayoutDashboard,
+    keywords: '',
+    shortcut: 'overview',
+    hidden: true,
+    run: (ctx) => ctx.openOverview(),
   },
   {
     id: 'terminal',
@@ -98,11 +115,27 @@ export const COMMANDS: readonly Command[] = [
     run: (ctx) => ctx.toggleSidebar(),
   },
   {
+    id: 'findProjects',
+    label: () => 'Find projects on this computer',
+    icon: FolderSearch,
+    keywords: 'find detect discover add projects repositories repos folders git',
+    available: () => isTauriEnvironment(),
+    run: () => openProjectDiscovery(),
+  },
+  {
+    id: 'importHistory',
+    label: () => 'Import Claude and Codex history',
+    icon: History,
+    keywords: 'import claude code codex history conversations sessions transcripts migrate',
+    available: () => isTauriEnvironment(),
+    run: () => openHistoryImport(),
+  },
+  {
     id: 'shortcuts',
     label: () => 'Keyboard shortcuts',
     icon: Keyboard,
-    keywords: 'keyboard shortcuts keys hotkeys',
-    key: '?',
+    keywords: 'keyboard shortcuts keys hotkeys keybindings',
+    shortcut: 'shortcuts',
     run: () => {
       requestAnimationFrame(openShortcuts);
     },

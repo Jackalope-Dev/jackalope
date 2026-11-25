@@ -39,3 +39,20 @@ function scorePath(path: string, needle: string): number | null {
   }
   return score;
 }
+
+/**
+ * Whether `path` matches a typed `@` mention closely enough to accept it with Enter: the
+ * path, a folder in it or the file name starts with the query. Scattered subsequence
+ * matches are left for the person to pick with the arrow keys or Tab.
+ */
+export function strongFileMatch(path: string, query: string) {
+  const needle = query.trim().toLowerCase().replace(/\\/g, '/');
+  if (needle.length < 2) return false;
+  const haystack = path.toLowerCase();
+  return haystack.startsWith(needle) || haystack.includes(`/${needle}`);
+}
+
+/** A mention that reads like prose (`@sam`) rather than a path, which stays quiet without a close match. */
+export function proseMention(query: string) {
+  return /^[\p{L}\p{N}]+$/u.test(query);
+}

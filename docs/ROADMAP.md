@@ -148,8 +148,8 @@ exercise these contracts; installed startup, memory and responsiveness acceptanc
 
 Validate first-run setup, agent sign-in and switching, recovery, accessibility and
 large-project performance in installed builds. Validate installation, updates and
-secure storage on each platform. Required account access
-in every build, optional settings sync, feedback and delivery need their own acceptance checks.
+secure storage on each platform. Optional account connection,
+settings sync, feedback and delivery need their own acceptance checks.
 Cross-platform discovery, browser, process cleanup, credential storage and notification
 hardening are implemented for native testing, including notification activation,
 account/settings sync, Unix process guardians and tray/Dock recovery. macOS and X11

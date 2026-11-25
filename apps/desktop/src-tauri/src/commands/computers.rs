@@ -28,6 +28,7 @@ pub(crate) mod platform;
 pub(crate) mod policy;
 pub(crate) mod pool;
 pub(crate) mod protocol;
+pub(crate) mod provider_proxy;
 pub(crate) mod relay;
 pub(crate) mod remote;
 pub(crate) mod runner;

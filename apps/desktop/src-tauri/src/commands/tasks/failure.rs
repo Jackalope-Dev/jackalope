@@ -15,6 +15,9 @@ pub enum FailureKind {
     QuotaExhausted,
     /// Too many requests in a short window; the account still has allowance.
     RateLimited,
+    /// The account's credit, balance or billing plan does not cover more use; it does not
+    /// reset by waiting.
+    Billing,
     /// The provider declined the request under its content or safety policy.
     ProviderRefused,
     /// The model does not exist or the account cannot use it.
@@ -100,7 +103,35 @@ pub(super) fn explain(run: &mut TaskRun, exit_code: Option<i32>) {
     }
     let message = run.error.as_deref().unwrap_or_default();
     run.failure_kind = classify(message, run.quota_failure.as_ref())
+        // Unreported stderr is the agent's own log, where "rate limit" or "402" can come
+        // from the project's tools; only a reported error marks the account limited.
+        .filter(|kind| !(unexplained && kind.is_limit()))
         .or(unexplained.then_some(FailureKind::AgentExited));
+    if run.failure_kind.is_some_and(FailureKind::is_limit) {
+        // A limit known only from the agent's final message still gets a typed record, so
+        // the attempt reports when the limit resets and a retry continues its work.
+        let message = message.to_string();
+        let snapshot = run.limit_snapshot_reset;
+        let failure = run.quota_failure.get_or_insert_with(|| QuotaFailure {
+            message: message.chars().take(2000).collect(),
+            ..Default::default()
+        });
+        if failure.resets_at.is_none() {
+            failure.resets_at = super::usage_limit::reset_at(&failure.message)
+                .or_else(|| super::usage_limit::reset_at(&message))
+                .or(snapshot);
+        }
+    }
+}
+
+impl FailureKind {
+    /// A provider limit on the account rather than a problem with the work.
+    pub(in crate::commands) fn is_limit(self) -> bool {
+        matches!(
+            self,
+            FailureKind::QuotaExhausted | FailureKind::RateLimited | FailureKind::Billing
+        )
+    }
 }
 
 /// The agent's last meaningful stderr lines, for a failure no event explained.
@@ -147,6 +178,8 @@ fn classify(message: &str, quota: Option<&QuotaFailure>) -> Option<FailureKind> 
         Some(FailureKind::ModelUnavailable)
     } else if authentication(first) {
         Some(FailureKind::Authentication)
+    } else if has_status(first, "402") || contains_any(&text, BILLING) {
+        Some(FailureKind::Billing)
     } else if let Some(quota) =
         super::routing::quota_failure(&serde_json::json!({"type": "error", "message": message}))
     {
@@ -174,6 +207,16 @@ const REFUSED: &[&str] = &[
     "finish reason: safety",
     "prohibited_content",
     "responsible ai policy",
+];
+
+/// Provider messages for an account whose balance or plan does not cover the request.
+const BILLING: &[&str] = &[
+    "credit balance is too low",
+    "insufficient balance",
+    "insufficient credit",
+    "requires more credits",
+    "payment required",
+    "billing_error",
 ];
 
 const CONTEXT: &[&str] = &[
@@ -248,28 +291,77 @@ fn has_status(text: &str, code: &str) -> bool {
     })
 }
 
-fn quota_kind(message: &str) -> FailureKind {
+/// Splits a quota error into a used-up allowance, a short rate window and a billing
+/// limit. Wording that names a reset or a longer window outranks rate-limit wording, and
+/// billing wording counts only when nothing says the limit resets: Codex's usage-limit
+/// message also offers to "purchase more credits".
+pub(super) fn quota_kind(message: &str) -> FailureKind {
     let text = message.to_lowercase();
-    let exhausted = contains_any(
+    let resets = super::usage_limit::reset_at(message).is_some()
+        || contains_any(
+            &text,
+            &["resets", "try again at", "reset after", "will reset"],
+        );
+    let allowance = contains_any(
         &text,
         &[
-            "quota",
             "usage limit",
             "usage_limit",
-            "credit",
-            "billing",
-            "resets",
             "hit your limit",
             "reached your limit",
-            "limit reached",
-            "limit_reached",
-            "exhausted",
+            "exhausted your",
+            "per day",
             "daily",
             "weekly",
             "monthly",
-            "out of",
+            "five-hour",
+            "5-hour",
         ],
     );
+    let billing = has_status(&text, "402")
+        || contains_any(
+            &text,
+            &[
+                "credit balance",
+                "billing",
+                "payment required",
+                "insufficient_quota",
+                "insufficient balance",
+                "insufficient credit",
+                "out of credits",
+                "no credits",
+                "spend limit",
+                "spending limit",
+                "budget exceeded",
+            ],
+        );
+    if billing && !resets && !allowance {
+        return FailureKind::Billing;
+    }
+    let short_window = contains_any(
+        &text,
+        &[
+            "per minute",
+            "per min",
+            "per second",
+            "(tpm)",
+            "(rpm)",
+            "requests per min",
+        ],
+    );
+    let exhausted = allowance
+        || contains_any(
+            &text,
+            &[
+                "quota",
+                "credit",
+                "resets",
+                "limit reached",
+                "limit_reached",
+                "exhausted",
+                "out of",
+            ],
+        );
     let transient = contains_any(
         &text,
         &[
@@ -279,7 +371,7 @@ fn quota_kind(message: &str) -> FailureKind {
             "retry after",
         ],
     ) || has_status(&text, "429");
-    if transient && !exhausted {
+    if (short_window && !allowance) || (transient && !exhausted) {
         FailureKind::RateLimited
     } else {
         FailureKind::QuotaExhausted
@@ -294,6 +386,7 @@ mod tests {
         QuotaFailure {
             model_only: false,
             message: message.into(),
+            ..Default::default()
         }
     }
 
@@ -314,6 +407,14 @@ mod tests {
             ("ProviderModelNotFoundError: Model not found: anthropic/claude-x", FailureKind::ModelUnavailable),
             ("You've hit your usage limit. Upgrade to Pro or try again at 4:12 PM.", FailureKind::QuotaExhausted),
             ("stream error: exceeded retry limit, last status: 429 Too Many Requests", FailureKind::RateLimited),
+            ("API Error: 400 {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"message\":\"Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits.\"}}", FailureKind::Billing),
+            ("Error: 402 Insufficient Balance", FailureKind::Billing),
+            ("Claude AI usage limit reached|1795564800", FailureKind::QuotaExhausted),
+            ("You've hit your usage limit. Upgrade to Pro (https://chatgpt.com/explore/pro), visit https://chatgpt.com/codex/settings/usage to purchase more credits or try again at 4:12 PM.", FailureKind::QuotaExhausted),
+            ("Rate limit reached for gpt-5 in organization org-1 on tokens per min (TPM): Limit 30000, Used 29800. Please try again in 1.2s.", FailureKind::RateLimited),
+            ("API Error: 429 {\"type\":\"error\",\"error\":{\"type\":\"rate_limit_error\",\"message\":\"This request would exceed the rate limit for your organization of 50,000 input tokens per minute.\"}}", FailureKind::RateLimited),
+            ("TerminalQuotaError: You have exhausted your capacity on this model. Your quota will reset after 2h33m17s.", FailureKind::QuotaExhausted),
+            ("Quota exceeded for quota metric 'Gemini 2.5 Pro Requests' and limit 'Gemini 2.5 Pro Requests per day per user per tier'", FailureKind::QuotaExhausted),
         ] {
             assert_eq!(classify(message, None), Some(kind), "{message}");
         }
@@ -349,7 +450,7 @@ mod tests {
                     "insufficient_quota: You exceeded your current quota"
                 ))
             ),
-            Some(FailureKind::QuotaExhausted)
+            Some(FailureKind::Billing)
         );
         for info in [
             serde_json::json!({"status":"rejected","rateLimitType":"five_hour","resetsAt":1_794_520_800}),
@@ -454,6 +555,39 @@ mod tests {
         explain(&mut run, Some(1));
         assert_eq!(run.error.as_deref(), Some("429 Too Many Requests"));
         assert_eq!(run.failure_kind, Some(FailureKind::RateLimited));
+
+        // A limit known only from the final message gets a typed record with its reset.
+        let mut run = failed(&[]);
+        run.error = Some("You've hit your limit · resets 3:40pm".into());
+        explain(&mut run, Some(1));
+        assert_eq!(run.failure_kind, Some(FailureKind::QuotaExhausted));
+        let failure = run.quota_failure.as_ref().unwrap();
+        assert_eq!(failure.message, "You've hit your limit · resets 3:40pm");
+        assert!(failure.resets_at.is_some());
+
+        // Without a stated reset, the agent's rate-limit snapshot supplies it.
+        let mut run = failed(&[]);
+        run.error = Some("You've hit your usage limit.".into());
+        run.limit_snapshot_reset = Some(1_900_000_000);
+        explain(&mut run, Some(1));
+        assert_eq!(run.quota_failure.unwrap().resets_at, Some(1_900_000_000));
+
+        let mut run = failed(&[]);
+        run.error = Some("Error: 402 Insufficient Balance".into());
+        explain(&mut run, Some(1));
+        assert_eq!(run.failure_kind, Some(FailureKind::Billing));
+        assert_eq!(run.quota_failure.unwrap().resets_at, None);
+
+        // Limit wording in the agent's own stderr does not mark the account limited.
+        for line in [
+            "npm warn GitHub API rate limit exceeded for 203.0.113.7",
+            "fetch failed: 402 Payment Required",
+        ] {
+            let mut run = failed(&["Running checks", line]);
+            explain(&mut run, Some(1));
+            assert_eq!(run.failure_kind, Some(FailureKind::AgentExited), "{line}");
+            assert!(run.quota_failure.is_none(), "{line}");
+        }
 
         let mut run = failed(&["Starting", "Error: 401 Unauthorized"]);
         explain(&mut run, Some(1));

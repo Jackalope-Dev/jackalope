@@ -164,6 +164,11 @@ only; it does not copy or relocate the CLI's credentials. A completed sign-in ca
 be selected for new tasks without rebinding existing attempts. Interactive
 two-account acceptance remains required before claiming provider login coverage.
 
+Local Codex turns run in a warm `codex app-server` session per live conversation and fall
+back to `codex exec` when the app-server cannot run the turn; Codex asks before leaving its
+sandbox, and those requests follow the project's permission settings (see
+[Codex app-server sessions](AGENT-QUALITY.md#codex-app-server-sessions)).
+
 Codex uses `CODEX_HOME`, Claude uses `CLAUDE_CONFIG_DIR`, and Grok uses `GROK_HOME`.
 OpenCode uses `XDG_DATA_HOME` for credentials and session data. Named OpenCode
 profiles also redirect XDG config, cache and state directories; the

@@ -1,11 +1,12 @@
 # Account setup and settings sync
 
-Launch checks account access outside the numbered setup flow. App appearance and
-privacy controls live on this screen. Approval shows a brief animated checkmark
-(with a reduced-motion alternative), then enters the workspace or project setup.
-Every desktop build requires a native verified account access lease, including
-local development builds. Native execution checks remain authoritative
-including after revocation and offline expiry. Saved work remains reviewable.
+The first-run welcome screen offers an account outside the numbered setup flow. App
+appearance and privacy controls live on this screen. Approval shows a brief animated
+checkmark (with a reduced-motion alternative), then enters project setup; **Continue
+without an account** goes straight to project setup. Settings sync, lesson sync and
+skill sync are account features: the native host refuses them before any request
+unless an approved account with a current offline lease is connected. Local work
+never depends on the account.
 
 Project setup has six steps: Project, Agents, Decisions, Behavior, Appearance and
 First task. Adding another project reuses this flow without replaying the launch

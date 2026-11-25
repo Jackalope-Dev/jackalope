@@ -7,14 +7,6 @@ use super::*;
 const RETAINED_REVIEWED: usize = 200;
 
 impl TaskRuntime {
-    #[cfg(test)]
-    pub(crate) fn with_test_access(directory: PathBuf) -> Result<Self, String> {
-        let runtime = Self::new(directory)?;
-        let now = Utc::now().timestamp_millis();
-        runtime.access.update(now, now + 60 * 60 * 1000);
-        Ok(runtime)
-    }
-
     /// Loads an attempt as if it were read from history, for tests outside this module.
     #[cfg(test)]
     pub(crate) fn insert_for_test(&self, run: TaskRun) {
@@ -47,7 +39,6 @@ impl TaskRuntime {
         let owner = Arc::new(owner);
         let writer = journal::Writer::new(directory.clone())?;
         let runtime = Self {
-            access: Arc::new(super::super::execution_access::ExecutionAccess::new()),
             knowledge: super::super::knowledge::KnowledgeStore::new(
                 directory.join("knowledge/entries.json"),
             ),
@@ -57,6 +48,7 @@ impl TaskRuntime {
             writer,
             warm_helpers: Default::default(),
             claude_sessions: Default::default(),
+            codex_sessions: Default::default(),
             _owner: owner,
         };
         // Holding the history lock means no attempt of this profile is running,
@@ -283,7 +275,12 @@ impl TaskRuntime {
             return Err(error);
         }
         updated.persistence_error = None;
+        let task = updated.task_id.clone();
         inner.runs.insert(id.to_string(), updated);
+        drop(inner);
+        if archived {
+            crate::commands::work_terminal::stop_when_finished([task.as_str()]);
+        }
         Ok(())
     }
 

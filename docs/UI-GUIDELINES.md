@@ -183,8 +183,8 @@ and size inputs to what they hold, such as a short code.
 
 Controls use the shared `--control-height` (36px) and `--control-height-compact` (32px)
 for menu rows, segments and dense navigation; coarse pointers raise both to 44px. The sidebar
-leads with Inbox (work across projects that needs the person) and Library (files work
-created), then favorite projects and work as tiles, then projects with their pinned work,
+leads with Inbox (work across projects that needs the person), Overview (what is running
+and how each project stands) and Library (files work created), then favorite projects and work as tiles, then projects with their pinned work,
 folders, live work and an "N more" link to the rest, then Setup (Bots, Agents) and Settings. Prefer
 compact layouts that keep this in view over extra padding. Native
 window chrome can follow platform sizing. Dialogs retain viewport space and scroll on
@@ -223,9 +223,13 @@ that starts off, so a useful one starts on. What stays off until chosen: anythin
 writes into the person's repository, publishes, shares data beyond what sign-in
 disclosed, lets an agent decide in the person's place, or starts something at login.
 
-App appearance/privacy and account access precede the project setup steps.
-Preserve settings-sync disclosure, pre-connection opt-out and deletion choices.
-Waitlist membership does not imply approved desktop access.
+App appearance/privacy and the optional account precede the project setup steps;
+continuing without an account is always available. Preserve settings-sync
+disclosure, pre-connection opt-out and deletion choices. Waitlist membership does
+not unlock account features. Gate an account feature with `RequiresAccount` (a card
+in place of the feature) or `AccountRequiredNotice` (inline beside local controls),
+never with a blocking dialog. Suggest connecting at most once, after a real
+milestone, through `AccountSuggestion`; remember snooze and dismissal.
 
 Provider-reported account identity is separate from custom labels. Keep account
 names and credentials local. A different default applies to future tasks;
@@ -340,6 +344,12 @@ container. Release builds turn off the webview's own right-click menu outside te
 and selections; right-click actions use ContextMenu and repeat a visible options menu's items. Tabs use arrow-key panel navigation; SegmentedControl uses pressed
 buttons for filtering and SegmentedNav uses aria-current for view navigation. CopyButton accepts a custom clipboard function, shows
 failure beside the action and clears stale feedback when its text changes.
+
+Add app-level shortcuts as actions in lib/keybindings.ts rather than window key listeners, so
+Settings, the ? sheet and command search show the person's keys. Contexts keep a focused
+terminal's keys, typing keys in text fields and `data-own-find` views' own find. Composer
+forms carry `data-composer` and register their actions with `useComposerKeybindings`.
+Pickers opened from the keyboard start on the current choice and move with the arrow keys.
 
 Use the standalone gallery with `pnpm ui:dev` at http://127.0.0.1:5190 to inspect
 shared controls without a native bridge or account service. `pnpm ui:build` checks

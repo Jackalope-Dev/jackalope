@@ -467,6 +467,36 @@
 .project-setting-input {
   width: min(360px, 100%);
 }
+.project-command-lifecycle {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.project-command-lifecycle-legend {
+  margin-bottom: 4px;
+  padding: 0;
+  overflow: hidden;
+  color: var(--color-text-primary);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.worktree-retention-log {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+}
+.worktree-retention-log li {
+  overflow-wrap: anywhere;
+}
 .project-git-fields {
   min-width: 0;
   margin: 0;
@@ -507,14 +537,46 @@
   width: min(360px, 100%);
 }
 /* Shortcuts read as keycaps; recording swaps the caps for a focused capture target. */
+/* Each action wraps its row and any clash notice, so the wrapper carries the divider. */
+.shortcut-row {
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+.shortcut-row:last-child {
+  border-bottom: none;
+}
 .shortcut-edit {
   display: inline-flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
+  gap: 4px 8px;
 }
 .shortcut-keys {
   display: inline-flex;
+  flex-wrap: wrap;
   gap: 4px;
+}
+/* A chord's strokes sit apart; a stroke's keys sit together. */
+.shortcut-stroke {
+  display: inline-flex;
+  gap: 4px;
+}
+.shortcut-stroke {
+  align-items: center;
+}
+.shortcut-then {
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+}
+.shortcut-unset {
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+}
+.shortcut-import {
+  width: min(520px, calc(100vw - 32px));
+}
+.shortcut-import-body {
+  display: grid;
+  gap: 12px;
 }
 .shortcut-key {
   display: inline-grid;
@@ -530,7 +592,10 @@
   font: 500 var(--text-xs) / 1 var(--font-mono, ui-monospace, monospace);
 }
 .shortcut-recorder {
-  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 28px;
   padding: 0 10px;
   border: 1px dashed var(--color-border-focus);
   border-radius: var(--radius-xs);

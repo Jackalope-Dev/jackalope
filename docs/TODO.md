@@ -21,6 +21,13 @@ release dates.
 - [ ] Merge `.xcscheme` and `Package.resolved` structurally, and use one Xcode project detector
   for simulator tools, devices, TestFlight and host placement.
 
+- [ ] Check the new default shortcuts (Mod+Shift+M/E/P/G, Mod+I) in installed WebView2,
+  WKWebView and WebKitGTK, including IBus on Linux.
+- [ ] Accept the optional account in installed builds: continue without an account on a clean
+  profile, run a real task, connect later, and check that expiry and revocation only turn off
+  account features. Update the Microsoft Store listing to say the account is optional.
+- [ ] Accept the Overview page in an installed app with real running work, previews and
+  pull requests, and load Cloudflare swarm state app-wide so swarms appear as one item.
 - [ ] Finish the Android and iOS companion (apps/mobile): push notifications when work needs
   you (host registration of device tokens, a server relay holding the FCM and APNs
   credentials, generic notification text), signed device builds and CI builds for both
@@ -39,6 +46,23 @@ release dates.
 
 ## Agents and task execution
 
+- [ ] Accept Edit from here in an installed app on macOS, Windows and Linux for Claude Code and
+  Codex conversations and tasks, including Undo and the turn after a rewind; watch for changes
+  to Claude Code's hidden `--resume-session-at` flag.
+- [ ] Accept repository discovery on a fresh macOS install with sessions under protected
+  folders (no permission prompts), and on Windows and Linux.
+- [ ] Accept worktree lifecycle in an installed app on macOS, Windows and Linux:
+  `.worktreeinclude` copies, worktree commands and their failure output, stopping a marked
+  terminal on merge and archive, and an automatic cleanup pass keeping and removing the
+  right worktrees.
+- [ ] Accept Codex app-server sessions in an installed app on each platform: approvals,
+  Send now, Stop, and resume after a restart.
+- [ ] Accept composer side questions (Claude fork-session, `codex exec fork`) and per-send
+  effort with real providers in an installed app; move the Codex side question to the
+  app-server's thread fork.
+- [ ] Accept importing Claude Code and Codex history in an installed app on each platform:
+  the onboarding offer, a real import, updating a conversation that grew, and continuing an
+  imported conversation through its CLI.
 - [ ] Extend agents on a computer: automatic routing that does not require the CLI here.
 - [ ] Accept the runner's local bridge in real runs: a protocol 4 image built and run on a
   local sandbox, a cloud machine and a live Agent37 account, with a real Claude Code and
@@ -52,7 +76,8 @@ release dates.
   wake, spend), bridge tools, on-demand connections, stdio connections running on the
   computer (npx and uvx servers, the uv install, Claude Code's approval hook and Codex's
   `mcp_servers` overrides), `execute_tool` approvals and project
-  secrets through the relay, Jackalope context (cloud resources manifest and pasted
+  secrets through the relay, Keep API keys on this device with Claude Code and Codex
+  streaming from Anthropic and OpenAI, Jackalope context (cloud resources manifest and pasted
   images) reaching the agent there, desktop control and the browser tools on
   the agent's computer, read-only planners and swarm orchestrators there, stop, quota
   handoff, lost contact, reattach and restart recovery.
@@ -159,6 +184,13 @@ release dates.
 
 ## Context, usage and integrations
 
+- [ ] Accept GitLab merge requests (including from a fork) and Bitbucket pull requests
+  against live repositories in an installed app: create, follow pipelines or builds, failed
+  log and review drafts, each merge method, a merge blocked by a newer push, glab signed
+  out, and a missing or revoked Bitbucket token.
+- [ ] Accept usage-limit resume and account or agent switching against real Claude, Codex
+  and Gemini limits in an installed app, and decide whether conversations may switch
+  agent or account after a limit.
 - [ ] Use Learning activity to calibrate background learning's cadence, probation,
   archive, miss and curator thresholds against real use, and measure whether learned
   lessons reduce repeated corrections before claiming it.

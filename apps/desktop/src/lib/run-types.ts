@@ -2,6 +2,7 @@ import type { PendingUserPrompt, RunStatus } from '@jackalope/contracts/runs';
 import type { DecisionReceipt } from './decisions.ts';
 import type { ContextReceipt, ContextSelection } from './knowledge-types.ts';
 import type { ReviewCaptures } from './review-captures.ts';
+import type { RewindState } from './rewind.ts';
 import type { DesktopPermission } from './system-info.ts';
 import type { TaskEffort } from './task-effort.ts';
 import type { EvidenceLevel, GoalRestatement, SafetyFact, TaskContract } from './task-outcomes.ts';
@@ -27,6 +28,7 @@ export type FailureKind =
   | 'authentication'
   | 'quota_exhausted'
   | 'rate_limited'
+  | 'billing'
   | 'provider_refused'
   | 'model_unavailable'
   | 'context_too_long'
@@ -63,8 +65,14 @@ export interface ActivityTime {
 export interface TaskRun {
   archivedAt?: string | null;
   liveSessionId?: string | null;
+  /** Work that changes no code, run in the project folder as it is. */
+  nonCode?: boolean;
+  /** The session from outside Jackalope this work continues. */
+  continues?: { adapter: string; sessionId: string } | null;
   effort?: TaskEffort | null;
   codexSpeed?: 'standard' | 'fast' | null;
+  /** The running turn takes new messages without stopping (a Codex app-server turn). */
+  steerable?: boolean;
   requestedServiceTier?: string | null;
   reasoningEffort?: string | null;
   efficiency?: {
@@ -109,7 +117,12 @@ export interface TaskRun {
   };
   checkpoint?: { head: string; message: string } | null;
   checkpointError?: string | null;
-  quotaFailure?: { modelOnly: boolean; message: string } | null;
+  /** Turn checkpoint, conversation mark and rewinds; absent on attempts saved before them. */
+  rewind?: RewindState;
+  /** The provider limit that stopped the attempt; `resetsAt` is Unix seconds when reported. */
+  quotaFailure?: { modelOnly: boolean; message: string; resetsAt?: number | null } | null;
+  /** A retry the person scheduled for when that limit resets. */
+  resumeAtReset?: { at: number; error?: string | null } | null;
   routing?: {
     attempts?: {
       agent: string;
@@ -141,7 +154,7 @@ export interface TaskRun {
       sessionId: string | null;
       result: string;
       usage: RunUsage;
-      failure: { modelOnly: boolean; message: string };
+      failure: { modelOnly: boolean; message: string; resetsAt?: number | null };
       recordedAt: string;
     }[];
   } | null;
@@ -251,6 +264,8 @@ export interface TaskRun {
     cacheRead?: number;
     cacheWrite?: number;
   }[];
+  /** Context after the latest top-level model call; `window` only when the provider states it. */
+  context?: { used: number; window?: number | null } | null;
   prompts?: PendingUserPrompt[];
   validationSteps?: ValidationStep[];
   /** Append-only decision trail the agent reported for this attempt. */
@@ -373,6 +388,8 @@ export interface ScreenshotArtifact {
 }
 export interface RunRequest {
   effort?: TaskEffort;
+  /** A provider effort level chosen for this send; wins over the task approach's level. */
+  reasoningEffort?: string;
   codexSpeed?: 'standard' | 'fast';
   contextSelection?: ContextSelection;
   connectionIds?: string[];

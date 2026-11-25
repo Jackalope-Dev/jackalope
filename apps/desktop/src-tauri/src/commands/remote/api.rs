@@ -320,7 +320,6 @@ fn dispatch(service: &RemoteAccess, config: &Config, action: Action) -> Result<V
             }
         }
         "start" => {
-            service.runtime.access.ensure()?;
             let id = action.id.ok_or("Missing request identifier.")?;
             Uuid::parse_str(&id).map_err(|_| "Invalid request identifier.")?;
             let mut template = config
@@ -345,13 +344,13 @@ fn dispatch(service: &RemoteAccess, config: &Config, action: Action) -> Result<V
                     id,
                     text,
                     origin: None,
+                    reasoning_effort: None,
                 }),
                 SessionLimits::default(),
             )?;
             Ok(json!({"sessionId":session}))
         }
         "followup" | "resume" | "pause" => {
-            service.runtime.access.ensure()?;
             if let Some(session_id) = action.session_id {
                 let snapshot = service.sessions.snapshot(Some(&session_id))?;
                 if !snapshot.sessions.iter().any(|s| {
@@ -386,7 +385,6 @@ fn dispatch(service: &RemoteAccess, config: &Config, action: Action) -> Result<V
             Ok(json!({"accepted":true}))
         }
         "answer" => {
-            service.runtime.access.ensure()?;
             let run = run(&runs, config, action.run_id.as_deref())?;
             if !service.runtime.respond_prompt(
                 &run.id,
@@ -488,7 +486,7 @@ mod tests {
                 .status
                 .success());
         }
-        let runtime = TaskRuntime::with_test_access(directory.join("history")).unwrap();
+        let runtime = TaskRuntime::new(directory.join("history")).unwrap();
         let coordinator =
             Coordinator::new(directory.join("coordination"), runtime.clone()).unwrap();
         let session_path = directory.join("sessions.json");

@@ -63,7 +63,7 @@ const rise = {
 };
 
 /** A one-time, full-screen hello: what Jackalope does, that it's in beta, and how to tell us. */
-export function WelcomeDialog() {
+export function WelcomeDialog({ onClose }: { onClose?: () => void } = {}) {
   const [open, setOpen] = useState(welcomePending);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const [cheering, setCheering] = useState(true);
@@ -79,6 +79,7 @@ export function WelcomeDialog() {
   const close = (then?: () => void) => {
     markSeen();
     setOpen(false);
+    onClose?.();
     then?.();
   };
 

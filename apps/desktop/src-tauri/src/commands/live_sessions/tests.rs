@@ -58,7 +58,7 @@ fn fixture() -> (PathBuf, LiveSessions, String) {
             .status
             .success());
     }
-    let runtime = TaskRuntime::with_test_access(root.join("history")).unwrap();
+    let runtime = TaskRuntime::new(root.join("history")).unwrap();
     let coordinator = Coordinator::new(root.join("coordination"), runtime.clone()).unwrap();
     let service = LiveSessions::new(root.join("sessions/sessions.json"), runtime, coordinator);
     let request: RunRequest = serde_json::from_value(serde_json::json!({"id": Uuid::new_v4().to_string(), "projectId":"fixture", "projectName":"Fixture", "projectPath":repo.to_string_lossy(), "agent":"codex", "model":null, "prompt":"Session", "isolated":true, "previousRunId":null})).unwrap();
@@ -94,6 +94,50 @@ fn messages_are_durable_idempotent_and_keep_order() {
 }
 
 #[test]
+fn a_chosen_effort_is_saved_per_message_and_batches_never_mix_levels() {
+    let (_root, service, id) = fixture();
+    let send = |text: &str, effort: Option<&str>| {
+        service.send_with_effort(
+            &id,
+            Uuid::new_v4().to_string(),
+            text.into(),
+            None,
+            effort.map(str::to_string),
+        )
+    };
+    send("One", None).unwrap();
+    send("Two", None).unwrap();
+    send("Three", Some("high")).unwrap();
+    send("Four", Some("high")).unwrap();
+    assert!(send("Five", Some("turbo"))
+        .err()
+        .is_some_and(|error| error.contains("Unknown effort level")));
+    let saved: Ledger = serde_json::from_slice(&std::fs::read(&service.path).unwrap()).unwrap();
+    let mut messages = saved.sessions[0].messages.clone();
+    assert_eq!(messages[2].reasoning_effort.as_deref(), Some("high"));
+    let first: Vec<_> = next_batch(&messages)
+        .iter()
+        .map(|m| m.text.clone())
+        .collect();
+    assert_eq!(first, ["One", "Two"]);
+    for message in &mut messages[..2] {
+        message.run_id = Some("batch-1".into());
+    }
+    let second: Vec<_> = next_batch(&messages)
+        .iter()
+        .map(|m| m.text.clone())
+        .collect();
+    assert_eq!(second, ["Three", "Four"]);
+    // Messages saved before effort levels existed load with none.
+    let old = r#"{"id":"m","text":"Old","createdAt":"2026-01-01T00:00:00Z","runId":null,"canceled":false}"#;
+    let old: SessionMessage = serde_json::from_str(old).unwrap();
+    assert_eq!(old.reasoning_effort, None);
+    assert!(!serde_json::to_string(&old)
+        .unwrap()
+        .contains("reasoningEffort"));
+}
+
+#[test]
 fn first_message_starts_and_names_the_session_atomically() {
     let (_root, service, existing) = fixture();
     let request = service.snapshot(None).unwrap().sessions[0].request.clone();
@@ -109,6 +153,7 @@ fn first_message_starts_and_names_the_session_atomically() {
                     id: message_id.clone(),
                     text: "  Fix the search\n spacing  ".into(),
                     origin: None,
+                    reasoning_effort: None,
                 }),
             )
             .unwrap();
@@ -136,6 +181,7 @@ fn first_message_starts_and_names_the_session_atomically() {
                 id: message_id,
                 text: " ".into(),
                 origin: None,
+                reasoning_effort: None,
             })
         )
         .is_err());
@@ -202,6 +248,7 @@ fn missing_attempts_require_recovery_instead_of_silent_replay() {
                     previous_run_id: None,
                     error: None,
                     settled: false,
+                    reasoning_effort: None,
                 });
             Ok(())
         })
@@ -309,7 +356,7 @@ fn attach_run(root: &std::path::Path, service: &mut LiveSessions, id: &str, run:
         serde_json::to_vec(&run).unwrap(),
     )
     .unwrap();
-    service.runtime = TaskRuntime::with_test_access(history).unwrap();
+    service.runtime = TaskRuntime::new(history).unwrap();
     service.coordinator = Coordinator::new(
         root.join(format!("coordination-{}", Uuid::new_v4())),
         service.runtime.clone(),
@@ -326,6 +373,7 @@ fn attach_run(root: &std::path::Path, service: &mut LiveSessions, id: &str, run:
                 previous_run_id: None,
                 error: None,
                 settled: false,
+                reasoning_effort: None,
             });
             Ok(())
         })
@@ -569,6 +617,7 @@ fn limits_pause_new_batches_and_do_not_infer_missing_cost() {
         previous_run_id: None,
         error: None,
         settled: true,
+        reasoning_effort: None,
     });
     let mut run = TaskRun {
         id: "run".into(),
@@ -597,6 +646,33 @@ fn limits_pause_new_batches_and_do_not_infer_missing_cost() {
 }
 
 #[test]
+fn a_message_for_a_turn_that_cannot_take_it_is_left_to_stop_and_send() {
+    let (root, mut service, id) = fixture();
+    // A saved run never reads back as steerable, so a reloaded running turn takes nothing.
+    let run = TaskRun {
+        id: Uuid::new_v4().to_string(),
+        live_session_id: Some(id.clone()),
+        status: RunStatus::Running,
+        steerable: true,
+        ..Default::default()
+    };
+    attach_run(&root, &mut service, &id, run);
+    let message = Uuid::new_v4().to_string();
+    assert!(service
+        .steer(&id, message.clone(), "Also this".into(), None)
+        .unwrap()
+        .is_none());
+    let snapshot = service.snapshot(Some(&id)).unwrap();
+    assert!(!snapshot.sessions[0]
+        .messages
+        .iter()
+        .any(|m| m.id == message));
+    assert!(service
+        .steer(&id, "not-a-uuid".into(), "x".into(), None)
+        .is_err());
+}
+
+#[test]
 fn finishing_a_failed_attempt_pauses_dispatch_without_replaying_messages() {
     let (root, mut service, id) = fixture();
     let run = TaskRun {
@@ -613,6 +689,80 @@ fn finishing_a_failed_attempt_pauses_dispatch_without_replaying_messages() {
     assert!(snapshot.sessions[0].batches[0].settled);
     assert_eq!(snapshot.sessions[0].error.as_deref(), Some("Agent failed"));
     assert!(!service.tick().unwrap());
+}
+
+#[test]
+fn a_usage_limit_pause_resumes_once_at_its_reset_unless_the_person_acts() {
+    let (root, mut service, id) = fixture();
+    let resets = Utc::now().timestamp() + 3_600;
+    let run = TaskRun {
+        id: Uuid::new_v4().to_string(),
+        live_session_id: Some(id.clone()),
+        status: RunStatus::Failed,
+        error: Some("You've hit your limit · resets 3:40pm".into()),
+        failure_kind: Some(crate::commands::tasks::failure::FailureKind::QuotaExhausted),
+        quota_failure: serde_json::from_value(serde_json::json!({
+            "modelOnly": false,
+            "message": "You've hit your limit · resets 3:40pm",
+            "resetsAt": resets,
+        }))
+        .unwrap(),
+        ..Default::default()
+    };
+    let run_id = run.id.clone();
+    attach_run(&root, &mut service, &id, run);
+    // Not yet paused by the limit, so there is nothing to schedule.
+    assert!(service.action(&id, "resume-at-reset", None).is_err());
+    assert!(service.tick().unwrap());
+    service.action(&id, "resume-at-reset", None).unwrap();
+    let session = service.snapshot(Some(&id)).unwrap().sessions.remove(0);
+    assert_eq!(
+        session.resume_at_reset,
+        Some(SessionResume {
+            at: resets,
+            run_id: run_id.clone()
+        })
+    );
+
+    // A pause the person chooses cancels the scheduled resume.
+    service.action(&id, "pause", None).unwrap();
+    let mut session = service.snapshot(Some(&id)).unwrap().sessions.remove(0);
+    assert!(session.resume_at_reset.is_none());
+
+    // Before its reset nothing changes; after it the conversation continues once.
+    session.resume_at_reset = Some(SessionResume {
+        at: resets,
+        run_id: run_id.clone(),
+    });
+    assert!(!LiveSessions::resume_due(&mut session, resets));
+    assert!(session.paused);
+    assert!(LiveSessions::resume_due(&mut session, resets + 61));
+    assert!(!session.paused && session.error.is_none() && session.resume_at_reset.is_none());
+    let continued = session.messages.last().unwrap();
+    assert_eq!(continued.origin.as_ref().unwrap().kind, "resume");
+    assert!(continued.run_id.is_none());
+    assert!(!LiveSessions::resume_due(&mut session, resets + 120));
+
+    // A schedule for an attempt that is no longer the latest is dropped, not applied.
+    session.paused = true;
+    session.resume_at_reset = Some(SessionResume {
+        at: resets,
+        run_id: "older".into(),
+    });
+    assert!(LiveSessions::resume_due(&mut session, resets + 61));
+    assert!(session.paused && session.resume_at_reset.is_none());
+
+    // Billing limits do not reset by waiting.
+    let mut session = service.snapshot(Some(&id)).unwrap().sessions.remove(0);
+    session.paused = true;
+    session.error = Some("Insufficient balance".into());
+    let billing = TaskRun {
+        id: run_id,
+        status: RunStatus::Failed,
+        failure_kind: Some(crate::commands::tasks::failure::FailureKind::Billing),
+        ..Default::default()
+    };
+    assert!(LiveSessions::limit_resume(&session, &[billing]).is_err());
 }
 
 #[test]
@@ -743,6 +893,7 @@ fn bot_persona_is_repeated_in_every_batch_and_stays_out_of_the_transcript() {
                 id: Uuid::new_v4().to_string(),
                 text: "Check the lockfile".into(),
                 origin: None,
+                reasoning_effort: None,
             }),
             SessionLimits::default(),
             Some(persona.clone()),
@@ -790,6 +941,7 @@ fn non_code_conversations_are_saved_as_such_and_told_to_leave_files_alone() {
                 id: Uuid::new_v4().to_string(),
                 text: "Check that the website's signup page loads".into(),
                 origin: None,
+                reasoning_effort: None,
             }),
         )
         .unwrap();
@@ -801,4 +953,121 @@ fn non_code_conversations_are_saved_as_such_and_told_to_leave_files_alone() {
     let code = saved.sessions.iter().find(|s| s.id == existing).unwrap();
     assert!(!code.request.non_code);
     assert!(!batch_prompt(code, &[]).contains("not code work"));
+}
+
+/// The `jackalope` command and a headless host start a conversation exactly
+/// like this: `create_with_limits` with the first message. It runs with no
+/// current Jackalope account, whichever state the account is in.
+#[test]
+fn a_conversation_runs_without_a_current_jackalope_account() {
+    use crate::commands::account::fixture::{Account, FEATURES, STATES};
+    use crate::commands::agent_policy::{AgentPolicy, CustomAgent};
+    let (root, service, _) = fixture();
+    std::fs::write(
+        root.join("fixture.cjs"),
+        r#"
+process.stdin.resume();
+process.stdin.on('end',()=>{
+ console.log(JSON.stringify({type:'thread.started',thread_id:'no-account-session'}));
+ console.log(JSON.stringify({type:'item.completed',item:{type:'agent_message',text:'Answered locally'}}));
+});
+"#,
+    )
+    .unwrap();
+    let executable = root.join(if cfg!(windows) {
+        "fixture.cmd"
+    } else {
+        "fixture"
+    });
+    #[cfg(windows)]
+    std::fs::write(&executable, "@echo off\r\nnode \"%~dp0fixture.cjs\"\r\n").unwrap();
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::write(
+            &executable,
+            "#!/bin/sh\nexec node \"$(dirname \"$0\")/fixture.cjs\" \"$@\"\n",
+        )
+        .unwrap();
+        std::fs::set_permissions(&executable, std::fs::Permissions::from_mode(0o700)).unwrap();
+    }
+    let mut policy = AgentPolicy::default();
+    policy.custom_agents.push(CustomAgent {
+        id: "no-account-fixture".into(),
+        name: "No account fixture".into(),
+        command: executable.to_string_lossy().into_owned(),
+        adapter: Some("codex".into()),
+        args: Vec::new(),
+    });
+    std::fs::create_dir_all(service.runtime.policy_path().parent().unwrap()).unwrap();
+    std::fs::write(
+        service.runtime.policy_path(),
+        serde_json::to_vec(&policy).unwrap(),
+    )
+    .unwrap();
+    let mut request = service.snapshot(None).unwrap().sessions[0].request.clone();
+    request.agent = "no-account-fixture".into();
+    service.coordinator.launch();
+    let deadline = std::time::Instant::now() + Duration::from_secs(30);
+    while !service.coordinator.bridge_ready() {
+        assert!(
+            std::time::Instant::now() < deadline,
+            "Coordinator did not start"
+        );
+        std::thread::sleep(Duration::from_millis(25));
+    }
+    for state in STATES {
+        let account = Account::new(state);
+        assert!(FEATURES
+            .iter()
+            .all(|feature| account.admit(*feature).is_err()));
+        let id = Uuid::new_v4().to_string();
+        request.id = Uuid::new_v4().to_string();
+        service
+            .create_with_limits(
+                id.clone(),
+                "Terminal session".into(),
+                request.clone(),
+                Some(FirstMessage {
+                    id: Uuid::new_v4().to_string(),
+                    text: "Answer from this computer".into(),
+                    origin: None,
+                    reasoning_effort: None,
+                }),
+                SessionLimits {
+                    max_batches: None,
+                    pause_at_estimated_usd: None,
+                },
+            )
+            .unwrap();
+        let deadline = std::time::Instant::now() + Duration::from_secs(30);
+        loop {
+            service.tick().unwrap();
+            let snapshot = service.snapshot(Some(&id)).unwrap();
+            let session = snapshot.sessions.iter().find(|s| s.id == id).unwrap();
+            if let Some(error) = &session.error {
+                service.runtime.stop_all();
+                service.coordinator.shutdown();
+                panic!("{state:?}: {error}");
+            }
+            if !session.batches.is_empty() && session.batches.iter().all(|batch| batch.settled) {
+                let run = snapshot
+                    .runs
+                    .iter()
+                    .find(|run| run.live_session_id.as_deref() == Some(id.as_str()))
+                    .unwrap();
+                assert_eq!(run.status, RunStatus::Review, "{state:?}: {:?}", run.error);
+                assert_eq!(run.result, "Answered locally");
+                break;
+            }
+            if std::time::Instant::now() >= deadline {
+                service.runtime.stop_all();
+                service.coordinator.shutdown();
+                panic!("{state:?}: the conversation did not finish");
+            }
+            std::thread::sleep(Duration::from_millis(40));
+        }
+    }
+    service.coordinator.shutdown();
+    let _ = std::fs::remove_dir_all(root);
 }

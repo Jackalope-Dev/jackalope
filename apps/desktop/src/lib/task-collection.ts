@@ -58,7 +58,7 @@ export interface WorkItem {
  */
 function withPullRequest(item: WorkItem, pullRequest: TrackedPullRequest | undefined): WorkItem {
   if (!pullRequest) return item;
-  const view = pullRequestPhaseView(pullRequest.phase);
+  const view = pullRequestPhaseView(pullRequest.phase, pullRequest.provider);
   const settled = item.stage === 'review' || item.stage === 'finished';
   if (!settled || !view.stage || (item.stage === 'finished' && !isOpenPullRequest(pullRequest)))
     return { ...item, pullRequest };
@@ -130,8 +130,9 @@ export function workPresence(item: WorkItem): {
               ? 'Reply'
               : 'Open conversation'
       : run
-        ? pullRequest && item.statusLabel === pullRequestPhaseView(pullRequest.phase).label
-          ? pullRequestPhaseView(pullRequest.phase).action
+        ? pullRequest &&
+          item.statusLabel === pullRequestPhaseView(pullRequest.phase, pullRequest.provider).label
+          ? pullRequestPhaseView(pullRequest.phase, pullRequest.provider).action
           : item.stage === 'finished'
             ? 'Open result'
             : taskNextAction(run)
@@ -222,10 +223,12 @@ export function collectWorkspaceWork(
         title: withoutLeadingId(session.title),
         date: session.updatedAt,
         question,
+        // Unsent messages only make a conversation running while it dispatches them (its
+        // status is Queued); a paused or finished one keeps them until it is resumed.
         stage:
           question || work.status === 'Needs attention'
             ? 'attention'
-            : work.active || work.pending
+            : work.active || work.status === 'Queued'
               ? 'working'
               : session.closed
                 ? 'finished'
@@ -347,7 +350,11 @@ export function attentionReason(item: WorkItem): string | undefined {
   const run = item.run;
   if (run?.prompts?.some((prompt) => prompt.status === 'pending')) return 'Question waiting';
   // A pull request that placed the row here is the reason.
-  if (item.pullRequest && item.statusLabel === pullRequestPhaseView(item.pullRequest.phase).label)
+  if (
+    item.pullRequest &&
+    item.statusLabel ===
+      pullRequestPhaseView(item.pullRequest.phase, item.pullRequest.provider).label
+  )
     return item.statusLabel;
   if (run?.persistenceError) return 'History needs saving';
   if (run?.verificationError || run?.verification?.result.success === false) return 'Check failed';

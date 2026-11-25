@@ -966,7 +966,7 @@ impl PairRun<'_> {
         let deadline = Instant::now() + Duration::from_secs(15);
         let runtime = loop {
             std::thread::sleep(Duration::from_millis(300));
-            match TaskRuntime::with_test_access(self.history.clone()) {
+            match TaskRuntime::new(self.history.clone()) {
                 Ok(runtime) => break runtime,
                 Err(error) if Instant::now() > deadline => {
                     return Err(format!("History did not reopen: {error}"))
@@ -992,7 +992,7 @@ fn run_pair(pair: &Pair, limit: Duration) -> Attempt {
         std::env::temp_dir().join(format!("jackalope-agent-matrix-{}", uuid::Uuid::new_v4()));
     let repo = trial_repository(&root);
     let history = root.join("history");
-    let runtime = TaskRuntime::with_test_access(history.clone()).unwrap();
+    let runtime = TaskRuntime::new(history.clone()).unwrap();
     let mut run = PairRun {
         pair,
         limit,

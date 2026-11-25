@@ -105,7 +105,7 @@ async fn sources_include_task_context_and_provenance_without_echoing_text() {
         std::env::temp_dir().join(format!("jackalope-jev-questions-{}", uuid::Uuid::new_v4()));
     std::fs::create_dir_all(&root).unwrap();
     std::fs::write(root.join("report.md"), "Build failed\nMore evidence\n").unwrap();
-    let runtime = TaskRuntime::with_test_access(root.join("history")).unwrap();
+    let runtime = TaskRuntime::new(root.join("history")).unwrap();
     let run = run(&root);
     let mut request = input();
     request["sources"] =
@@ -184,7 +184,7 @@ async fn installed_agent_questions_trial() {
         serde_json::to_vec(&initial).unwrap(),
     )
     .unwrap();
-    let runtime = TaskRuntime::with_test_access(root.join("history")).unwrap();
+    let runtime = TaskRuntime::new(root.join("history")).unwrap();
     runtime
         .update_checked(&initial.id, |run| run.status = RunStatus::Running)
         .unwrap();

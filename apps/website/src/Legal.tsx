@@ -113,9 +113,9 @@ const privacy: Section[] = [
       <>
         <p>
           The desktop app stores project settings, tasks, history, and related workspace data on
-          your computer. Starting new work requires a free, signed-in Jackalope account in every
-          build; saved work stays readable without one. We do not receive your repository contents,
-          prompts, agent transcripts, local paths, or provider credentials through our
+          your computer. A Jackalope account is optional; the app runs without one, and connecting
+          one only enables account features such as settings sync. We do not receive your repository
+          contents, prompts, agent transcripts, local paths, or provider credentials through our
           usage-reporting system.
         </p>
         <p>

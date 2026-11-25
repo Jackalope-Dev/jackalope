@@ -1,0 +1,47 @@
+.usage-limit p {
+  margin: 0;
+}
+.usage-limit-title {
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+.usage-limit-reset,
+.usage-limit-scheduled {
+  color: var(--color-text-secondary);
+}
+/* Figures keep their width as the countdown ticks, so the line does not jitter. */
+.usage-limit-reset {
+  font-variant-numeric: tabular-nums;
+}
+.usage-limit-error {
+  color: var(--color-danger);
+}
+.usage-limit-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+/* The provider's text can carry long JSON bodies and URLs; wrap them inside the notice. */
+.usage-limit-message {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 16rem;
+  overflow: auto;
+}
+/* Narrow windows put the actions under the text instead of squeezing it. */
+@media (max-width: 1100px) {
+  .usage-limit.inline-notice {
+    flex-wrap: wrap;
+  }
+  .usage-limit .inline-notice-action {
+    flex-basis: 100%;
+  }
+  .usage-limit-actions {
+    justify-content: flex-start;
+  }
+}

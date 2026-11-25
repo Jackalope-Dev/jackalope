@@ -1,15 +1,38 @@
 import type { Review } from '@jackalope/contracts/runs';
 import { isActive } from '@jackalope/contracts/runs';
 import { invokeNative } from './native/transport.ts';
+import type { RewindOutcome, RewindPreview } from './rewind.ts';
 import type { ChangeStats, TaskRun } from './run-types.ts';
 
 export const stopTask = (id: string) => invokeNative<void>('task_stop', { id });
 export const markReviewed = (id: string) => invokeNative<void>('task_mark_reviewed', { id });
 export const stopPreview = (id: string) => invokeNative<void>('task_preview_stop', { id });
 /** Start a fresh attempt at a task whose last attempt did not finish. */
-/** `focus` leads the progress context when the retry picks up a quota-stopped attempt's work. */
-export const retryTask = (id: string, focus?: string) =>
-  invokeNative<string>('task_retry', { id, focus: focus?.trim() || null });
+/**
+ * `focus` leads the progress context when the retry picks up a quota-stopped attempt's work;
+ * `switchTo` moves work a usage limit stopped to another agent or account.
+ */
+export const retryTask = (
+  id: string,
+  focus?: string,
+  switchTo?: { agent: string; profileId: string | null },
+) =>
+  invokeNative<string>('task_retry', {
+    id,
+    focus: focus?.trim() || null,
+    switchTo: switchTo ?? null,
+  });
+/** Retries a usage-limited attempt once its reported reset passes, or cancels that. */
+export const resumeAtReset = (id: string, schedule: boolean) =>
+  invokeNative<void>('task_resume_at_reset', { id, schedule });
+/** What rewinding to `runId`'s turn would do; rejects with the reason it cannot. */
+export const previewRewind = (runId: string) =>
+  invokeNative<RewindPreview>('task_rewind_preview', { runId });
+/** Rewinds to `runId`'s turn, provided `latestRunId` is still the newest turn. */
+export const rewindTo = (runId: string, latestRunId: string) =>
+  invokeNative<RewindOutcome>('task_rewind', { runId, latestRunId });
+/** Undoes the rewind kept on `runId`, the latest turn, until the next turn starts. */
+export const undoRewind = (runId: string) => invokeNative<void>('task_rewind_undo', { runId });
 /** Marks an interrupted attempt stopped once the person confirmed nothing from it still runs. */
 export const releaseInterrupted = (id: string) =>
   invokeNative<TaskRun>('task_release_interrupted', { id });

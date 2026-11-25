@@ -78,7 +78,6 @@ macro_rules! with_commands {
             commands::desktop_integration,
             commands::devices,
             commands::dictation,
-            commands::execution_access,
             commands::external_sessions,
             commands::first_commit,
             commands::git,
@@ -103,6 +102,7 @@ macro_rules! with_commands {
             commands::project_favicon,
             commands::project_files,
             commands::project_git,
+            commands::project_discovery,
             commands::project_registry,
             commands::project_secrets,
             commands::readiness,
@@ -114,6 +114,7 @@ macro_rules! with_commands {
             commands::schedules,
             commands::simulators,
             commands::skills,
+            commands::source_control,
             commands::system,
             commands::task_strategy,
             commands::tasks,
@@ -319,7 +320,6 @@ pub fn run(launch: Launch) {
             std::fs::create_dir_all(&preferences)?;
             app.manage(commands::account::AccountService::new(
                 preferences.join("account.bin"),
-                runtime.access.clone(),
             ));
             commands::account::launch_refresh(app.handle().clone());
             app.manage(WindowBehavior::load(preferences.join("desktop.json")));

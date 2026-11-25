@@ -179,7 +179,6 @@ pub async fn routing_connect(
     revision: u64,
     project_id: Option<String>,
 ) -> Result<RoutingSettings, String> {
-    runtime.access.ensure()?;
     settings::validate_project(project_id.as_deref())?;
     if !valid_key(&key) {
         return Err("Enter a valid TypeSafe API key.".into());

@@ -321,7 +321,11 @@ pub(super) fn clone_swiftpm_state(source: &Path, target: &Path, home: &Path) -> 
         for name in SWIFTPM_STATE {
             let from = source.join(name);
             if std::fs::symlink_metadata(&from).is_ok() {
-                imp::clone_entry(&from, &target.join(name))?;
+                if from.is_file() {
+                    clone_file(&from, &target.join(name))?;
+                } else {
+                    clone_tree(&from, &target.join(name))?;
+                }
             }
         }
         relocate_state(target, &roots, home)?;
@@ -532,7 +536,7 @@ fn display(workspace: &Path, path: &Path) -> String {
 }
 
 /// Resolves `.` and `..` without touching the filesystem; `None` if it climbs above the root.
-fn normalize(path: &Path) -> Option<PathBuf> {
+pub(super) fn normalize(path: &Path) -> Option<PathBuf> {
     let mut resolved = PathBuf::new();
     for component in path.components() {
         match component {
@@ -576,11 +580,31 @@ pub(super) fn is_unsupported(error: &io::Error) -> bool {
 }
 
 /// Makes `destination`, which must not exist, a copy-on-write clone of the directory
-/// `source`, keeping links as links. On failure nothing is left at `destination`.
+/// `source`, keeping links as links. On failure nothing it made is left at `destination`.
 pub(super) fn clone_tree(source: &Path, destination: &Path) -> io::Result<()> {
-    let result = imp::clone_entry(source, destination);
-    if result.is_err() && std::fs::symlink_metadata(destination).is_ok() {
+    let result = imp::clone_tree(source, destination);
+    if result.as_ref().is_err_and(|error| !existed(error))
+        && std::fs::symlink_metadata(destination).is_ok()
+    {
         let _ = std::fs::remove_dir_all(destination);
+    }
+    result
+}
+
+/// The clone refused a destination that was already there, which is not the clone's to remove.
+fn existed(error: &io::Error) -> bool {
+    error.kind() == io::ErrorKind::AlreadyExists
+}
+
+/// Makes `destination`, which must not exist, a copy-on-write clone of the regular file
+/// `source`. [`is_unsupported`] tells a volume that cannot clone from a real failure; on any
+/// failure nothing it made is left at `destination`.
+pub(super) fn clone_file(source: &Path, destination: &Path) -> io::Result<()> {
+    let result = imp::clone_file(source, destination);
+    if result.as_ref().is_err_and(|error| !existed(error))
+        && std::fs::symlink_metadata(destination).is_ok_and(|m| m.is_file())
+    {
+        let _ = std::fs::remove_file(destination);
     }
     result
 }
@@ -594,7 +618,7 @@ mod imp {
 
     /// A directory source clones its whole tree in one call. `clonefile` refuses an existing
     /// destination, so it can never overwrite one.
-    pub fn clone_entry(source: &Path, destination: &Path) -> io::Result<()> {
+    pub fn clone_tree(source: &Path, destination: &Path) -> io::Result<()> {
         let source = CString::new(source.as_os_str().as_bytes())?;
         let destination = CString::new(destination.as_os_str().as_bytes())?;
         // SAFETY: both strings are NUL-terminated and outlive the call, which keeps neither.
@@ -603,6 +627,11 @@ mod imp {
         } else {
             Err(io::Error::last_os_error())
         }
+    }
+
+    /// `clonefile` takes a single file the same way, and refuses an existing destination.
+    pub fn clone_file(source: &Path, destination: &Path) -> io::Result<()> {
+        clone_tree(source, destination)
     }
 }
 
@@ -624,37 +653,47 @@ mod imp {
     /// Walks the tree, recreating directories and links and sharing each file's extents with
     /// `FICLONE`. `copy_file_range` is deliberately not used: it silently copies bytes on
     /// filesystems that cannot share extents.
-    pub fn clone_entry(source: &Path, destination: &Path) -> io::Result<()> {
-        let metadata = fs::symlink_metadata(source)?;
-        if metadata.is_file() {
-            return clone_file(source, destination);
-        }
-        if metadata.file_type().is_symlink() {
-            return std::os::unix::fs::symlink(fs::read_link(source)?, destination);
-        }
+    pub fn clone_tree(source: &Path, destination: &Path) -> io::Result<()> {
+        let mode = fs::symlink_metadata(source)?.permissions().mode();
         fs::DirBuilder::new()
-            .mode(metadata.permissions().mode() & 0o7777)
+            .mode(mode & 0o7777)
             .create(destination)?;
+        // Past this point `destination` is the clone's own, so a clash inside it must not read
+        // as a destination that already existed.
+        fill(source, destination).map_err(|error| {
+            if error.kind() == io::ErrorKind::AlreadyExists {
+                io::Error::other(error)
+            } else {
+                error
+            }
+        })
+    }
+
+    fn fill(source: &Path, destination: &Path) -> io::Result<()> {
         for entry in fs::read_dir(source)? {
             let entry = entry?;
             let kind = entry.file_type()?;
             let from = entry.path();
             let to = destination.join(entry.file_name());
-            if kind.is_dir() || kind.is_symlink() || kind.is_file() {
-                clone_entry(&from, &to)?;
+            if kind.is_dir() {
+                clone_tree(&from, &to)?;
+            } else if kind.is_symlink() {
+                std::os::unix::fs::symlink(fs::read_link(&from)?, &to)?;
+            } else if kind.is_file() {
+                clone_file(&from, &to)?;
             }
         }
         Ok(())
     }
 
-    fn clone_file(from: &Path, to: &Path) -> io::Result<()> {
-        let input = File::open(from)?;
+    pub fn clone_file(source: &Path, destination: &Path) -> io::Result<()> {
+        let input = File::open(source)?;
         let metadata = input.metadata()?;
         let output = fs::OpenOptions::new()
             .write(true)
             .create_new(true)
             .mode(metadata.permissions().mode() & 0o7777)
-            .open(to)?;
+            .open(destination)?;
         // SAFETY: both descriptors belong to files open for the call; the kernel keeps neither.
         if metadata.len() > 0
             && unsafe { libc::ioctl(output.as_raw_fd(), FICLONE, input.as_raw_fd()) } != 0
@@ -669,10 +708,17 @@ mod imp {
 mod imp {
     use std::{io, path::Path};
 
-    pub fn clone_entry(_source: &Path, _destination: &Path) -> io::Result<()> {
+    pub fn clone_tree(_source: &Path, _destination: &Path) -> io::Result<()> {
         Err(io::Error::new(
             io::ErrorKind::Unsupported,
             "copy-on-write folder clones are not available on this platform",
+        ))
+    }
+
+    pub fn clone_file(_source: &Path, _destination: &Path) -> io::Result<()> {
+        Err(io::Error::new(
+            io::ErrorKind::Unsupported,
+            "copy-on-write file clones are not available on this platform",
         ))
     }
 }
@@ -759,6 +805,28 @@ mod tests {
             workspace.to_str().unwrap(),
             "pnpm install --frozen-lockfile",
         )
+    }
+
+    #[test]
+    fn a_clone_onto_an_existing_path_fails_without_removing_it() {
+        let root = scratch();
+        std::fs::write(root.join("source"), "new").unwrap();
+        std::fs::write(root.join("existing"), "keep").unwrap();
+        assert!(clone_file(&root.join("source"), &root.join("existing")).is_err());
+        assert_eq!(
+            std::fs::read_to_string(root.join("existing")).unwrap(),
+            "keep"
+        );
+        std::fs::create_dir_all(root.join("from")).unwrap();
+        std::fs::write(root.join("from/file"), "new").unwrap();
+        std::fs::create_dir_all(root.join("to")).unwrap();
+        std::fs::write(root.join("to/file"), "keep").unwrap();
+        assert!(clone_tree(&root.join("from"), &root.join("to")).is_err());
+        assert_eq!(
+            std::fs::read_to_string(root.join("to/file")).unwrap(),
+            "keep"
+        );
+        let _ = std::fs::remove_dir_all(&root);
     }
 
     #[test]

@@ -25,12 +25,17 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   a project row opens that project's work and its menu opens project pages, including
   Appearance. Favorites sit above the tree as tiles sized by how many there are; pinned
   work stays at the top of its project and folders group a project's work, all saved
-  locally. A project with no work shows a launchpad of starting points and project pages.
+  locally. A project with no work leads with a launchpad of starting points and project
+  pages; a project with work shows it below the work list, where it can be hidden per
+  project and brought back from the list's menu.
   The sidebar and the Work project switcher offer General, a place without a project for
-  work such as operating a web page or checking a connection; once added it lists like
-  any project.
+  work such as operating a web page or checking a connection; the sidebar lists it above
+  the projects, and once added it holds work like any project.
   Inbox gathers work that needs the person, new results, app alerts (including low
-  allowances), running work and pull requests waiting on others across projects. Library
+  allowances), running work and pull requests waiting on others across projects.
+  Overview (sidebar, Mod+Shift+O) shows running work across projects, each project's
+  status with PRs, checks and previews, accounts at or near their limits with resets, and
+  recent results. Library
   shows task screenshots, files agents saved under `.jackalope/artifacts`, pasted
   attachments and images or PDFs a task's latest workspace changed, filtered by project
   and kind. The title bar holds command search; the bottom bar shows the focused project,
@@ -45,6 +50,16 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   those CLIs' session files for the accounts Jackalope uses; Jackalope's own attempts are
   left out. Continue in Jackalope starts a conversation that resumes the CLI's session
   directly in the checkout or worktree it ran in. Settings → Privacy turns reading off.
+  Import Claude and Codex history (command search, Settings → Data & reset, and offered
+  once after setup) copies those conversations into Jackalope by project, in the
+  background with progress, cancel and idempotent updates. Imported conversations open
+  read-only in an Imported group under their project and continue by resuming the CLI
+  session. Checked with fixtures and a read-only local trial; installed acceptance is open.
+  First-run setup and command search (Find projects on this computer) list repositories
+  found from Claude Code and Codex session folders, common code folders and recent VS Code,
+  Cursor and Windsurf folders, reading only Git metadata. Desktop, Documents, Downloads,
+  ~/Library, iCloud and volumes are never opened, here or when listing and importing
+  sessions; chosen repositories are added with detected commands.
   See [conversations from outside Jackalope](CORE-WORKFLOW.md#conversations-from-outside-jackalope).
 - Non-code work (a short request to read or operate a web page or a connection, work on an
   attached window that names no code, and everything in General) runs in the project folder as it is: no
@@ -58,7 +73,11 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   theme in Jackalope Violet, which follows the system's light or dark setting. Native macOS acceptance remains
   open.
 - Desktop preferences include interface zoom, editor and shell selection, terminal
-  font size, HTTP links and editable search, new-work and settings shortcuts. Saved
+  font size and HTTP links. Every app shortcut, including tabs, Back/Forward, `?` and the
+  composer's agent, effort, plan and branch pickers, is a named action that can be searched,
+  recorded (including two-key chords), cleared, reset, swapped on a clash, and imported or
+  exported as JSON in Settings → Keyboard shortcuts; the `?` sheet and command search show
+  the person's keys. Saved
   prompts and commands can apply to all projects or one project; commands require an
   explicit Run action. Voice to text inserts editable text at the cursor and never sends
   the task automatically. It transcribes on the computer with a downloaded Whisper model
@@ -83,6 +102,13 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   `node_modules` folders copy-on-write (APFS `clonefile`, Linux `FICLONE`) when both
   checkouts' dependency manifests match; the command still runs. Other volumes and
   Windows install in full, never by byte copy. Native acceptance remains open.
+- A project's `.worktreeinclude` (gitignore syntax) copies matching Git-ignored files into
+  each new task worktree, copy-on-write where the volume allows, bounded and never
+  following links out. Saved terminal commands can run when a worktree is created or stop
+  their terminal when the task is merged or archived. Remove finished worktrees (off by
+  default) removes merged or archived task worktrees after a chosen period through the
+  existing cleanup guards; worktrees with local files, a running process or unmerged work
+  are kept and logged. Native acceptance remains open.
 - The workspace has one layout: a collapsible project sidebar beside the open
   item, with review, preview, terminal or activity next to its conversation. The work
   list offers list and board views, and its filters save per project.
@@ -158,7 +184,13 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   The composer shows its agent choice beside Send: Automatic, one agent, or up to four
   agents that each receive the prompt as a separate isolated task. Compared tasks link to
   each other and show status, time, check, changed lines and reported tokens side by side;
-  keeping one archives the other finished attempts. Composers accept pasted images, dropped
+  keeping one archives the other finished attempts. Composers (new work, conversations and
+  follow-ups) offer `/` commands (/model, /effort, /plan, /clear, /btw and Claude skills),
+  `@` file mentions, prompt history, large pastes saved as text attachments, a per-send
+  effort picker limited to levels the run uses, and a context meter shown only when the
+  provider reports its window. `/btw` asks a read-only, unsaved fork of a Claude Code or
+  Codex session without touching the main conversation. Real-provider and installed
+  acceptance remain open. Composers accept pasted images, dropped
   files and picked files as editable path lines. Pasted images are saved under the
   project's Git-excluded `.jackalope/attachments` and copied into each task workspace that
   names them, worktree or computer alike; project files are referenced relative to the
@@ -250,6 +282,12 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   are recorded. Project settings, the bot editor and `/browser` open, clear and delete
   profiles.
 - Delivery inspects local Git state and optionally reads PR/CI through the GitHub CLI.
+  Delivery, pull request following, issue import and workflow starters also work with
+  GitLab (gitlab.com and self-managed, through the person's glab sign-in, as merge requests
+  and pipelines; a fork's merge request targets the parent project unless kept in the fork)
+  and Bitbucket Cloud (through an API token in protected storage). Merges are pinned to the
+  reviewed commit on GitLab and checked against it on Bitbucket. GitHub is unchanged. Not
+  yet accepted against live GitLab or Bitbucket repositories.
   PR, CI and deployment preparation carry evidence into editable drafts. Failing PR
   checks are listed openly with a draft asking the agent to reproduce and fix them.
   Create pull request drafts an editable title and description from the branch's diff alone
@@ -310,6 +348,10 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   starts once as a new conversation in the same workspace with the earlier progress (Codex
   and Grok before launch, Claude Code, Kimi, ACP agents and OpenCode's server after they
   refuse it). Continuations of sessions from outside Jackalope fail instead.
+  Local Codex conversations run in one warm `codex app-server` session (falling back to
+  `codex exec` with the reason shown). Requests to leave its sandbox follow the project's
+  permission settings, Stop interrupts the turn, and Send now adds a message to a running
+  Codex turn. A real smoke run passed; installed acceptance on each platform is open.
 - Project-scoped agent lists, task defaults and account choices; app-wide limits
   remain explicit. The terminal follows saved project accents, including live updates.
 - Agent accounts, model choices, reported usage, capacity-aware routing and bounded
@@ -317,6 +359,10 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   Provider refusals never trigger handoff. Retrying a quota-stopped attempt continues
   its worktree changes with an optional focus line; the handoff context sent is kept
   on the attempt.
+  Usage, rate and billing limits are typed with the reset time the provider reports.
+  Stopped tasks and conversations show a usage-limit banner with a reset countdown and
+  can resume at the reset; tasks can also switch to another allowed account or agent.
+  Not yet accepted against live provider limits in an installed app.
   The Agents page connects API providers directly, including DeepSeek and OpenRouter,
   using protected OpenCode account keys and discovered models. A local OpenAI-compatible
   server on this computer can be saved the same way after its model list is read.
@@ -396,6 +442,12 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   Plan, Work, Check and Review lead to one result, preview, combined diff and outcome
   review before explicit application. Focused review and elapsed integration time remain
   distinct local measurements. Installed-provider and cost/quality acceptance remain open.
+- Edit from here rewinds a Claude Code or Codex conversation or task in a Jackalope worktree
+  to an earlier turn: files return from a hidden per-turn checkpoint, the agent's own
+  conversation resumes from the turn before (Claude `--resume-session-at --fork-session`,
+  Codex app-server thread fork), current files are kept in a safety snapshot, undone turns
+  stay in history collapsed, and Undo works until the next turn. Real Claude and Codex trial
+  runs passed; installed acceptance remains open.
 - Plan mode is explicit: **Plan with me** in the composer or beside a plan or
   investigation assessment, `/plan` in the terminal or `jackalope plan`. A read-only
   planning attempt explores, asks at most the project's question cap (default 5) and
@@ -534,7 +586,11 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   (Rust, TypeScript, JavaScript, Python and Go) the way this device ranks its symbol
   map, then plain text matches.
   Control tools reach this device through a relay that keeps the bridge credential here;
-  desktop control acts on that computer. An image on protocol 3 or older keeps the
+  desktop control acts on that computer. With **Keep API keys on this device** (Settings
+  → Computers, off by default) an Anthropic or OpenAI API key stays here too: the agent
+  gets a per-attempt token and reaches only the provider's model routes through that
+  relay, which adds the key and streams the answer back; a Claude Code sign-in token still
+  goes to the computer. An image on protocol 3 or older keeps the
   earlier tools: browser tools only on a local sandbox with networking and
   workspace-reading tools only for read-only attempts. `peer_adopt` and
   `browser_open_profile` are unavailable. Selected on-demand HTTP connections, and every on-demand connection of a
@@ -699,7 +755,12 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   output assigned to a variable are not parsed as commands. Agents are asked to edit
   files with their edit tools so each edit is checked, and `record_decision` replies
   flag evidence pointers that resolve to nothing. Each automatic approval and escalation is recorded in the
-  task's activity. Saved always-allow rules still apply; a chained command (`&&`,
+  task's activity. ACP requests are read the way tool rules read them: Kimi's carry no kind or
+  input, so its earlier streamed arguments stand in. A command argument is checked
+  whatever kind the request claims, and connected tools named for deleting, deploying or
+  publishing ask with or without an `mcp__` prefix. A shell request with no readable
+  command, a file change with no readable path, and a request with neither a kind nor
+  any input ask. Saved always-allow rules still apply; a chained command (`&&`,
   `;`, `|`) is allowed when every command in it has a rule, and choosing always
   allow saves one for each, except chains through shells, interpreters or `sudo`. Codex keeps its workspace-write sandbox; Gemini
   CLI, Grok and Antigravity follow their own CLI approval policies.
@@ -767,10 +828,11 @@ approval. Connections persist across restarts and detect approval; offline progr
 remains labeled and cannot authorize execution. Installed and deployed acceptance of
 waitlist mode remain open.
 
-New execution requires approved account access in every desktop build. Previously
-verified accounts retain bounded offline access; saved work remains reviewable after
-expiry. Feedback, reporting and settings sync have separate controls. See
-[account access](DESKTOP-ACCOUNT.md) and [service boundaries](BACKEND.md).
+The Jackalope account is optional: local work runs without one in every desktop build,
+and only account features such as settings, lesson and skill sync, invitations and the
+Store beta program need it. Previously verified accounts keep those features for a
+bounded offline period. Feedback, reporting and settings sync have separate controls. See
+[account connection](DESKTOP-ACCOUNT.md) and [service boundaries](BACKEND.md).
 
 The website provides setup and workflow guides, compatibility tables, sample-workspace
 media and account flows. Its content is shared with bundled native help through
@@ -919,8 +981,9 @@ stop are covered by unit tests only. Agents on a computer are covered by unit te
 agent's POSIX run, relay and runner tests and the opt-in Docker trial with a stand-in agent;
 attempts on this device and on a computer share one runner path, which a unit test drives
 with a real local agent process and a stand-in computer runner;
-real Claude Code or Codex runs there, bridge, desktop and browser tools used by a real
-agent, the runner's local bridge and agent-browser in a built image, planning there, lost-contact
+real Claude Code or Codex runs there (including through Keep API keys on this device,
+which is covered by unit and runner tests with a stand-in provider only), bridge, desktop
+and browser tools used by a real agent, the runner's local bridge and agent-browser in a built image, planning there, lost-contact
 recovery against a real computer, Git-synced workspaces and artifacts against a built
 image from Windows and macOS hosts, the template build and instances on a live Agent37
 account, and gVisor support for the image's desktop are unverified, and Agent37

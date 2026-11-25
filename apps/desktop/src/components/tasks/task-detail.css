@@ -151,6 +151,7 @@
 }
 /* The form is the field: one rounded card holding the draft and its pill buttons. */
 .task-followup-form {
+  position: relative;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 8px;
@@ -313,7 +314,7 @@
 .task-detail-navigation .workspace-heading p {
   margin-top: 4px;
 }
-.task-followup-form > .inline-notice {
+.task-followup-form > :is(.inline-notice, .side-question, .composer-chips) {
   grid-column: 1 / -1;
 }
 .task-followup-form[data-dragging] {

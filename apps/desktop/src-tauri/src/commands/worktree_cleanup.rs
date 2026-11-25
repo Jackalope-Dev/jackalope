@@ -7,6 +7,8 @@ use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 use tauri::State;
 
+pub mod retention;
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct CleanupStatus {
     pub target_branch: Option<String>,
@@ -52,15 +54,40 @@ const ARCHIVE_MAX_FILES: usize = 20_000;
 /// recoverable and archiving still applies its own limits.
 const CONTENT_CHECK_MAX_BYTES: u64 = 64 * 1024 * 1024;
 const CONTENT_CHECK_MAX_FILES: usize = 5_000;
+/// Largest ignored file compared with the project checkout's copy.
+const COPY_CHECK_MAX_BYTES: u64 = 16 * 1024 * 1024;
 
+/// The resolved path, without the `\\?\` verbatim prefix `std::fs::canonicalize` adds on
+/// Windows wherever the plain form means the same thing. Git cannot use a verbatim path as a
+/// working directory or argument (`//?/C:/…`), and every path compared here resolves through
+/// this one function, so comparisons stay like for like.
 fn canonical(path: &str) -> Result<PathBuf, String> {
-    std::fs::canonicalize(path).map_err(|e| format!("Cannot inspect {path}: {e}"))
+    dunce::canonicalize(path).map_err(|e| format!("Cannot inspect {path}: {e}"))
+}
+
+/// `relative` in Git's form, with `/` between components on every platform, as `git ls-files`
+/// reports the ignored paths it is compared with and shown beside.
+fn git_relative(relative: &Path) -> String {
+    relative
+        .components()
+        .map(|part| part.as_os_str().to_string_lossy())
+        .collect::<Vec<_>>()
+        .join("/")
+}
+
+/// The project checkout, Git's first worktree, whose ignored files a worktree may hold unchanged
+/// copies of. A bare repository has no checkout to compare with.
+fn checkout(entries: &[WorktreeEntry]) -> Option<PathBuf> {
+    entries
+        .first()
+        .filter(|main| !main.is_bare)
+        .and_then(|main| canonical(&main.path).ok())
 }
 
 // Resolve the existing ancestor so deleted task folders still protect related
 // worktrees without blocking every unrelated worktree in the repository.
 fn task_workspace(path: &Path) -> Result<PathBuf, String> {
-    match std::fs::canonicalize(path) {
+    match dunce::canonicalize(path) {
         Ok(path) => Ok(path),
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
             let parent = path.parent().ok_or("Cannot resolve the task workspace.")?;
@@ -286,20 +313,194 @@ fn sensitive_name(filename: &str) -> bool {
         .any(|suffix| filename.ends_with(suffix))
 }
 
+/// Folders of dependencies and build output automatic cleanup may delete without anyone seeing
+/// them. Wider than [`regenerable_tree`], which also decides what the secret scan skips, so a
+/// `.env` inside `dist/` still keeps a worktree through that scan.
+fn unattended_output(name: &str) -> bool {
+    regenerable_tree(name)
+        || matches!(
+            name,
+            "dist"
+                | "build"
+                | ".next"
+                | ".nuxt"
+                | ".svelte-kit"
+                | ".output"
+                | ".angular"
+                | ".cache"
+                | ".parcel-cache"
+                | ".vite"
+                | "coverage"
+                | ".nyc_output"
+                | "storybook-static"
+        )
+}
+
+/// Files tools and the operating system recreate on their own.
+fn unattended_file(name: &str) -> bool {
+    matches!(name, ".DS_Store" | "Thumbs.db" | ".eslintcache")
+        || name.ends_with(".tsbuildinfo")
+        || name.ends_with(".pyc")
+}
+
+/// Jackalope's record of a completed setup command, rewritten on the next preparation. The rest
+/// of `.jackalope/` holds artifacts and attachments the Library lists, so it is kept.
+const PREPARATION_MARKER: &str = ".jackalope/prepared.json";
+
+/// Entries a [`local_files`] scan looks at before it keeps the worktree as too large to check.
+const UNATTENDED_SCAN: usize = 200_000;
+/// Paths named in the reason a worktree was kept.
+const LOCAL_FILES_SHOWN: usize = 3;
+
+/// Ignored paths in `discarded` (as Git listed them) that automatic cleanup must not delete,
+/// because a person may have made them: anything other than dependency or build output, files
+/// tools recreate, unchanged copies of checkout files, and Jackalope's preparation marker. A
+/// folder is named as `out/…`. Links are never followed and count as local files.
+pub(super) fn local_files(
+    root: &Path,
+    discarded: &[String],
+    original: Option<&Path>,
+    budget: &mut usize,
+) -> Result<Vec<String>, String> {
+    let mut found = Vec::new();
+    for name in discarded {
+        if found.len() > LOCAL_FILES_SHOWN {
+            break;
+        }
+        let Some(start) = ignored_location(root, name) else {
+            found.push(name.clone());
+            continue;
+        };
+        let relative = name.trim_end_matches('/');
+        if relative.split('/').any(unattended_output) {
+            continue;
+        }
+        let label = |is_dir: bool| {
+            if is_dir {
+                format!("{relative}/…")
+            } else {
+                relative.to_string()
+            }
+        };
+        let disposable = |path: &Path| {
+            let file = path
+                .file_name()
+                .map(|file| file.to_string_lossy().into_owned())
+                .unwrap_or_default();
+            unattended_file(&file)
+                || path
+                    .strip_prefix(root)
+                    .is_ok_and(|inside| git_relative(inside) == PREPARATION_MARKER)
+                || unchanged_copy(original, root, path)
+        };
+        let metadata = match std::fs::symlink_metadata(&start) {
+            Ok(metadata) => metadata,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => continue,
+            Err(error) => return Err(error.to_string()),
+        };
+        if is_link(&metadata) {
+            found.push(label(false));
+            continue;
+        }
+        if !metadata.is_dir() {
+            if !disposable(&start) {
+                found.push(label(false));
+            }
+            continue;
+        }
+        let mut directories = vec![start.clone()];
+        'walk: while let Some(directory) = directories.pop() {
+            for entry in std::fs::read_dir(&directory).map_err(|e| e.to_string())? {
+                let entry = entry.map_err(|e| e.to_string())?;
+                *budget = budget.saturating_sub(1);
+                if *budget == 0 {
+                    return Err(
+                        "Kept: its ignored files are too many to check without someone looking."
+                            .into(),
+                    );
+                }
+                let metadata =
+                    std::fs::symlink_metadata(entry.path()).map_err(|e| e.to_string())?;
+                let file = entry.file_name().to_string_lossy().into_owned();
+                if metadata.is_dir() && !is_link(&metadata) {
+                    if !unattended_output(&file) {
+                        directories.push(entry.path());
+                    }
+                } else if is_link(&metadata) || !disposable(&entry.path()) {
+                    found.push(label(true));
+                    break 'walk;
+                }
+            }
+        }
+    }
+    Ok(found)
+}
+
+/// Why automatic cleanup kept a worktree holding [`local_files`].
+pub(super) fn local_files_reason(found: &[String]) -> String {
+    let mut shown: Vec<&str> = found
+        .iter()
+        .take(LOCAL_FILES_SHOWN)
+        .map(String::as_str)
+        .collect();
+    if found.len() > LOCAL_FILES_SHOWN {
+        shown.push("…");
+    }
+    format!(
+        "Kept: has local files ({}). Move what you need, then remove it with Clean up in Project worktrees.",
+        shown.join(", ")
+    )
+}
+
+/// Whether `path`, a regular file inside the worktree `root`, is byte for byte the file at the
+/// same place in the project checkout `original`, as the copies `.worktreeinclude` and setup
+/// files make are until someone edits them. Removing such a copy loses nothing.
+fn unchanged_copy(original: Option<&Path>, root: &Path, path: &Path) -> bool {
+    let Some(original) = original else {
+        return false;
+    };
+    let Ok(relative) = path.strip_prefix(root) else {
+        return false;
+    };
+    let Ok(source) = super::workspace_setup::no_links(original, relative) else {
+        return false;
+    };
+    let (Ok(copy), Ok(source_metadata)) = (
+        std::fs::symlink_metadata(path),
+        std::fs::symlink_metadata(&source),
+    ) else {
+        return false;
+    };
+    if !copy.is_file()
+        || !source_metadata.is_file()
+        || copy.len() != source_metadata.len()
+        || copy.len() > COPY_CHECK_MAX_BYTES
+    {
+        return false;
+    }
+    matches!(
+        (
+            super::history::read_bounded(path, COPY_CHECK_MAX_BYTES),
+            super::history::read_bounded(&source, COPY_CHECK_MAX_BYTES),
+        ),
+        (Ok(copy), Ok(source)) if copy == source
+    )
+}
+
 /// Walk one ignored path for content that must be preserved, returning the first
 /// offending path relative to the worktree root. Links are never followed: they are
-/// removed as links, so nothing outside the worktree is inspected or deleted.
+/// removed as links, so nothing outside the worktree is inspected or deleted. With the
+/// project checkout as `original`, an unchanged copy of one of its files is not preserved.
 fn preserved_content(
     root: &Path,
     start: &Path,
     budget: &mut usize,
+    original: Option<&Path>,
 ) -> Result<Option<String>, String> {
     let relative = |path: &Path| -> Result<String, String> {
-        Ok(path
-            .strip_prefix(root)
-            .map_err(|e| e.to_string())?
-            .to_string_lossy()
-            .into_owned())
+        Ok(git_relative(
+            path.strip_prefix(root).map_err(|e| e.to_string())?,
+        ))
     };
     let metadata = match std::fs::symlink_metadata(start) {
         Ok(metadata) => metadata,
@@ -318,7 +519,7 @@ fn preserved_content(
         return Ok(None);
     }
     if !metadata.is_dir() {
-        return if sensitive_name(&name) {
+        return if sensitive_name(&name) && !unchanged_copy(original, root, start) {
             Ok(Some(relative(start)?))
         } else {
             Ok(None)
@@ -338,11 +539,13 @@ fn preserved_content(
             if regenerable_tree(&name) {
                 continue;
             }
-            if sensitive_name(&name) {
-                return Ok(Some(relative(&entry.path())?));
-            }
             // Dependency links are removed as links; never follow them outside the worktree.
             let metadata = std::fs::symlink_metadata(entry.path()).map_err(|e| e.to_string())?;
+            if sensitive_name(&name)
+                && (metadata.is_dir() || !unchanged_copy(original, root, &entry.path()))
+            {
+                return Ok(Some(relative(&entry.path())?));
+            }
             if metadata.is_dir() && !is_link(&metadata) {
                 directories.push(entry.path());
             }
@@ -351,7 +554,7 @@ fn preserved_content(
     Ok(None)
 }
 
-fn local_content(path: &Path) -> Result<LocalContent, String> {
+fn local_content(path: &Path, original: Option<&Path>) -> Result<LocalContent, String> {
     let status = repo::git_exact(
         path,
         &[
@@ -390,7 +593,7 @@ fn local_content(path: &Path) -> Result<LocalContent, String> {
             content.preserved_path = Some(name.to_owned());
             break;
         };
-        match preserved_content(path, &location, &mut budget)? {
+        match preserved_content(path, &location, &mut budget, original)? {
             Some(preserved) => {
                 content.preserved_path = Some(preserved);
                 break;
@@ -499,6 +702,7 @@ fn inspect_entries(
     let repo = canonical(repo_path)?;
     let mut entries = list_worktrees(repo_path)?;
     let target = target(&repo, requested);
+    let original = checkout(&entries);
     for index in 0..entries.len() {
         if only.is_some_and(|path| entries[index].path != path) {
             continue;
@@ -536,7 +740,9 @@ fn inspect_entries(
         }
         match hard_block(&repo, &entries, index, runs) {
             Err(reason) => status.blocked_reason = Some(reason),
-            Ok(()) => match canonical(&entries[index].path).and_then(|path| local_content(&path)) {
+            Ok(()) => match canonical(&entries[index].path)
+                .and_then(|path| local_content(&path, original.as_deref()))
+            {
                 Ok(content) => {
                     status.discarded_paths = content.discarded_paths;
                     if let Some(name) = content.preserved_path {
@@ -577,6 +783,7 @@ fn inspect_entries(
     Ok(entries)
 }
 
+#[allow(clippy::too_many_arguments)]
 pub(super) fn remove(
     repo_path: &str,
     worktree_path: &str,
@@ -586,6 +793,33 @@ pub(super) fn remove(
     runs: &[TaskRun],
     delete_branch: bool,
     expected_branch: Option<&str>,
+) -> Result<(), String> {
+    remove_with(
+        repo_path,
+        worktree_path,
+        target_branch,
+        expected_head,
+        expected_target_head,
+        runs,
+        delete_branch,
+        expected_branch,
+        false,
+    )
+}
+
+/// [`remove`], and with `unattended` also refusing a worktree that holds [`local_files`]: no one
+/// reviews the ignored paths an automatic removal deletes.
+#[allow(clippy::too_many_arguments)]
+pub(super) fn remove_with(
+    repo_path: &str,
+    worktree_path: &str,
+    target_branch: &str,
+    expected_head: &str,
+    expected_target_head: &str,
+    runs: &[TaskRun],
+    delete_branch: bool,
+    expected_branch: Option<&str>,
+    unattended: bool,
 ) -> Result<(), String> {
     let entries = inspect_entries(repo_path, Some(target_branch), runs, Some(worktree_path))?;
     let wt = entries
@@ -616,10 +850,43 @@ pub(super) fn remove(
         );
     }
     let root = canonical(worktree_path)?;
+    let original = checkout(&entries);
+    let mut budget = 200_000usize;
+    if unattended {
+        let mut scan = UNATTENDED_SCAN;
+        let found = local_files(
+            &root,
+            &status.discarded_paths,
+            original.as_deref(),
+            &mut scan,
+        )?;
+        if !found.is_empty() {
+            return Err(local_files_reason(&found));
+        }
+    }
     for discarded in &status.discarded_paths {
         let path = ignored_location(&root, discarded)
             .filter(|path| path.starts_with(&root) && path != &root)
             .ok_or("Ignored path changed. Refresh before cleanup.")?;
+        if unattended {
+            let mut scan = UNATTENDED_SCAN;
+            let found = local_files(
+                &root,
+                std::slice::from_ref(discarded),
+                original.as_deref(),
+                &mut scan,
+            )?;
+            if !found.is_empty() {
+                return Err(local_files_reason(&found));
+            }
+        }
+        // An unchanged copy of a checkout file may have been edited since the inspection, which
+        // can take seconds, so the content is checked again right before it goes.
+        if let Some(found) = preserved_content(&root, &path, &mut budget, original.as_deref())? {
+            return Err(format!(
+                "Ignored content now holds secrets or local data: {found}. Refresh before cleanup."
+            ));
+        }
         let metadata = match std::fs::symlink_metadata(&path) {
             Ok(metadata) => metadata,
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => continue,
@@ -654,8 +921,10 @@ pub(super) fn remove(
     } else {
         vec!["worktree", "remove", "--", worktree_path]
     };
+    let tasks = super::tasks::rewind::tasks_using(&root, runs);
     let simulator = super::simulators::workspace_identity(worktree_path);
     repo::git_exact(Path::new(repo_path), &args, Inspection).map_err(|e| format!("Could not finish removing {worktree_path}: {e}. Close processes using this folder and refresh. If Git already removed its registration, inspect the remaining folder manually; no unverified files will be deleted."))?;
+    super::tasks::rewind::forget_refs(Path::new(repo_path), &tasks, runs, None);
     super::simulators::release(simulator);
     if delete_branch && !wt.branch.is_empty() {
         delete_merged_branch(
@@ -770,8 +1039,8 @@ fn archive(
         }));
     }
     // Confirm the raw paths still resolve to what Git registered, then keep using
-    // the raw forms: Git rejects the `\\?\` verbatim paths `canonicalize` yields
-    // on Windows for the bundle output.
+    // the raw forms for the bundle output: on Windows `canonical` still yields a `\\?\`
+    // verbatim path, which Git rejects, when the plain form would be too long.
     let repo = Path::new(repo_path);
     let path = Path::new(worktree_path);
     if canonical(worktree_path)?
@@ -935,19 +1204,22 @@ fn archive(
     )
     .map_err(|e| e.to_string())?;
 
-    if let Some(name) = local_content(path)?.preserved_path {
+    let original = checkout(&entries);
+    if let Some(name) = local_content(path, original.as_deref())?.preserved_path {
         return Err(abandon(
             &archive_root,
             &format!("local ignored content appeared: {name}"),
         ));
     }
     // Nothing else can be recovered from disk now — take the worktree down.
+    let tasks = super::tasks::rewind::tasks_using(path, runs);
     let simulator = super::simulators::workspace_identity(worktree_path);
     repo::git_exact(
         repo,
         &["worktree", "remove", "--force", "--", worktree_path],
         Inspection,
     )?;
+    super::tasks::rewind::forget_refs(repo, &tasks, runs, Some(&archive_root));
     super::simulators::release(simulator);
     if branch.starts_with("jackalope/") {
         let _ = repo::git_exact(repo, &["branch", "-D", &branch], Inspection);
@@ -1006,7 +1278,7 @@ fn orphans(repo_path: &str, runs: &[TaskRun]) -> Result<Vec<OrphanFolder>, Strin
         }
         if blocked.is_none() {
             let mut budget = 200_000usize;
-            blocked = preserved_content(&parent, &path, &mut budget)?
+            blocked = preserved_content(&parent, &path, &mut budget, None)?
                 .map(|found| format!("Holds secrets or local data: {found}. Move it out first."));
         }
         found.push(OrphanFolder {
@@ -1060,6 +1332,8 @@ macro_rules! tauri_commands {
             commands::worktree_cleanup::git_prune_worktrees,
             commands::worktree_cleanup::git_list_worktree_orphans,
             commands::worktree_cleanup::git_remove_worktree_orphan,
+            commands::worktree_cleanup::retention::worktree_retention_run,
+            commands::worktree_cleanup::retention::worktree_retention_log,
         ] $($rest)*)
     };
 }
@@ -1465,6 +1739,109 @@ mod tests {
             );
             assert_eq!(fs::read_to_string(file).unwrap(), "local data");
         }
+    }
+
+    #[test]
+    fn unattended_removal_keeps_local_files_the_clean_up_button_would_list() {
+        let f = Fixture::new("main");
+        f.commit(&f.worktree, "merged\n");
+        repo::git_exact(&f.repo, &["merge", "--ff-only", "feature"], Inspection).unwrap();
+        fs::create_dir_all(f.worktree.join("ignored/target/debug")).unwrap();
+        fs::write(f.worktree.join("ignored/target/debug/app"), "binary").unwrap();
+        let entry = f.entry();
+        let status = entry.cleanup.as_ref().unwrap();
+        let unattended = |entry: &WorktreeEntry| {
+            let status = entry.cleanup.as_ref().unwrap();
+            remove_with(
+                f.repo.to_str().unwrap(),
+                &entry.path,
+                "main",
+                &entry.head,
+                status.target_head.as_deref().unwrap(),
+                &[],
+                false,
+                Some(&entry.branch),
+                true,
+            )
+        };
+        let mut budget = UNATTENDED_SCAN;
+        let root = canonical(&entry.path).unwrap();
+        assert!(
+            local_files(&root, &status.discarded_paths, None, &mut budget)
+                .unwrap()
+                .is_empty()
+        );
+        fs::write(f.worktree.join("ignored/notes.txt"), "my notes").unwrap();
+        let entry = f.entry();
+        assert_eq!(
+            unattended(&entry).unwrap_err(),
+            local_files_reason(&["ignored/…".into()])
+        );
+        assert_eq!(
+            fs::read_to_string(f.worktree.join("ignored/notes.txt")).unwrap(),
+            "my notes"
+        );
+        assert!(f.worktree.join("ignored/target/debug/app").exists());
+        assert_eq!(
+            local_files_reason(&["a".into(), "b/…".into(), "c".into(), "d".into()]),
+            "Kept: has local files (a, b/…, c, …). Move what you need, then remove it with Clean up in Project worktrees."
+        );
+        f.remove(&entry, &[]).unwrap();
+        assert!(
+            !f.worktree.exists(),
+            "Clean up, which lists the files, still removes it"
+        );
+    }
+
+    #[test]
+    fn unchanged_copies_of_checkout_secrets_are_discarded_but_edited_ones_keep_the_worktree() {
+        let f = Fixture::new("main");
+        f.commit(&f.worktree, "merged\n");
+        repo::git_exact(&f.repo, &["merge", "--ff-only", "feature"], Inspection).unwrap();
+        fs::write(f.repo.join(".env"), "TOKEN=checkout").unwrap();
+        fs::create_dir_all(f.repo.join("ignored")).unwrap();
+        fs::write(f.repo.join("ignored/local.env"), "A=1").unwrap();
+        fs::write(f.worktree.join(".env"), "TOKEN=checkout").unwrap();
+        fs::create_dir_all(f.worktree.join("ignored")).unwrap();
+        fs::write(f.worktree.join("ignored/local.env"), "A=2").unwrap();
+        let entry = f.entry();
+        let status = entry.cleanup.as_ref().unwrap();
+        assert!(
+            status
+                .blocked_reason
+                .as_ref()
+                .unwrap()
+                .contains("ignored/local.env"),
+            "an edited copy is the task's own data: {status:?}"
+        );
+        fs::write(f.worktree.join("ignored/local.env"), "A=1").unwrap();
+        let entry = f.entry();
+        let status = entry.cleanup.as_ref().unwrap();
+        assert_eq!(status.blocked_reason, None);
+        assert!(status.discarded_paths.contains(&".env".to_string()));
+        f.remove(&entry, &[]).unwrap();
+        assert!(!f.worktree.exists());
+        assert_eq!(
+            fs::read_to_string(f.repo.join(".env")).unwrap(),
+            "TOKEN=checkout"
+        );
+    }
+
+    #[test]
+    fn paths_reach_git_and_messages_in_git_form() {
+        // Built with the platform separator, which is `\` on Windows.
+        let nested = Path::new("ignored").join("deeper").join("local.env");
+        assert_eq!(git_relative(&nested), "ignored/deeper/local.env");
+        assert_eq!(
+            git_relative(&Path::new(".jackalope").join("prepared.json")),
+            PREPARATION_MARKER
+        );
+        let resolved = canonical(&std::env::temp_dir().to_string_lossy()).unwrap();
+        assert!(
+            !resolved.to_string_lossy().starts_with(r"\\?\"),
+            "Git rejects verbatim paths: {}",
+            resolved.display()
+        );
     }
 
     #[test]
@@ -1924,6 +2301,89 @@ mod tests {
             .trim(),
             "change"
         );
+    }
+
+    /// Points `reference` at the current commit, like a turn checkpoint or rewind snapshot.
+    fn hidden_ref(f: &Fixture, reference: &str) {
+        let head = repo::git_exact(&f.repo, &["rev-parse", "HEAD"], Inspection).unwrap();
+        repo::git_exact(&f.repo, &["update-ref", reference, head.trim()], Inspection).unwrap();
+    }
+
+    fn hidden_refs(f: &Fixture) -> Vec<String> {
+        repo::git_exact(
+            &f.repo,
+            &["for-each-ref", "--format=%(refname)", "refs/jackalope"],
+            Inspection,
+        )
+        .unwrap()
+        .lines()
+        .map(str::to_string)
+        .collect()
+    }
+
+    #[test]
+    fn cleanup_removes_the_rewind_refs_of_tasks_that_worked_there() {
+        let f = Fixture::new("master");
+        let run = f.run("reviewed");
+        let mut other = f.run("reviewed");
+        other.id = "run-other".into();
+        other.task_id = "task-other".into();
+        other.workspace = f.root.join("still here").to_string_lossy().into_owned();
+        fs::create_dir_all(&other.workspace).unwrap();
+        for reference in [
+            "refs/jackalope/checkpoints/task-fixture/run-fixture",
+            "refs/jackalope/rewinds/task-fixture/rewind-1",
+            "refs/jackalope/checkpoints/task-other/run-other",
+        ] {
+            hidden_ref(&f, reference);
+        }
+        let entry = f.entries(std::slice::from_ref(&run)).remove(1);
+        f.remove(&entry, &[run, other]).unwrap();
+        assert!(!f.worktree.exists());
+        // Another task's refs stay while its workspace exists, and the removed task keeps
+        // its safety snapshot because only Archive & remove bundles and deletes those.
+        assert_eq!(
+            hidden_refs(&f),
+            [
+                "refs/jackalope/checkpoints/task-other/run-other",
+                "refs/jackalope/rewinds/task-fixture/rewind-1",
+            ]
+        );
+    }
+
+    #[test]
+    fn archiving_bundles_rewind_snapshots_before_removing_their_refs() {
+        let f = Fixture::new("main");
+        repo::git_exact(
+            &f.worktree,
+            &["branch", "-m", "jackalope/task-1"],
+            Inspection,
+        )
+        .unwrap();
+        f.commit(&f.worktree, "branch work\n");
+        hidden_ref(&f, "refs/jackalope/checkpoints/task-fixture/run-fixture");
+        hidden_ref(&f, "refs/jackalope/rewinds/task-fixture/rewind-1");
+        let run = f.run("reviewed");
+        let entry = f.entries(std::slice::from_ref(&run)).remove(1);
+        let status = entry.cleanup.as_ref().unwrap();
+        let archived = archive(
+            f.repo.to_str().unwrap(),
+            &entry.path,
+            "main",
+            &entry.head,
+            status.target_head.as_deref().unwrap(),
+            &[run],
+        )
+        .unwrap();
+        assert!(hidden_refs(&f).is_empty());
+        let bundle = PathBuf::from(archived).join("rewinds-task-fixture.bundle");
+        let listed = repo::git_exact(
+            &f.repo,
+            &["bundle", "list-heads", bundle.to_str().unwrap()],
+            Inspection,
+        )
+        .unwrap();
+        assert!(listed.contains("refs/jackalope/rewinds/task-fixture/rewind-1"));
     }
 
     #[test]

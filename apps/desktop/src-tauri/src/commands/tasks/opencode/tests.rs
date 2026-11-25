@@ -255,7 +255,7 @@ fn owned_server_permissions_resume_denial_and_stop_preserve_session_and_history(
     };
     std::fs::write(folder.join("fixture.cjs"), include_str!("fixture.cjs")).unwrap();
     std::fs::write(folder.join("stall-first-health"), "").unwrap();
-    let runtime = TaskRuntime::with_test_access(folder.join("history")).unwrap();
+    let runtime = TaskRuntime::new(folder.join("history")).unwrap();
     let mut policy = AgentPolicy::default();
     policy.custom_agents.push(CustomAgent {
         id: "opencode-fixture".into(),

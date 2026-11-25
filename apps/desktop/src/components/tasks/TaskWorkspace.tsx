@@ -11,7 +11,7 @@ import {
   LoadingState,
   DropdownMenu as Menu,
 } from '@jackalope/ui';
-import { FolderOpen, ListTodo, MoreHorizontal, Workflow } from 'lucide-react';
+import { Compass, FolderOpen, ListTodo, MoreHorizontal, Workflow } from 'lucide-react';
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { navigateWorkspace } from '../../lib/app-events';
@@ -20,6 +20,7 @@ import { selectedManagedTask, type WorkItem } from '../../lib/task-collection';
 import { useCompanionStore } from '../../stores/companionStore';
 import { useExecutionStore } from '../../stores/executionStore';
 import { useExternalSessionStore } from '../../stores/externalSessionStore';
+import { useImportedConversationStore } from '../../stores/importedConversationStore';
 import { useLiveSessionStore } from '../../stores/liveSessionStore';
 import { useManagedTaskStore } from '../../stores/managedTaskStore';
 import { useOnboardingStore } from '../../stores/onboardingStore';
@@ -42,6 +43,11 @@ const LiveSessionView = lazy(() =>
 );
 const ExternalSessionView = lazy(() =>
   import('../sessions/ExternalSessionView').then((m) => ({ default: m.ExternalSessionView })),
+);
+const ImportedConversationView = lazy(() =>
+  import('../sessions/ImportedConversationView').then((m) => ({
+    default: m.ImportedConversationView,
+  })),
 );
 const TaskDetail = lazy(() => import('./TaskDetail').then((m) => ({ default: m.TaskDetail })));
 const ProjectQueue = lazy(() =>
@@ -84,6 +90,9 @@ export function TaskWorkspace({
   const external = useExternalSessionStore((state) =>
     state.sessions.find((session) => session.key === state.selectedKey),
   );
+  const imported = useImportedConversationStore((state) =>
+    state.conversations.find((conversation) => conversation.id === state.selectedId),
+  );
   const sessionRuns = useLiveSessionStore((state) => state.runs);
   const allRuns = useAllRuns();
   const selectedId = useExecutionStore((state) => state.selectedId);
@@ -104,8 +113,12 @@ export function TaskWorkspace({
     setView: saveView,
     listRequest,
     clearListRequest,
+    hiddenLaunchpads,
+    setLaunchpadHidden,
   } = useWorkViewStore(
     useShallow((s) => ({
+      hiddenLaunchpads: s.hiddenLaunchpads,
+      setLaunchpadHidden: s.setLaunchpadHidden,
       scope: s.scope,
       setScope: s.setScope,
       views: s.views,
@@ -280,6 +293,12 @@ export function TaskWorkspace({
         <ExternalSessionView key={external.key} session={external} />
       </Suspense>
     );
+  if (imported && (projectFilter === 'all' || imported.projectId === projectFilter))
+    return (
+      <Suspense fallback={<LoadingState label="Loading conversation…" />}>
+        <ImportedConversationView key={imported.id} conversation={imported} />
+      </Suspense>
+    );
   if (parallel && project)
     return (
       <Suspense fallback={<LoadingState label="Loading queue…" />}>
@@ -289,19 +308,38 @@ export function TaskWorkspace({
 
   // The page's commands share the work list's menu; without a list they get their own.
   // New work is the composer bar, and Repo TODOs is a project page view.
-  const pageMenuItems = project && (
-    <Menu.Item className="workspace-menu-item" onSelect={() => setParallel(true)}>
-      <Workflow size={16} aria-hidden="true" />
-      Plan feature work
-    </Menu.Item>
-  );
   // Its starting points are code work, which General never holds.
   const general = isGeneralProject(project);
-  const launchpad = project && projectFilter !== 'all' && !general && (
-    <ProjectLaunchpad
-      project={project}
-      onStart={(text) => setStarterSeed({ id: crypto.randomUUID(), text })}
-    />
+  const hasLaunchpad = !!project && projectFilter !== 'all' && !general;
+  const launchpadHidden = !!project && !!hiddenLaunchpads[project.id];
+  const startWith = (text: string) => setStarterSeed({ id: crypto.randomUUID(), text });
+  const launchpad = hasLaunchpad && <ProjectLaunchpad project={project} onStart={startWith} />;
+  // Below a project's work it can be hidden; an empty project still leads with it.
+  const launchpadBelow = hasLaunchpad && !archived && items.length > 0 && !launchpadHidden && (
+    <div className="launchpad-below">
+      <ProjectLaunchpad
+        project={project}
+        onStart={startWith}
+        onHide={() => setLaunchpadHidden(project.id, true)}
+      />
+    </div>
+  );
+  const pageMenuItems = project && (
+    <>
+      <Menu.Item className="workspace-menu-item" onSelect={() => setParallel(true)}>
+        <Workflow size={16} aria-hidden="true" />
+        Plan feature work
+      </Menu.Item>
+      {hasLaunchpad && launchpadHidden && (
+        <Menu.Item
+          className="workspace-menu-item"
+          onSelect={() => setLaunchpadHidden(project.id, false)}
+        >
+          <Compass size={16} aria-hidden="true" />
+          Show starting points
+        </Menu.Item>
+      )}
+    </>
   );
   return (
     <WorkspacePage className="task-home">
@@ -355,7 +393,7 @@ export function TaskWorkspace({
             onArchivedChange={setArchived}
             menuItems={pageMenuItems}
             emptyState={
-              !archived && launchpad ? (
+              !archived && launchpad && !launchpadBelow ? (
                 launchpad
               ) : (
                 <EmptyState
@@ -414,6 +452,7 @@ export function TaskWorkspace({
           {launchpad}
         </>
       )}
+      {launchpadBelow}
       {archived && (
         <Suspense fallback={<LoadingState label="Loading archive…" />}>
           <ArchivedHistory />

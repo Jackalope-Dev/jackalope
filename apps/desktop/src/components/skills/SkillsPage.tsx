@@ -36,6 +36,7 @@ import { SkillDetailDialog } from './SkillDetailDialog';
 import { SkillConstellation } from './SkillOrbit';
 import { type SkillAction, SkillTile } from './SkillTile';
 import './skills.css';
+import { ConnectAccountButton } from '../account/RequiresAccount';
 
 function since(at: string | null) {
   if (!at) return '';
@@ -202,6 +203,7 @@ export function SkillsPage() {
               <p className="skill-hero-note">{since(sync.lastSyncedAt)}</p>
             )}
             <div className="skill-hero-actions">
+              {isTauriEnvironment() && !sync.available && !sync.reset && <ConnectAccountButton />}
               {sync.available && !sync.settingsSync && (
                 <Button variant="outline" onClick={() => openSettings('Privacy')}>
                   Open privacy settings

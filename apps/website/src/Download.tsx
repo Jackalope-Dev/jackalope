@@ -257,12 +257,12 @@ export function DownloadPage({ downloads = desktopDownloads }: { downloads?: Pla
           <Ticket size={23} strokeWidth={1.5} aria-hidden="true" />
           <div>
             <h2 id="download-access-title" ref={accessHeading} tabIndex={-1}>
-              {email && !token ? 'Your account is ready.' : 'Create a free account to get started.'}
+              {email && !token ? 'Your account is ready.' : 'Create a free account (optional).'}
             </h2>
             <p>
               {email && !token
                 ? `You’re signed in as ${email}. Choose your platform above to get started.`
-                : 'Sign up with your email, confirm it, then sign in to the app with the same address.'}
+                : 'The app works without one. An account syncs settings, lessons and skills across your computers. Sign up with your email, confirm it, then connect the app.'}
             </p>
             {email && !token ? (
               <a className="text-link" href="/access/">

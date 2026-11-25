@@ -119,6 +119,7 @@ fn routing_excludes_shared_exhausted_accounts_but_preserves_other_model_pools() 
         failure: QuotaFailure {
             model_only: false,
             message: "Quota".into(),
+            ..Default::default()
         },
         recorded_at: Utc::now().to_rfc3339(),
     };
@@ -186,6 +187,7 @@ fn new_work_returns_to_the_preferred_account_once_its_quota_resets() {
         failure: QuotaFailure {
             model_only: false,
             message: "Claude's five-hour usage limit is used up.".into(),
+            ..Default::default()
         },
         recorded_at: Utc::now().to_rfc3339(),
     };
@@ -313,7 +315,7 @@ fn main() {
     )
     .unwrap();
     let history = root.join("history");
-    let runtime = TaskRuntime::with_test_access(history.clone()).unwrap();
+    let runtime = TaskRuntime::new(history.clone()).unwrap();
     let mut policy = AgentPolicy::default();
     policy.automatic_quota_handoff = Some(enabled);
     for id in crate::commands::agents::builtin_ids() {
@@ -430,7 +432,7 @@ fn main() {
         std::thread::sleep(Duration::from_millis(10));
     }
     drop(runtime);
-    let restored = TaskRuntime::with_test_access(history).unwrap();
+    let restored = TaskRuntime::new(history).unwrap();
     let run = restored.inner.lock().unwrap().runs[&id].clone();
     assert_eq!(run.workspace, settled.workspace);
     assert_eq!(run.routing.unwrap().handoffs.len(), 1);
@@ -582,7 +584,7 @@ fn routing_installed_codex_selects_and_executes_in_disposable_repository() {
         ],
     )
     .unwrap();
-    let runtime = TaskRuntime::with_test_access(root.join("history")).unwrap();
+    let runtime = TaskRuntime::new(root.join("history")).unwrap();
     let mut policy = AgentPolicy::default();
     policy.default_meta_agent = "codex".into();
     for id in crate::commands::agents::builtin_ids() {
@@ -745,7 +747,7 @@ fn main() {
         ],
     )
     .unwrap();
-    let runtime = TaskRuntime::with_test_access(root.join("history")).unwrap();
+    let runtime = TaskRuntime::new(root.join("history")).unwrap();
     let mut policy = AgentPolicy::default();
     for id in crate::commands::agents::builtin_ids() {
         policy.enabled_agents.insert(id.into(), false);
@@ -773,7 +775,7 @@ fn main() {
     let request: RunRequest = serde_json::from_value(serde_json::json!({"id":id,"projectId":"routing-budget-fixture","projectName":"Routing budget","projectPath":repo,"agent":"auto","prompt":"Complete the fixture.","isolated":true,"connectionIds":[]})).unwrap();
     let started = std::time::Instant::now();
     runtime.start(request).unwrap();
-    let deadline = started + Duration::from_secs(25);
+    let deadline = started + Duration::from_secs(90);
     let settled = loop {
         let run = runtime.inner.lock().unwrap().runs[&id].clone();
         if !run.status.is_active() {

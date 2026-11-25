@@ -5,11 +5,14 @@
 //! The bridge serves every tool in-process, and the runner reports every
 //! workspace capability ([`computers::runner::RunnerCapabilities::device`]).
 //! The agent process is owned here: it is registered under the attempt so
-//! [`TaskRuntime::stop`] can end its process tree, and a persistent Claude Code
-//! session is driven through [`TaskRuntime::run_claude_session`].
+//! [`TaskRuntime::stop`] can end its process tree. A persistent Claude Code session is
+//! driven through [`TaskRuntime::run_claude_session`], and a Codex turn through
+//! [`TaskRuntime::run_codex_session`], which falls back to `codex exec` here when the
+//! app-server cannot run it.
 
 use super::super::{
-    agent_process::AgentProcess, antigravity, claude_session, gemini, kimi, opencode, resume,
+    agent_process::AgentProcess, antigravity, claude_session, codex_session, gemini, kimi,
+    opencode, resume,
 };
 use super::*;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -29,6 +32,8 @@ pub(in crate::commands::tasks) struct LocalRunner {
     opencode: Option<opencode::Connection>,
     acp_servers: Vec<serde_json::Value>,
     persistent: Option<Persistent>,
+    /// The turn runs in a Codex app-server session.
+    codex: Option<codex_session::Settings>,
     /// Keeps a managed runtime installed from launch until the agent's own
     /// process holds it.
     _lease: Option<crate::commands::managed_runtime::UseGuard>,
@@ -56,6 +61,7 @@ impl LocalRunner {
         opencode: Option<opencode::Connection>,
         acp_servers: Vec<serde_json::Value>,
         persistent: Option<Persistent>,
+        codex: Option<codex_session::Settings>,
         lease: Option<crate::commands::managed_runtime::UseGuard>,
     ) -> Self {
         Self {
@@ -65,6 +71,7 @@ impl LocalRunner {
             opencode,
             acp_servers,
             persistent,
+            codex,
             _lease: lease,
             process: None,
         }
@@ -82,7 +89,7 @@ impl AttemptRunner for LocalRunner {
 
     fn start(&mut self, runtime: &TaskRuntime, launch: &mut Launch) -> Result<Step, String> {
         // A persistent session starts or continues its process when followed.
-        if self.persistent.is_some() {
+        if self.persistent.is_some() || self.codex.is_some() {
             return Ok(Step::Ready);
         }
         let (id, req, adapter, workspace) =
@@ -100,7 +107,11 @@ impl AttemptRunner for LocalRunner {
         let launched = std::time::Instant::now();
         let opencode = &mut self.opencode;
         let server = opencode.is_some();
+        let resumed = self.resumed_session.as_deref();
         let Some(spawned) = runtime.register_process(id, Some(workspace), || {
+            if adapter == "codex" {
+                runtime.codex_sessions.check_free(resumed, workspace)?;
+            }
             if let Some(connection) = opencode {
                 connection.release_port();
             }
@@ -302,6 +313,47 @@ impl AttemptRunner for LocalRunner {
                 exit_code: outcome.exit_code,
                 quota_stopped: outcome.quota_stopped,
             }));
+        }
+        if let Some(settings) = self.codex.take() {
+            let outcome = runtime.run_codex_session(codex_session::Launch {
+                id,
+                request: launch.req,
+                exec: &launch.cmd,
+                input: &launch.input,
+                workspace: launch.workspace,
+                previous_session: self.resumed_session.as_deref(),
+                settings: &settings,
+            })?;
+            match outcome {
+                codex_session::Outcome::Ran {
+                    success,
+                    exit_code,
+                    quota_stopped,
+                } => {
+                    return Ok(Some(Outcome {
+                        success,
+                        exit_code,
+                        quota_stopped,
+                    }))
+                }
+                codex_session::Outcome::Stopped => return Ok(None),
+                codex_session::Outcome::Unavailable(reason) => {
+                    // An attempt stopped meanwhile starts nothing, so it does not say exec ran.
+                    if self.start(runtime, launch)? == Step::Stopped {
+                        return Ok(None);
+                    }
+                    runtime.update_checked(id, |run| {
+                        run.efficiency.codex_transport = Some("exec".into());
+                        activity(
+                            run,
+                            &format!(
+                                "{}. Running this turn with codex exec instead.",
+                                reason.trim_end_matches('.')
+                            ),
+                        );
+                    })?;
+                }
+            }
         }
         let Some(process) = self.process.as_ref() else {
             return Err("The agent did not start.".into());

@@ -35,6 +35,10 @@ struct Terminal {
     pty: PtySession,
     output: Arc<Mutex<Output>>,
     history: Option<std::path::PathBuf>,
+    /// A saved command marked to stop when its task finishes ran here, so merging or archiving
+    /// the task stops this whole shell and everything it started. The mark covers the shell
+    /// rather than the command's job: merging needs the workspace free of any running terminal.
+    stop_when_finished: bool,
 }
 impl Terminal {
     fn persist(&self) -> Result<(), String> {
@@ -97,6 +101,9 @@ pub struct TerminalView {
     output: String,
     cursor: usize,
     reset: bool,
+    /// The whole shell stops when its task is merged or archived, because a saved command
+    /// marked for that ran in it.
+    stops_when_finished: bool,
 }
 fn running(terminal: &mut Terminal) -> Result<bool, String> {
     if terminal
@@ -131,6 +138,7 @@ fn view(terminal: &mut Terminal, cursor: usize, generation: &str) -> Result<Term
         output: output.text[start..].into(),
         cursor: end,
         reset,
+        stops_when_finished: running && terminal.stop_when_finished,
     })
 }
 
@@ -142,6 +150,35 @@ pub fn ensure_idle(workspace: &str) -> Result<(), String> {
         }
     }
     Ok(())
+}
+/// Stops the terminals of `task_ids` that ran a command marked to stop when its task finishes,
+/// returning how many were running. Call without holding the terminal lock.
+pub fn stop_when_finished<'a>(task_ids: impl IntoIterator<Item = &'a str>) -> usize {
+    let Ok(mut sessions) = terminals().lock() else {
+        return 0;
+    };
+    let mut stopped = 0;
+    for task in task_ids {
+        for slot in ["main", "split"] {
+            let Ok(key) = terminal_id(task, slot) else {
+                continue;
+            };
+            let Some(terminal) = sessions.get_mut(&key) else {
+                continue;
+            };
+            if !terminal.stop_when_finished || !matches!(running(terminal), Ok(true)) {
+                continue;
+            }
+            match terminal.pty.stop() {
+                Ok(()) => stopped += 1,
+                Err(error) => eprintln!("A finished task's terminal could not be stopped: {error}"),
+            }
+            if let Err(error) = terminal.persist() {
+                eprintln!("Terminal output could not be saved: {error}");
+            }
+        }
+    }
+    stopped
 }
 pub fn close_all() {
     if let Ok(mut sessions) = terminals().lock() {
@@ -207,7 +244,6 @@ pub(super) fn start_with_shell(
     slot: &str,
     retain_output: bool,
 ) -> Result<(), String> {
-    runtime.access.ensure()?;
     let _guard = integration::execution_guard()?;
     let runs = runtime.integration_runs()?;
     let run = runs
@@ -344,6 +380,7 @@ fn spawn_terminal(
             },
             output: output.clone(),
             history,
+            stop_when_finished: false,
         },
     );
     let task_id = terminal_id;
@@ -456,8 +493,15 @@ pub fn task_terminal_status(
         .map(|terminal| view(terminal, cursor, &generation))
         .transpose()
 }
+/// `stop_when_finished` marks the shell as running a saved command that should stop when the
+/// task is merged or archived; the mark lasts until the shell exits.
 #[tauri::command]
-pub fn task_terminal_write(id: String, generation: String, input: String) -> Result<(), String> {
+pub fn task_terminal_write(
+    id: String,
+    generation: String,
+    input: String,
+    stop_when_finished: Option<bool>,
+) -> Result<(), String> {
     if input.len() > 65536 {
         return Err("Terminal input is too large".into());
     }
@@ -471,7 +515,11 @@ pub fn task_terminal_write(id: String, generation: String, input: String) -> Res
         .pty
         .writer
         .write_all(input.as_bytes())
-        .map_err(|e| e.to_string())
+        .map_err(|e| e.to_string())?;
+    if stop_when_finished == Some(true) {
+        terminal.stop_when_finished = true;
+    }
+    Ok(())
 }
 #[tauri::command]
 pub fn task_terminal_resize(
@@ -553,6 +601,7 @@ pub async fn task_terminal_restore(
             cursor: saved.output.len(),
             output: saved.output,
             reset: true,
+            stops_when_finished: false,
         }))
     })
     .await

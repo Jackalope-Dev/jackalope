@@ -376,7 +376,7 @@ export function WaitlistPage() {
                 ? 'If this address has signed up, a fresh link is on its way. Check spam too. You can request another after a minute.'
                 : 'If this address is on the list, a private link is on its way. Check spam too. You can request another after a minute.'
               : open
-                ? 'There’s no waitlist. Create a free account, confirm your email, and download the app.'
+                ? 'There’s no waitlist. Download the app and start right away, or create a free account to sync across your computers.'
                 : 'Already joined? We’ll send you a private link to your position and referrals.'}
           </p>
           {open && !sent && (

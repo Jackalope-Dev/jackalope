@@ -287,6 +287,15 @@ fn gemini_surfaces_permission_denials_and_terminal_quota_errors() {
     stream.consume(&mut run, r#"{"type":"result","status":"error","error":{"type":"TerminalQuotaError","message":"You have exhausted your capacity on this model. RESOURCE_EXHAUSTED"}}"#);
     assert!(run.quota_failure.is_some());
     assert!(run.error.is_some());
+    assert_eq!(run.quota_failure.unwrap().resets_at, None);
+
+    let mut run = sample("gemini");
+    let mut stream = gemini::Stream::default();
+    stream.consume(&mut run, GEMINI_INIT);
+    let before = chrono::Utc::now().timestamp();
+    stream.consume(&mut run, r#"{"type":"result","status":"error","error":{"type":"TerminalQuotaError","message":"You have exhausted your capacity on this model. Your quota will reset after 2h33m17s."}}"#);
+    let resets = run.quota_failure.unwrap().resets_at.unwrap();
+    assert!((before + 9_197..=before + 9_200).contains(&resets));
 
     let mut run = sample("gemini");
     gemini::diagnostic(&mut run, "Retrying with backoff: quota exceeded");
