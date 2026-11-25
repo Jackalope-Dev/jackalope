@@ -255,7 +255,7 @@ impl Fixture {
             path
         };
         let history = root.join("history");
-        let runtime = TaskRuntime::with_test_access(history.clone()).unwrap();
+        let runtime = TaskRuntime::new(history.clone()).unwrap();
         let mut policy = AgentPolicy::default();
         policy.custom_agents.push(CustomAgent {
             id: "claude-rewind".into(),
@@ -496,7 +496,7 @@ fn a_rewind_restores_files_resumes_the_earlier_conversation_and_survives_a_resta
     let mut fixture = fixture;
     fixture.runtime.take().unwrap().stop_all();
     std::thread::sleep(Duration::from_millis(200));
-    let restored = TaskRuntime::with_test_access(fixture.history.clone()).unwrap();
+    let restored = TaskRuntime::new(fixture.history.clone()).unwrap();
     let reloaded = restored.integration_runs().unwrap();
     let get = |id: &str| reloaded.iter().find(|run| run.id == id).unwrap().clone();
     assert!(get(&two.id).rewind.rewound.is_some());
@@ -542,7 +542,7 @@ fn a_rewind_to_the_first_turn_starts_a_new_conversation_and_refuses_a_busy_works
 fn real_rewind_trial(agent: &str, model: Option<String>) {
     let root = std::env::temp_dir().join(format!("jackalope-rewind-real-{}", uuid::Uuid::new_v4()));
     let repo = super::super::tests::trial_repository(&root);
-    let runtime = TaskRuntime::with_test_access(root.join("history")).unwrap();
+    let runtime = TaskRuntime::new(root.join("history")).unwrap();
     // No managed account: the CLI's own sign-in.
     std::fs::create_dir_all(runtime.profiles_root()).unwrap();
     std::fs::write(
