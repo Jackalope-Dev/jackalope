@@ -204,6 +204,7 @@ fn finds_repositories_from_sessions_code_folders_and_editors() {
 #[test]
 fn guarded_folders_are_never_opened() {
     let home = Home::new();
+    // macOS asks for permission inside these; Windows and Linux don't, so discovery looks there.
     for path in [
         "Documents/x",
         "Desktop",
@@ -211,9 +212,17 @@ fn guarded_folders_are_never_opened() {
         "Library/Mobile Documents/com~apple~CloudDocs/repo",
         "Pictures",
     ] {
-        assert!(protected(&home.path(path), &home.root), "{path}");
+        assert_eq!(
+            protected(&home.path(path), &home.root),
+            cfg!(target_os = "macos"),
+            "{path}"
+        );
     }
-    assert!(protected(Path::new("/Volumes/USB/repo"), &home.root));
+    let volume = Path::new("/Volumes/USB/repo");
+    assert_eq!(
+        protected(volume, &home.root),
+        cfg!(target_os = "macos") || !volume.is_absolute()
+    );
     assert!(protected(Path::new("relative/path"), &home.root));
     for path in ["Code/x", "Developer", "DocumentsArchive/x"] {
         assert!(!protected(&home.path(path), &home.root), "{path}");

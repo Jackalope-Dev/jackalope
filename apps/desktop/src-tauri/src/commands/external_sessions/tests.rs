@@ -745,8 +745,9 @@ fn sessions_in_protected_locations_are_listed_without_looking_at_their_folder() 
 
 #[test]
 fn protected_locations_are_judged_from_the_path_text() {
-    use super::super::platform::{absolute_fixture, protected_location_in};
+    use super::super::platform::{absolute_fixture, macos_guarded_in, protected_location_in};
     let home = absolute_fixture("/Users/someone");
+    // Guarded only on macOS, which asks for permission there; elsewhere they are ordinary.
     for path in [
         "/Users/someone/Desktop",
         "/Users/someone/Documents/repo",
@@ -760,16 +761,28 @@ fn protected_locations_are_judged_from_the_path_text() {
         "/Users/other/Library/Mobile Documents/x",
     ] {
         let path = absolute_fixture(path);
-        assert!(protected_location_in(&path, &home), "{}", path.display());
+        assert!(macos_guarded_in(&path, &home), "{}", path.display());
+        assert_eq!(
+            protected_location_in(&path, &home),
+            cfg!(target_os = "macos"),
+            "{}",
+            path.display()
+        );
     }
-    // macOS volumes and system folders, a folder written without a drive, and a relative
-    // path. On Windows none of them has a drive, so all of them are relative there.
-    for path in [
-        "/Volumes/USB/repo",
-        "/System/Volumes/Data",
-        r"\Users\someone\Code\repo",
-        "relative/path",
-    ] {
+    // macOS volumes and system folders. Without a drive they are relative on Windows, so
+    // protected there too.
+    for path in ["/Volumes/USB/repo", "/System/Volumes/Data"] {
+        let path = Path::new(path);
+        assert!(macos_guarded_in(path, &home), "{}", path.display());
+        assert_eq!(
+            protected_location_in(path, &home),
+            cfg!(target_os = "macos") || !path.is_absolute(),
+            "{}",
+            path.display()
+        );
+    }
+    // A folder written without a drive, and a relative path: protected everywhere.
+    for path in [r"\Users\someone\Code\repo", "relative/path"] {
         assert!(protected_location_in(Path::new(path), &home), "{path}");
     }
     for path in [
@@ -780,6 +793,7 @@ fn protected_locations_are_judged_from_the_path_text() {
         "/private/tmp/repo",
     ] {
         let path = absolute_fixture(path);
+        assert!(!macos_guarded_in(&path, &home), "{}", path.display());
         assert!(!protected_location_in(&path, &home), "{}", path.display());
     }
 }

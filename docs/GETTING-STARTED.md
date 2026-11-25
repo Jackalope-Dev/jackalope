@@ -21,7 +21,7 @@ code folders in your home (such as `~/Code`, `~/Developer`, `~/Projects`, `~/src
 `~/source/repos`), and folders VS Code, Cursor and Windsurf list as open or recently open
 in their `storage.json`. Worktrees count as their main checkout, and repositories that are
 already projects are left out. It reads only directory entries and Git metadata (current
-commit time and the default remote's host), never file contents, and it never opens
+commit time and the default remote's host), never file contents. On macOS it never opens
 Desktop, Documents, Downloads, the media folders, `~/Library` (including iCloud Drive) or
 mounted volumes, so macOS does not ask for permission. The scan stops after a few seconds
 with what it found. The few with recent agent conversations or commits start chosen; **Add

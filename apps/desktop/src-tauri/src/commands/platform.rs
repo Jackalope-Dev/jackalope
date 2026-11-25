@@ -15,15 +15,22 @@ const PROTECTED_FOLDERS: [&str; 8] = [
     "Public",
 ];
 
-/// Whether looking inside `path` could make macOS ask the person for permission: a guarded
-/// home folder, iCloud Drive or a mounted volume. Decided from the path text alone, so a
-/// caller can skip the folder without touching it. Relative paths count as protected,
-/// since where they point is unknown; on Windows that includes `\Users\x`, which has no drive.
-/// The home folder matches whatever its case, as macOS and Windows disks ignore case and an
-/// agent records the folder as the person typed it.
+/// Whether `path` must not be looked inside unless the person asks: a relative path anywhere,
+/// since where it points is unknown (on Windows that includes `\Users\x`, which has no drive),
+/// and on macOS a place [`macos_guarded_in`] names. Windows and Linux ask nothing for those
+/// folders, so there an absolute path is never protected; skipping them would hide repositories
+/// in `Documents\GitHub`, GitHub Desktop's default on Windows. Decided from the path text alone,
+/// so a caller can skip the folder without touching it.
 pub(crate) fn protected_location_in(path: &Path, home: &Path) -> bool {
-    if !path.is_absolute()
-        || path.starts_with("/Volumes")
+    !path.is_absolute() || (cfg!(target_os = "macos") && macos_guarded_in(path, home))
+}
+
+/// Whether looking inside `path` could make macOS ask the person for permission: a guarded
+/// home folder, iCloud Drive or a mounted volume, judged from the path text on any platform.
+/// The home folder matches whatever its case, as macOS disks ignore case and an agent records
+/// the folder as the person typed it.
+pub(crate) fn macos_guarded_in(path: &Path, home: &Path) -> bool {
+    if path.starts_with("/Volumes")
         || path.starts_with("/System")
         || path
             .components()
