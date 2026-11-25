@@ -1,5 +1,14 @@
 import { AgentCharacter } from '@jackalope/brand/agent-character';
-import { Button, InlineNotice, Select, SelectItem, Textarea } from '@jackalope/ui';
+import {
+  BorderBeamLayer,
+  Button,
+  InlineNotice,
+  lastPressedControl,
+  playDistortionWave,
+  Select,
+  SelectItem,
+  Textarea,
+} from '@jackalope/ui';
 import { emit, listen } from '@tauri-apps/api/event';
 import { FolderOpen } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -153,6 +162,7 @@ export function SessionStart({
     chosen.length === 1 ? modelChoice?.id : undefined,
   );
   const [busy, setBusy] = useState(false);
+  const [recording, setRecording] = useState(false);
   const [limits, setLimits] = useState<Limits>(() => {
     try {
       const saved = JSON.parse(localStorage.getItem(`${draftKey}:limits`) ?? '{}');
@@ -382,6 +392,22 @@ ${incoming}`
   });
   /** Non-code work Jackalope inferred, which Options can switch back to code work. */
   const inferredNonCode = !general && !!nonCodeReason(text, { window: !!attached });
+  /**
+   * Sent work replaces this composer with its result, so a wave from the Send control carries
+   * that change across the pane. The source is measured before sending: the composer may be
+   * gone by the time the work exists.
+   */
+  const waveFromSend = () => {
+    const form = composer.current;
+    const pressed = lastPressedControl();
+    const control =
+      pressed && form?.contains(pressed) ? pressed : form?.querySelector('[type="submit"]');
+    const source = (control ?? form)?.getBoundingClientRect();
+    const within = form?.closest('.workspace-canvas') ?? form?.closest('.workspace-page-layout');
+    return () => {
+      if (source && within?.isConnected) playDistortionWave({ within, source });
+    };
+  };
   const send = async (
     requested: 'assess' | 'single' | 'plan' | 'interview' = 'assess',
     override?: string,
@@ -404,6 +430,7 @@ ${incoming}`
     setBusy(true);
     setError('');
     setAttachNotice('');
+    const wave = waveFromSend();
     let handedOff = false;
     try {
       if (comparing && choice !== 'interview') {
@@ -428,7 +455,10 @@ ${incoming}`
         const first = useExecutionStore
           .getState()
           .runs.find((run) => run.taskId === comparison.taskIds[0]);
-        if (first) selectWork({ task: first.id });
+        if (first) {
+          wave();
+          selectWork({ task: first.id });
+        }
         return;
       }
       const lead = chosen[0];
@@ -475,6 +505,7 @@ ${incoming}`
           setText('');
           setPlanning(false);
         }
+        wave();
         usePlanStore.getState().select(plan.id);
         navigateWorkspace('plans');
         return;
@@ -496,6 +527,7 @@ ${incoming}`
       }
       if (choice === 'plan' || autoStart) {
         await assessment.create(withEffort, value, autoStart);
+        wave();
         await skipAttached();
         finishOrigin(value);
         localStorage.removeItem(draftKey);
@@ -519,7 +551,10 @@ ${incoming}`
       localStorage.removeItem(draftKey);
       localStorage.removeItem(`${draftKey}:context`);
       if (handedOff) setAttachRefresh((value) => value + 1);
-      if (mounted.current) useLiveSessionStore.getState().select(attempt.id);
+      if (mounted.current) {
+        wave();
+        useLiveSessionStore.getState().select(attempt.id);
+      }
       return attempt.id;
     } catch (cause) {
       if (handedOff) {
@@ -581,6 +616,11 @@ ${incoming}`
             void send();
           }}
         >
+          <BorderBeamLayer
+            variant={recording ? 'pulse' : 'line'}
+            active={recording || busy || sharpen.busy}
+            level={recording ? 'var(--voice-level, 0)' : undefined}
+          />
           {assist.menu}
           <Textarea
             ref={input}
@@ -685,6 +725,7 @@ ${incoming}`
               )}
               <VoiceButton
                 disabled={busy}
+                onRecordingChange={setRecording}
                 onText={(value) => {
                   assessment.clear();
                   const next = insertDictation(text, value, input.current);

@@ -1,4 +1,5 @@
-import { Button, InlineNotice, Textarea } from '@jackalope/ui';
+import { isRunning } from '@jackalope/contracts/runs';
+import { BorderBeamLayer, Button, InlineNotice, Textarea } from '@jackalope/ui';
 import { ArrowRight } from 'lucide-react';
 import { useMemo, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
@@ -69,6 +70,7 @@ export function TaskFollowUpPanel({
 }) {
   const form = useRef<HTMLFormElement>(null);
   const replyField = useRef<HTMLTextAreaElement>(null);
+  const [recording, setRecording] = useState(false);
   const agentName = useExecutionStore(
     (state) =>
       state.runners.find((runner) => runner.id === run.agent)?.name ??
@@ -194,6 +196,12 @@ export function TaskFollowUpPanel({
             send();
           }}
         >
+          <BorderBeamLayer
+            variant={recording ? 'pulse' : 'travel'}
+            active={recording || (active && isRunning(run))}
+            level={recording ? 'var(--voice-level, 0)' : undefined}
+            strength={recording ? 1 : 0.85}
+          />
           {assist.menu}
           {side && (
             <SideQuestion
@@ -243,6 +251,7 @@ export function TaskFollowUpPanel({
             )}
             <VoiceButton
               disabled={submitting || acting}
+              onRecordingChange={setRecording}
               onText={(value) => {
                 const next = insertDictation(reply, value, replyField.current);
                 onReply(next.text);

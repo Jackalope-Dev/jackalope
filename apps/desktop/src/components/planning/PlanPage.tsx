@@ -352,7 +352,11 @@ function PlanDetail({
         );
       })}
       {view.planning && !view.questions.length && (
-        <LoadingState compact label="The planner is reading the code and drafting…" />
+        <LoadingState
+          compact
+          orb="planning"
+          label="The planner is reading the code and drafting…"
+        />
       )}
       <WorkspaceTabs.Root value={tab} onValueChange={(value) => setTab(value as Tab)}>
         <WorkspaceTabs.List aria-label="Plan views">

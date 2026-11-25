@@ -25,8 +25,8 @@ it uses the home project; removing a project from the bot moves its wake-ups hom
 
 The Bots page opens on a card per project showing the bots that work there, what they
 are doing and what waits on you. Choosing a card lists that project's bots and their
-conversations in that project, and **Add an existing bot** adds a bot from another
-project to this one. An open conversation shows the project it runs in.
+conversations in that project, and **New bot → Add an existing bot** adds a bot from
+another project to this one. An open conversation shows the project it runs in.
 
 An optional `appearance` holds a character style (the shared `AgentCharacter`
 silhouettes plus bot-only shapes whose face stays inside the fill) and a colour from
@@ -52,7 +52,7 @@ the renderer's bot record.
 ## Sharing bots
 
 **Share these bots** in a project's Bots menu saves that project's bots as one
-`.jackalope-bots.json` file (or copies it as text), and **Import bots** adds a file's bots
+`.jackalope-bots.json` file (or copies it as text), and **New bot → Import bots** adds a file's bots
 to the open project after listing them. `lib/bot-team.ts` owns the format, which is an
 allowlist: a team name and, per bot, name, description, instructions, appearance, whether
 it works with other bots, and schedule or project-change wake-ups. It has no field for an

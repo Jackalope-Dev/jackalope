@@ -1,0 +1,126 @@
+@import "./foundation.css";
+@import "./motion.css";
+@layer components {
+  .ui-liquid {
+    position: relative;
+    isolation: isolate;
+  }
+  /* Sits under the group's content; the group measures and places it around every piece. */
+  .ui-liquid-surface {
+    position: absolute;
+    z-index: -1;
+    overflow: visible;
+    pointer-events: none;
+  }
+  .ui-liquid-surface rect {
+    fill: var(--liquid-fill, var(--color-surface-elevated));
+    transition: fill var(--motion-base, 180ms);
+  }
+  .ui-liquid-item {
+    translate: var(--liquid-x, 0) var(--liquid-y, 0);
+    scale: var(--liquid-scale, 1);
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .ui-liquid-item {
+      --liquid-duration: 360ms;
+      --liquid-ease: cubic-bezier(0.22, 1, 0.36, 1);
+      transition:
+        translate var(--liquid-duration) var(--liquid-ease) var(--liquid-delay, 0ms),
+        scale var(--liquid-duration) var(--liquid-ease) var(--liquid-delay, 0ms);
+    }
+    .ui-liquid-item[data-transition="snappy"] {
+      --liquid-duration: var(--motion-slow, 240ms);
+      --liquid-ease: var(--ease-out, ease-out);
+    }
+    .ui-liquid-item[data-transition="bouncy"] {
+      --liquid-duration: 560ms;
+      --liquid-ease: cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+  }
+
+  /* Speed dial: the trigger and its actions are one liquid in the action colour. */
+  .ui-liquid-actions {
+    --liquid-fill: var(--color-action);
+    display: inline-flex;
+    flex: none;
+  }
+  .ui-liquid-actions[data-open] {
+    z-index: 30;
+  }
+  .ui-liquid-actions[data-disabled] {
+    --liquid-fill: var(--color-surface-sunken);
+  }
+  .ui-liquid-actions-menu {
+    position: absolute;
+    top: 0;
+    right: 0;
+  }
+  .ui-liquid-actions:not([data-open]) .ui-liquid-actions-menu {
+    pointer-events: none;
+  }
+  /* Every action starts in the trigger's slot, collapsed behind it, and springs down. */
+  .ui-liquid-actions-slot {
+    position: absolute;
+    top: 0;
+    right: 0;
+    transform-origin: right center;
+  }
+  :is(.ui-liquid-actions-trigger, .ui-liquid-actions-item) {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    height: var(--control-height, 36px);
+    padding: 0 16px 0 12px;
+    border: 0;
+    border-radius: var(--radius-full);
+    background: transparent;
+    color: var(--color-on-action);
+    font: inherit;
+    font-size: var(--text-sm, 0.875rem);
+    font-weight: 500;
+    white-space: nowrap;
+    cursor: pointer;
+    transition:
+      background-color var(--motion-fast, 120ms),
+      color var(--motion-base, 180ms),
+      opacity var(--motion-base, 180ms);
+  }
+  :is(.ui-liquid-actions-trigger, .ui-liquid-actions-item):hover:not(:disabled, [aria-disabled]) {
+    background: color-mix(in srgb, var(--color-on-action) 12%, transparent);
+  }
+  :is(.ui-liquid-actions-trigger, .ui-liquid-actions-item):focus-visible {
+    outline: 2px solid var(--color-border-focus);
+    outline-offset: 2px;
+  }
+  .ui-liquid-actions-trigger:disabled {
+    color: var(--color-text-secondary);
+    cursor: not-allowed;
+  }
+  .ui-liquid-actions-item[aria-disabled] {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+  .ui-liquid-actions:not([data-open]) .ui-liquid-actions-item {
+    opacity: 0;
+  }
+  /* Labels wait until their piece has mostly grown, so text never shows at a sliver's size. */
+  .ui-liquid-actions[data-open] .ui-liquid-actions-item {
+    transition-delay: 0ms, 0ms, calc(var(--liquid-delay, 0ms) + 160ms);
+  }
+  .ui-liquid-actions-icon {
+    display: inline-flex;
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .ui-liquid-actions-icon {
+      transition: rotate var(--motion-slow, 240ms) var(--ease-out, ease-out);
+    }
+  }
+  .ui-liquid-actions[data-open] .ui-liquid-actions-icon {
+    rotate: 45deg;
+  }
+  @media (forced-colors: active) {
+    :is(.ui-liquid-actions-trigger, .ui-liquid-actions-item) {
+      border: 1px solid ButtonText;
+    }
+  }
+}

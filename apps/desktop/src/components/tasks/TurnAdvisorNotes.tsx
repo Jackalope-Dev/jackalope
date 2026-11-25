@@ -1,5 +1,4 @@
-import { Badge } from '@jackalope/ui';
-import { Loader2 } from 'lucide-react';
+import { Badge, ThinkingOrb } from '@jackalope/ui';
 import {
   type AdvisorNote,
   type AdvisorReview,
@@ -30,7 +29,7 @@ export function TurnAdvisorNotes({ review }: { review?: AdvisorReview | null }) 
     <section className="turn-advisor" aria-label="Turn advisor">
       <p className="turn-advisor-status" role={reviewing ? 'status' : undefined}>
         {reviewing ? (
-          <Loader2 size={14} className="animate-spin" aria-hidden="true" />
+          <ThinkingOrb state="breathing" size={20} aria-hidden="true" />
         ) : (
           review.agent && <ProviderMark provider={review.agent} size={14} />
         )}

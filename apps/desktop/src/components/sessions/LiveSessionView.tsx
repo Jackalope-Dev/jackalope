@@ -1045,11 +1045,12 @@ export function LiveSessionView({
                     </div>
                   )}
                   {latest && <DesktopPermissionNotice key={latest.id} run={latest} />}
-                  {questions.map((prompt) => (
+                  {questions.map((prompt, index) => (
                     <AgentQuestion
                       key={prompt.id}
                       prompt={prompt}
                       active
+                      highlight={index === 0}
                       onAnswer={async (answer) => {
                         if (!active) throw new Error('This attempt is no longer running.');
                         await respondToPrompt(active.id, prompt.id, answer);

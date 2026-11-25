@@ -1,4 +1,5 @@
 import { elapsedLabel, isActive } from '@jackalope/contracts/runs';
+import { ThinkingOrb } from '@jackalope/ui';
 import { Activity, CircleAlert, FilePenLine, FileSearch, Search, Terminal } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import type { TaskRun } from '../../lib/run-types';
@@ -14,7 +15,16 @@ const icons = {
   check: Terminal,
 };
 
-export function TaskLiveActivity({ run, omitPhase }: { run: TaskRun; omitPhase?: string }) {
+export function TaskLiveActivity({
+  run,
+  omitPhase,
+  orb = true,
+}: {
+  run: TaskRun;
+  omitPhase?: string;
+  /** Off where a neighbouring status already shows this run's orb. */
+  orb?: boolean;
+}) {
   const active = isActive(run);
   const [, tick] = useState(0);
   useEffect(() => {
@@ -31,7 +41,10 @@ export function TaskLiveActivity({ run, omitPhase }: { run: TaskRun; omitPhase?:
   return (
     <section className="task-live-activity" aria-label="Live activity">
       <div className="task-live-heading">
-        {state.phase !== omitPhase && <span role="status">{state.phase}</span>}
+        <span className="task-live-phase">
+          {orb && state.orb && <ThinkingOrb state={state.orb} size={20} aria-hidden="true" />}
+          {state.phase !== omitPhase && <span role="status">{state.phase}</span>}
+        </span>
         {run.progress && run.progress.attempt > 1 && <span>Attempt {run.progress.attempt}</span>}
         {elapsed && (
           <span className="task-live-elapsed">

@@ -21,9 +21,13 @@ const LIMIT_MS = 59_000;
 export function VoiceButton({
   onText,
   disabled,
+  onRecordingChange,
 }: {
   onText: (text: string) => void;
   disabled?: boolean;
+  /** Recording started or stopped. While recording, the enclosing `[data-composer]`
+   * form also carries the live `--voice-level` (0 to 1). */
+  onRecordingChange?: (recording: boolean) => void;
 }) {
   const [state, setState] = useState<'idle' | 'recording' | 'processing'>('idle');
   const [setup, setSetup] = useState(false);
@@ -35,6 +39,14 @@ export function VoiceButton({
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const receiveText = useRef(onText);
   receiveText.current = onText;
+  const reportRecording = useRef(onRecordingChange);
+  reportRecording.current = onRecordingChange;
+  const recording = state === 'recording';
+  useEffect(() => {
+    if (!recording) return;
+    reportRecording.current?.(true);
+    return () => reportRecording.current?.(false);
+  }, [recording]);
 
   useEffect(
     () => () => {
@@ -70,13 +82,15 @@ export function VoiceButton({
     analyser.fftSize = 512;
     context.createMediaStreamSource(stream).connect(analyser);
     const samples = new Float32Array(analyser.fftSize);
+    const composer = button.current?.closest<HTMLElement>('[data-composer]');
     let frame = 0;
     const tick = () => {
       analyser.getFloatTimeDomainData(samples);
       let sum = 0;
       for (const sample of samples) sum += sample * sample;
-      const level = Math.min(1, Math.sqrt(sum / samples.length) * 6);
-      button.current?.style.setProperty('--voice-level', level.toFixed(3));
+      const level = Math.min(1, Math.sqrt(sum / samples.length) * 6).toFixed(3);
+      button.current?.style.setProperty('--voice-level', level);
+      composer?.style.setProperty('--voice-level', level);
       frame = requestAnimationFrame(tick);
     };
     tick();
@@ -85,6 +99,7 @@ export function VoiceButton({
       if (stopped) return;
       stopped = true;
       cancelAnimationFrame(frame);
+      composer?.style.removeProperty('--voice-level');
       void context.close();
     };
   };

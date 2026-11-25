@@ -1,10 +1,20 @@
-import { useRef } from 'react';
+import {
+  type CSSProperties,
+  type MouseEvent,
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from 'react';
 import './agent-character.css';
 
 export interface AgentGaze {
   x: number;
   y: number;
 }
+
+export type AgentCharacterState = 'idle' | 'working' | 'waiting';
 
 const silhouettes: Record<string, string> = {
   codex:
@@ -31,20 +41,136 @@ const silhouettes: Record<string, string> = {
     'M40 22C55 22 66 33 66 47C66 61 55 70 40 70C25 70 14 61 14 47C14 33 25 22 40 22ZM40 22C38 14 42 8 50 8C50 15 46 20 40 22Z',
 };
 
+// Characters drawn at least this wide get the fur edge and a ground shadow; smaller ones stay crisp.
+const LARGE = 48;
+
+// One observer of each kind serves every character on the page.
+const characters = new Set<SVGSVGElement>();
+let visibility: IntersectionObserver | undefined;
+let sizing: ResizeObserver | undefined;
+
+function syncHidden() {
+  for (const element of characters) {
+    element.toggleAttribute('data-hidden', document.hidden);
+  }
+}
+
+function track(element: SVGSVGElement) {
+  if (typeof window === 'undefined') return () => {};
+  if (characters.size === 0) document.addEventListener('visibilitychange', syncHidden);
+  characters.add(element);
+  element.toggleAttribute('data-hidden', document.hidden);
+  if ('IntersectionObserver' in window) {
+    visibility ??= new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          entry.target.toggleAttribute('data-offscreen', !entry.isIntersecting);
+        }
+      },
+      { rootMargin: '64px' },
+    );
+    visibility.observe(element);
+  }
+  if ('ResizeObserver' in window) {
+    sizing ??= new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        entry.target.toggleAttribute('data-large', entry.contentRect.width >= LARGE);
+      }
+    });
+    sizing.observe(element);
+  }
+  return () => {
+    characters.delete(element);
+    visibility?.unobserve(element);
+    sizing?.unobserve(element);
+    if (characters.size === 0) document.removeEventListener('visibilitychange', syncHidden);
+  };
+}
+
+function reducedMotion() {
+  return (
+    typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+  );
+}
+
+function randomBetween(low: number, high: number) {
+  return low + Math.random() * (high - low);
+}
+
 export function AgentCharacter({
   provider,
   state = 'idle',
   gaze,
+  material = 'plush',
+  interactive = false,
+  onClick,
 }: {
   provider: string;
-  state?: 'idle' | 'working' | 'waiting';
+  state?: AgentCharacterState;
   gaze?: AgentGaze;
+  /** Plush adds soft studio shading, bead eyes and, at larger sizes, a fur edge. */
+  material?: 'plush' | 'flat';
+  /** A click makes the character hop and turn round. Leave off inside clickable rows. */
+  interactive?: boolean;
+  onClick?: (event: MouseEvent<SVGSVGElement>) => void;
 }) {
   const silhouette = silhouettes[provider] ?? silhouettes.codex;
-  const blinkDelayRef = useRef<string | undefined>(undefined);
-  if (blinkDelayRef.current === undefined) {
-    blinkDelayRef.current = `${(Math.random() * 4).toFixed(2)}s`;
+  const id = `brand-agent-${useId().replace(/[^\w-]/g, '')}`;
+  const root = useRef<SVGSVGElement>(null);
+  const body = useRef<SVGGElement>(null);
+  const turn = useRef<SVGGElement>(null);
+  // Per-instance timing, so a row of characters never blinks, glances or jumps in unison.
+  const timing = useRef<Record<string, string> | undefined>(undefined);
+  if (timing.current === undefined) {
+    timing.current = {
+      '--brand-agent-blink-delay': `${randomBetween(0, 4).toFixed(2)}s`,
+      '--brand-agent-glance-delay': `${randomBetween(-11, 0).toFixed(2)}s`,
+      '--brand-agent-idle-period': `${randomBetween(13, 19).toFixed(2)}s`,
+      '--brand-agent-idle-delay': `${randomBetween(-12, -2).toFixed(2)}s`,
+      '--brand-agent-work-delay': `${randomBetween(-0.25, 0).toFixed(2)}s`,
+    };
   }
+  const [poke, setPoke] = useState(0);
+
+  useEffect(() => {
+    const element = root.current;
+    return element ? track(element) : undefined;
+  }, []);
+
+  // Changing state swaps CSS animations, which would snap mid-hop. Capture the pose the old
+  // animation left on screen while the old DOM is still committed, then ease out of it.
+  const previous = useRef(state);
+  const outgoing = useRef<{ body: string; turn: string } | null>(null);
+  if (previous.current !== state) {
+    previous.current = state;
+    outgoing.current =
+      body.current && turn.current && !reducedMotion()
+        ? {
+            body: getComputedStyle(body.current).transform,
+            turn: getComputedStyle(turn.current).transform,
+          }
+        : null;
+  }
+  useLayoutEffect(() => {
+    const from = outgoing.current;
+    outgoing.current = null;
+    if (!from || !body.current?.animate) return;
+    const settle = { duration: 320, easing: 'cubic-bezier(0.2, 0.8, 0.2, 1)' };
+    for (const [element, transform] of [
+      [body.current, from.body],
+      [turn.current, from.turn],
+    ] as const) {
+      if (element && transform && transform !== 'none') {
+        element.animate([{ transform }, { transform: 'none' }], settle);
+      }
+    }
+  });
+
+  useEffect(() => {
+    if (!poke) return;
+    const timer = window.setTimeout(() => setPoke(0), 720);
+    return () => window.clearTimeout(timer);
+  }, [poke]);
 
   const clampedX = gaze ? Math.max(-1, Math.min(1, gaze.x)) : 0;
   const clampedY = gaze ? Math.max(-1, Math.min(1, gaze.y)) : 0;
@@ -59,41 +185,112 @@ export function AgentCharacter({
     ? `translate(${headDx}px, ${headDy}px) rotate(${headRotate}deg)`
     : undefined;
   const gazeTransform = gaze ? `translate(${eyeDx}px, ${eyeDy}px)` : undefined;
+  const plush = material === 'plush';
+  const eyes = state === 'working' ? 'M29 39h4m12 0h4' : 'M31 37v4m16-4v4';
 
   return (
     <svg
+      ref={root}
       className="brand-agent-character"
       data-state={state}
+      data-material={material}
+      data-glance={gaze ? undefined : ''}
+      data-interactive={interactive || undefined}
+      // Alternating values restart the one-shot animation on a quick second click.
+      data-poke={poke ? (poke % 2 ? 'a' : 'b') : undefined}
       viewBox="0 0 88 88"
       fill="none"
       aria-hidden="true"
+      style={{ ...timing.current, '--brand-agent-fur': `url(#${id}-fur)` } as CSSProperties}
+      onClick={
+        interactive || onClick
+          ? (event) => {
+              if (interactive) setPoke((count) => count + 1);
+              onClick?.(event);
+            }
+          : undefined
+      }
     >
-      <g
-        className="brand-agent-head"
-        style={headTransform ? { transform: headTransform } : undefined}
-      >
-        {[4, 3, 2, 1].map((layer) => (
-          <path
-            key={layer}
-            d={silhouette}
-            transform={`translate(${layer * 3} ${layer * 1.5})`}
-            className="brand-agent-echo"
-          />
-        ))}
-        <path d={silhouette} fill="currentColor" />
-        {provider === 'grok' && <path d="M12 57C26 54 51 33 64 20" className="brand-agent-orbit" />}
-        <g
-          className="brand-agent-gaze"
-          style={gazeTransform ? { transform: gazeTransform } : undefined}
-        >
-          <g
-            className="brand-agent-face"
-            strokeLinecap="round"
-            strokeWidth="3.5"
-            style={{ animationDelay: blinkDelayRef.current }}
-          >
-            <path d={state === 'working' ? 'M29 39h4m12 0h4' : 'M31 37v4m16-4v4'} />
-            {state === 'waiting' && <path d="M45 30l5-2" strokeWidth="2" />}
+      {plush && (
+        <defs>
+          <clipPath id={`${id}-clip`}>
+            <path d={silhouette} />
+          </clipPath>
+          <radialGradient id={`${id}-shade`} cx="0.3" cy="0.22" r="0.95">
+            <stop offset="0" className="brand-agent-stop-light" />
+            <stop offset="0.42" className="brand-agent-stop-clear" />
+            <stop offset="0.72" className="brand-agent-stop-clear" />
+            <stop offset="1" className="brand-agent-stop-dark" />
+          </radialGradient>
+          <linearGradient id={`${id}-rim`} x1="1" y1="0" x2="0.35" y2="0.75">
+            <stop offset="0" className="brand-agent-stop-rim" />
+            <stop offset="0.55" className="brand-agent-stop-clear" />
+          </linearGradient>
+          <filter id={`${id}-fur`} x="-10%" y="-10%" width="120%" height="120%">
+            <feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="2" seed="7" />
+            <feDisplacementMap in="SourceGraphic" scale="2.4" yChannelSelector="G" />
+          </filter>
+        </defs>
+      )}
+      {plush && <ellipse className="brand-agent-ground" cx="42" cy="80" rx="22" ry="3" />}
+      <g ref={body} className="brand-agent-body">
+        <g className="brand-agent-lean">
+          <g ref={turn} className="brand-agent-turn">
+            <g
+              className="brand-agent-head"
+              style={headTransform ? { transform: headTransform } : undefined}
+            >
+              {[4, 3, 2, 1].map((layer) => (
+                <path
+                  key={layer}
+                  d={silhouette}
+                  transform={`translate(${layer * 3} ${layer * 1.5})`}
+                  className="brand-agent-echo"
+                />
+              ))}
+              <g className="brand-agent-fill">
+                <path d={silhouette} fill="currentColor" />
+                {plush && (
+                  <g clipPath={`url(#${id}-clip)`}>
+                    <path d={silhouette} fill={`url(#${id}-shade)`} />
+                    <path
+                      d={silhouette}
+                      stroke={`url(#${id}-rim)`}
+                      strokeWidth="5"
+                      className="brand-agent-rim"
+                    />
+                  </g>
+                )}
+              </g>
+              {provider === 'grok' && (
+                <path d="M12 57C26 54 51 33 64 20" className="brand-agent-orbit" />
+              )}
+              <g
+                className="brand-agent-gaze"
+                style={gazeTransform ? { transform: gazeTransform } : undefined}
+              >
+                <g className="brand-agent-glance">
+                  <g className="brand-agent-face" strokeLinecap="round" strokeWidth="3.5">
+                    <path d={eyes} />
+                    {plush && state !== 'working' && (
+                      <g className="brand-agent-bead">
+                        <circle cx="31.6" cy="37.6" r="0.9" />
+                        <circle cx="47.6" cy="37.6" r="0.9" />
+                      </g>
+                    )}
+                    {state === 'waiting' && <path d="M45 30l5-2" strokeWidth="2" />}
+                  </g>
+                  {state === 'working' && (
+                    <path
+                      d="M34 46.5Q39 50.5 44 46.5"
+                      className="brand-agent-smile"
+                      strokeLinecap="round"
+                      strokeWidth="2.5"
+                    />
+                  )}
+                </g>
+              </g>
+            </g>
           </g>
         </g>
       </g>

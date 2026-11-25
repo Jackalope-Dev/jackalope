@@ -1,5 +1,6 @@
 import { describeError } from '@jackalope/contracts/errors';
-import { Button, InlineNotice, Textarea } from '@jackalope/ui';
+import { isRunning } from '@jackalope/contracts/runs';
+import { BorderBeamLayer, Button, InlineNotice, Textarea } from '@jackalope/ui';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { usePromptAttachments } from '../../hooks/usePromptAttachments';
 import { useProviderSkills } from '../../hooks/useProviderSkills';
@@ -51,6 +52,7 @@ export function SessionComposer({
   });
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
+  const [recording, setRecording] = useState(false);
   const revision = useRef(session.draft.revision);
   const saved = useRef(session.draft.text);
   const pending = useRef<{ id: string; text: string } | null>(null);
@@ -299,6 +301,12 @@ export function SessionComposer({
         void send();
       }}
     >
+      <BorderBeamLayer
+        variant={recording ? 'pulse' : 'travel'}
+        active={recording || (!!active && isRunning(active))}
+        level={recording ? 'var(--voice-level, 0)' : undefined}
+        strength={recording ? 1 : 0.85}
+      />
       {assist.menu}
       {side && work && (
         <SideQuestion
@@ -369,6 +377,7 @@ export function SessionComposer({
       <div className="live-composer-actions">
         <VoiceButton
           disabled={saving || session.closed}
+          onRecordingChange={setRecording}
           onText={(value) => {
             editing.current = true;
             const next = insertDictation(text, value, input.current);

@@ -9,6 +9,7 @@ import { WelcomeDialog } from './components/layout/WelcomeDialog';
 import { JackalopeMascot } from './components/mascot/JackalopeMascot';
 import { ThemeEditor } from './components/theme/ThemeEditor';
 import { WorkspaceHeading } from './components/ui/WorkspaceHeading';
+import { FlourishesLab } from './design-lab/flourishes/FlourishesLab';
 import { localAiFixture } from './design-lab/local-ai-fixture';
 import { TaskExperienceExamples } from './design-lab/TaskExperienceExamples';
 import { type MascotMood, useMascotStore } from './stores/mascotStore';
@@ -212,6 +213,7 @@ function DesignLab() {
             )}
           </div>
         </section>
+        <FlourishesLab />
         <TaskExperienceExamples />
       </div>
     </main>

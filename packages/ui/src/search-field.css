@@ -5,6 +5,10 @@
     min-width: 0;
     width: 100%;
   }
+  .ui-search-field > .ui-beam {
+    --beam-edge: 0px;
+    border-radius: var(--radius-md, 8px);
+  }
   .ui-search-icon {
     position: absolute;
     left: 12px;

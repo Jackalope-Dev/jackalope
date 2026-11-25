@@ -1,7 +1,8 @@
 import { isActive, isDone, needsAttention, statusLabel } from '@jackalope/contracts/runs';
-import { Badge, type BadgeProps, LoadingIcon } from '@jackalope/ui';
+import { Badge, type BadgeProps, ThinkingOrb } from '@jackalope/ui';
 import { Check, CircleAlert, CircleCheck, Clock3, LoaderCircle, Square } from 'lucide-react';
 import type { StepProgress, TaskRun } from '../../lib/run-types';
+import { activityOrb } from '../../lib/task-live-activity';
 
 const icons = {
   starting: Clock3,
@@ -34,9 +35,11 @@ export function RunStatus({
       className="task-status"
       data-state={status}
       variant={variant}
-      icon={active ? undefined : icons[status]}
+      icon={active && status !== 'stopping' ? undefined : icons[status]}
     >
-      {active && <LoadingIcon />}
+      {active && status !== 'stopping' && (
+        <ThinkingOrb state={activityOrb(status, progress)} size={20} aria-hidden="true" />
+      )}
       {progress?.label || statusLabel[status]}
     </Badge>
   );

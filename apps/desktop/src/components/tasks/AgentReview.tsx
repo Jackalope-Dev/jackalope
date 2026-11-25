@@ -14,9 +14,10 @@ import {
   SelectItem,
   Switch,
   Textarea,
+  ThinkingOrb,
 } from '@jackalope/ui';
 import * as Dialog from '@radix-ui/react-dialog';
-import { Check, Circle, CircleCheck, Loader2, ScanSearch, X } from 'lucide-react';
+import { Check, Circle, CircleCheck, ScanSearch, X } from 'lucide-react';
 import { type ReactNode, useEffect, useMemo, useState } from 'react';
 import { agentAdapter } from '../../lib/agent-catalog';
 import {
@@ -127,7 +128,7 @@ export function AgentReview({
       {reviewer ? (
         <Button variant="outline" onClick={() => setOpen(true)}>
           {state === 'running' ? (
-            <Loader2 size={16} className="animate-spin" aria-hidden="true" />
+            <ThinkingOrb state="searching" size={20} aria-hidden="true" />
           ) : (
             <ScanSearch size={16} aria-hidden="true" />
           )}
@@ -258,7 +259,7 @@ function Steps({ steps }: { steps: Step[] }) {
             {step.status === 'done' ? (
               <Check size={14} />
             ) : step.status === 'active' ? (
-              <Loader2 size={14} className="animate-spin" />
+              <ThinkingOrb state="searching" size={20} />
             ) : step.status === 'failed' ? (
               <X size={14} />
             ) : (
