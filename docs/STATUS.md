@@ -738,7 +738,11 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   Simulator (reused by follow-ups, a bounded pool, shut down when idle and deleted with the
   workspace; only devices Jackalope created are touched). Agents read and drive apps there
   with `simulator_*` tools through a bundled XCUITest driver, and the Screen view shows the
-  device. New worktrees reuse CocoaPods, Carthage and resolved Swift packages as
+  device. Preview builds, installs and launches the app on that Simulator with a live screen
+  the person can tap, type into, rotate, switch to dark mode or larger text, open links in
+  and select elements from for follow-up notes. Finished work that changes the app gets
+  light, dark and large-text review screenshots before and after, and feature-map entries
+  can name deep links. New worktrees reuse CocoaPods, Carthage and resolved Swift packages as
   copy-on-write clones, and projects can lengthen setup and check time limits.
   `project.pbxproj` files merge object by object, so concurrent file, target and package
   additions do not conflict. A person can attach a paired iPhone or iPad to a conversation
