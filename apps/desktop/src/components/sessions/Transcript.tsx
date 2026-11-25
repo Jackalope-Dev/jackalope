@@ -37,6 +37,7 @@ import {
   jumpBehavior,
   type ScrollSample,
   sampleScroll,
+  scrolledFromPin,
 } from '../../lib/transcript-follow';
 import './transcript.css';
 
@@ -139,9 +140,12 @@ export function Transcript({
   const itemCount = useRef(items);
   itemCount.current = items;
   const baseline = useRef(items);
+  /** Where following last held the end; null until it next does. */
+  const pinned = useRef<number | null>(null);
   const follow = useCallback((value: boolean) => {
     if (following.current === value) return;
     following.current = value;
+    pinned.current = null;
     if (!value) baseline.current = itemCount.current;
     setIsFollowing(value);
   }, []);
@@ -151,8 +155,21 @@ export function Transcript({
   const readingTop = useRef(0);
   const stick = useCallback(() => {
     const node = scroller.current;
-    if (node?.clientHeight && following.current) node.scrollTop = node.scrollHeight;
-  }, []);
+    if (!node?.clientHeight) {
+      // Hiding the scroller drops its position, so the next one is not a scroll.
+      pinned.current = null;
+      return;
+    }
+    if (!following.current) return;
+    // A scrollbar drag, key or script can move the view up just before a commit, ahead of
+    // its scroll event. That stops following rather than being pulled back to the end.
+    if (scrolledFromPin(pinned.current, sampleScroll(node))) {
+      follow(false);
+      return;
+    }
+    node.scrollTop = node.scrollHeight;
+    pinned.current = node.scrollTop;
+  }, [follow]);
   // Every commit can grow the rows or what follows them. This runs before the virtualizer
   // reads the position, so its first range is the end.
   useLayoutEffect(() => stick());
@@ -237,6 +254,7 @@ export function Transcript({
       const { row, height, distance, timer } = held;
       window.clearTimeout(timer);
       following.current = held.following;
+      pinned.current = null;
       held = null;
       // The rows' total size changes only once the row is measured, which may not have
       // happened yet, so the end is judged from the row's own change in height.

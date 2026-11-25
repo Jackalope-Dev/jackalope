@@ -37,6 +37,15 @@ export function followAfterScroll(
   return following;
 }
 
+/**
+ * Whether a followed transcript, last held at the end at `pinned`, was scrolled up before
+ * its scroll event arrived. While following, content changes only move the view to the end:
+ * growth leaves the position alone and shrinking clamps it there.
+ */
+export function scrolledFromPin(pinned: number | null, sample: ScrollSample) {
+  return pinned !== null && sample.top < pinned - 1 && distanceFromEnd(sample) > 1;
+}
+
 /** Scroll behavior for returning to the end: instant for long distances or reduced motion. */
 export function jumpBehavior(distance: number, viewport: number, reducedMotion: boolean) {
   return reducedMotion || distance > viewport * 3 ? 'auto' : 'smooth';

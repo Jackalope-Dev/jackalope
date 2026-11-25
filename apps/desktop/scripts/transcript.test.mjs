@@ -16,7 +16,12 @@ import {
   occurrences,
   stepMatch,
 } from '../src/lib/transcript-find.ts';
-import { distanceFromEnd, followAfterScroll, jumpBehavior } from '../src/lib/transcript-follow.ts';
+import {
+  distanceFromEnd,
+  followAfterScroll,
+  jumpBehavior,
+  scrolledFromPin,
+} from '../src/lib/transcript-follow.ts';
 
 test('find searches every row part, case-insensitively, in reading order', () => {
   const rows = [
@@ -78,6 +83,12 @@ test('following continues through growth and stops when the person reads back', 
   assert.equal(followAfterScroll(false, reading, { top: 590, height: 1500, client: 500 }), false);
   assert.equal(followAfterScroll(false, { ...end, top: 990 }, { ...end, top: 985 }), false);
   assert.equal(followAfterScroll(false, null, end), true);
+  // A scroll up that lands before its event is not pulled back to the end; growth and a
+  // shrink that clamps to the end are not scrolls, and nothing counts before the first hold.
+  assert.equal(scrolledFromPin(1000, { top: 700, height: 1600, client: 500 }), true);
+  assert.equal(scrolledFromPin(1000, { top: 1000, height: 1700, client: 500 }), false);
+  assert.equal(scrolledFromPin(1000, { top: 900, height: 1400, client: 500 }), false);
+  assert.equal(scrolledFromPin(null, { top: 0, height: 1500, client: 500 }), false);
   assert.equal(jumpBehavior(400, 500, false), 'smooth');
   assert.equal(jumpBehavior(400, 500, true), 'auto');
   assert.equal(jumpBehavior(5000, 500, false), 'auto');

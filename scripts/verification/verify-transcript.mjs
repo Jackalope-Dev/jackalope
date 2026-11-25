@@ -364,6 +364,10 @@ async function checkBehavior(page) {
   assert.equal(await group.count(), 0, 'the group unmounts once far away');
   await page.keyboard.press(`${modifier}+F`);
   await finder.fill('Message 1503:');
+  // Closing find before the match is found would cancel bringing it into view.
+  await page.waitForFunction(
+    () => document.querySelector('.transcript-find-count')?.textContent === '1 of 1',
+  );
   await finder.press('Escape');
   await group.waitFor();
   assert.equal(await group.evaluate((node) => node.open), true, 'the group stays open');
@@ -378,25 +382,45 @@ async function checkBehavior(page) {
   assert.ok(Math.abs((await summaryTop()) - closing) <= 1, 'closing holds the summary in place');
 
   // At the end, a group that opens below the view stops following instead of scrolling it away.
-  await page.evaluate(() =>
+  // The newest runs are rewound, so the group sits at the end, in view while following.
+  const newest = await page.evaluate(() => {
+    const runs = window.transcriptFixture.storeRuns().slice(-2);
+    const ids = runs.map((run) => run.id);
     window.transcriptFixture.runs((runs) =>
       runs.map((run) =>
-        ['r1998', 'r1999'].includes(run.id)
+        ids.includes(run.id)
           ? { ...run, rewind: { rewound: { rewindId: 'rewind', at: run.startedAt } } }
           : run,
       ),
-    ),
-  );
+    );
+    return `rewound:m${ids[0].slice(1)}`;
+  });
   await page.locator('.transcript-jump').click();
   await page.waitForFunction(() => {
     const node = document.querySelector('.live-transcript');
     return node.scrollHeight - node.scrollTop - node.clientHeight < 2;
   });
-  const last = page.locator('.transcript-row[data-key="rewound:m1998"] summary');
+  const lastGroup = page.locator(`.transcript-row[data-key="${newest}"] .rewound-turns`);
+  const last = lastGroup.locator('summary');
   await last.waitFor();
-  const lastTop = await last.evaluate((node) => node.getBoundingClientRect().top);
+  await page.locator('.transcript-jump').waitFor({ state: 'detached' });
+  // Measured in view: clicking a summary out of view would scroll it in first.
+  const lastTop = await last.evaluate((node) => {
+    const box = node.getBoundingClientRect();
+    const view = node.closest('.live-transcript').getBoundingClientRect();
+    return box.top >= view.top && box.bottom <= view.bottom ? box.top : null;
+  });
+  assert.notEqual(lastTop, null, 'the newest group is in view at the end');
   await last.click();
-  await page.waitForTimeout(400);
+  // Opening lands once the group is open, measured and following has stopped.
+  await page.locator('.transcript-jump').waitFor();
+  await page.waitForFunction((key) => {
+    const row = document.querySelector(`.transcript-row[data-key="${key}"]`);
+    return row?.querySelector('.rewound-turns').open && row.offsetHeight > 200;
+  }, newest);
+  await page.evaluate(
+    () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))),
+  );
   assert.ok(
     Math.abs((await last.evaluate((node) => node.getBoundingClientRect().top)) - lastTop) <= 1,
     'the summary stays under the pointer at the end',
@@ -413,6 +437,10 @@ async function checkBehavior(page) {
   const row = page.locator('.transcript-row[data-key="m1980"]');
   await page.keyboard.press(`${modifier}+F`);
   await finder.fill('Message 1980:');
+  // Closing find before the match is found would cancel bringing it into view.
+  await page.waitForFunction(
+    () => document.querySelector('.transcript-find-count')?.textContent === '1 of 1',
+  );
   await finder.press('Escape');
   await row.waitFor();
   const edit = row.getByRole('button', { name: 'Edit from here' });
@@ -433,6 +461,12 @@ async function checkBehavior(page) {
   await dialog.waitFor();
   await page.keyboard.press('Escape');
   await dialog.waitFor({ state: 'detached' });
+  // The dialog returns focus in the task after it unmounts.
+  await page
+    .waitForFunction((node) => node === document.activeElement, await edit.elementHandle(), {
+      timeout: 2000,
+    })
+    .catch(() => {});
   assert.equal(
     await edit.evaluate((node) => node === document.activeElement),
     true,
