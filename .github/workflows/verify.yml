@@ -179,7 +179,9 @@ jobs:
     # check still reports from the quick job otherwise. Trial packages are built on the
     # same runs.
     runs-on: ${{ (needs.changes.outputs.platform == 'false' || (matrix.os == 'macos-15-intel' && needs.changes.outputs.release == 'false')) && 'ubuntu-latest' || matrix.os }}
-    timeout-minutes: 60
+    # Intel macOS builds the trial bundle on the slowest runners; release publication waits
+    # for this check, so a timeout there would stall a release.
+    timeout-minutes: ${{ matrix.os == 'macos-15-intel' && 90 || 60 }}
     env:
       SUITES: ${{ (needs.changes.outputs.platform == 'false' || (matrix.os == 'macos-15-intel' && needs.changes.outputs.release == 'false')) && 'skip' || 'run' }}
       TRIAL: ${{ needs.changes.outputs.release != 'false' && 'build' || 'skip' }}
