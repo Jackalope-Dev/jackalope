@@ -20,9 +20,12 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { useState } from 'react';
+import { useProjectHost } from '../../hooks/useProjectHost';
+import { openSettings } from '../../lib/app-events';
 import { invokeNative } from '../../lib/native/transport';
 import { checkName, isOpenPullRequest, type PullRequestView } from '../../lib/pull-requests';
 import type { TaskRun } from '../../lib/run-types';
+import { hostTerms } from '../../lib/source-control';
 import { mergeDestination } from '../../lib/task-workflow';
 import { useProjectStore } from '../../stores/projectStore';
 import { usePullRequestStore } from '../../stores/pullRequestStore';
@@ -44,14 +47,14 @@ interface DeliveryStatus {
 }
 
 /** What the agent can be asked to prepare; `goal` completes the handoff sentence. */
-const PREPARE_GOALS = [
-  { goal: 'a pull request', label: 'Pull request', icon: GitPullRequest },
+const prepareGoals = (noun: string, Noun: string) => [
+  { goal: `a ${noun}`, label: Noun, icon: GitPullRequest },
   { goal: 'CI verification', label: 'CI verification', icon: ShieldCheck },
   { goal: 'a deployment', label: 'Deployment', icon: Rocket },
-] as const;
+];
 
-export function deliveryHandoff(run: TaskRun, integrated: boolean, goal: string) {
-  return `Prepare ${goal} for this result. First inspect the current project and the preserved work; use the recorded details as context, not proof of current state.\n\nProject: ${run.projectPath}\nTask workspace: ${run.workspace}\nTask branch: ${run.branch}\nTarget: ${run.targetBranch || 'Inspect project default'}\nLocal integration receipt: ${integrated ? 'Recorded; recheck current ancestry' : 'Not recorded'}\n\nRequested outcome:\n${run.prompt.slice(0, 4000)}\n\nPrevious result:\n${run.result.slice(0, 4000)}\n\nChecks: ${run.verification ? `${run.verification.command}: ${run.verification.result.success ? 'passed for the recorded tree only' : 'failed'}` : 'Not recorded'}\n\nPreserve unrelated and uncommitted work. Check the current diff, requirements, configured checks, repository contribution rules, and delivery configuration. Prepare concrete changes and a reviewable handoff with exact branch, environment, commands and expected effects. Do not commit, push, open or merge a PR, deploy, send messages, or change remote state until the user explicitly approves that concrete action. Report local integration, remote publication, CI results and deployed behavior separately, with evidence and remaining uncertainties.`;
+export function deliveryHandoff(run: TaskRun, integrated: boolean, goal: string, short = 'PR') {
+  return `Prepare ${goal} for this result. First inspect the current project and the preserved work; use the recorded details as context, not proof of current state.\n\nProject: ${run.projectPath}\nTask workspace: ${run.workspace}\nTask branch: ${run.branch}\nTarget: ${run.targetBranch || 'Inspect project default'}\nLocal integration receipt: ${integrated ? 'Recorded; recheck current ancestry' : 'Not recorded'}\n\nRequested outcome:\n${run.prompt.slice(0, 4000)}\n\nPrevious result:\n${run.result.slice(0, 4000)}\n\nChecks: ${run.verification ? `${run.verification.command}: ${run.verification.result.success ? 'passed for the recorded tree only' : 'failed'}` : 'Not recorded'}\n\nPreserve unrelated and uncommitted work. Check the current diff, requirements, configured checks, repository contribution rules, and delivery configuration. Prepare concrete changes and a reviewable handoff with exact branch, environment, commands and expected effects. Do not commit, push, open or merge a ${short}, deploy, send messages, or change remote state until the user explicitly approves that concrete action. Report local integration, remote publication, CI results and deployed behavior separately, with evidence and remaining uncertainties.`;
 }
 
 export function TaskDelivery({
@@ -73,6 +76,12 @@ export function TaskDelivery({
   const pullRequest = usePullRequestStore((state) => state.tracked[run.taskId]);
   const ids = { taskId: run.taskId, runId: run.id };
   const project = useProjectStore((state) => state.projects.find((p) => p.id === run.projectId));
+  const { data: host } = useProjectHost(run.projectPath);
+  const terms = hostTerms(host?.kind);
+  const gitlab = host?.kind === 'gitlab';
+  // GitHub's access is not checked ahead; GitLab and Bitbucket say what is missing up front.
+  const access =
+    host && host.kind !== 'github' && host.access.state !== 'ready' ? host.access : null;
   const target = run.targetBranch?.trim() || mergeDestination(run, project);
   const path = (value: string) => value.replaceAll('\\', '/').replace(/\/+$/, '').toLowerCase();
   // Worktree tasks merge through the integration above; these worked in the project checkout.
@@ -102,13 +111,27 @@ export function TaskDelivery({
   const prepare = async (goal: string) => {
     setError('');
     try {
-      await onHandoff(deliveryHandoff(run, integrated, goal));
+      await onHandoff(deliveryHandoff(run, integrated, goal, terms.short));
     } catch (cause) {
       setError(describeError(cause));
     }
   };
   return (
     <section className="task-delivery space-y-4" aria-label="Delivery">
+      {access && (
+        <InlineNotice
+          tone="warning"
+          action={
+            host?.kind === 'bitbucket' ? (
+              <Button variant="outline" onClick={() => openSettings('Connected work')}>
+                Connection settings
+              </Button>
+            ) : undefined
+          }
+        >
+          {access.message}
+        </InlineNotice>
+      )}
       {pullRequest && (
         <TaskPullRequest
           run={run}
@@ -142,17 +165,20 @@ export function TaskDelivery({
             }}
           />
         )}
-        {!(pullRequest && isOpenPullRequest(pullRequest)) && !onTarget && (
-          <CreatePullRequest
-            run={run}
-            disabled={busy || isActive(run)}
-            onCreated={(url) => {
-              const store = usePullRequestStore.getState();
-              store.track(ids, url);
-              void store.refresh(run.taskId);
-            }}
-          />
-        )}
+        {!(pullRequest && isOpenPullRequest(pullRequest)) &&
+          !onTarget &&
+          host?.capabilities.create !== false && (
+            <CreatePullRequest
+              run={run}
+              provider={host?.kind}
+              disabled={busy || isActive(run)}
+              onCreated={(url) => {
+                const store = usePullRequestStore.getState();
+                store.track(ids, url);
+                void store.refresh(run.taskId);
+              }}
+            />
+          )}
         <Menu.Root>
           <Menu.Trigger asChild>
             <Button variant="outline" disabled={busy} loading={busy} loadingLabel="Inspecting…">
@@ -172,7 +198,7 @@ export function TaskDelivery({
               </Menu.Item>
               <Menu.Item className="workspace-menu-item" onSelect={() => void inspect(true)}>
                 <ListChecks size={16} aria-hidden="true" />
-                Check pull request and CI
+                {gitlab ? 'Check merge request and pipeline' : 'Check pull request and CI'}
               </Menu.Item>
               <Menu.Separator className="menu-separator" />
               <Menu.Sub>
@@ -183,7 +209,7 @@ export function TaskDelivery({
                 </Menu.SubTrigger>
                 <Menu.Portal>
                   <Menu.SubContent className="workspace-menu">
-                    {PREPARE_GOALS.map(({ goal, label, icon: Icon }) => (
+                    {prepareGoals(terms.noun, terms.Noun).map(({ goal, label, icon: Icon }) => (
                       <Menu.Item
                         key={goal}
                         className="workspace-menu-item"
@@ -200,7 +226,7 @@ export function TaskDelivery({
                 className="workspace-menu-item"
                 onSelect={() =>
                   void navigator.clipboard
-                    .writeText(deliveryHandoff(run, integrated, 'a delivery handoff'))
+                    .writeText(deliveryHandoff(run, integrated, 'a delivery handoff', terms.short))
                     .catch((cause) => setError(describeError(cause)))
                 }
               >
@@ -235,15 +261,19 @@ export function TaskDelivery({
           </p>
           {status.pullRequest && (
             <div className="space-y-2">
-              {status.pullRequest.headRefOid !== status.head && (
+              {!(
+                status.pullRequest.headRefOid &&
+                status.head.startsWith(status.pullRequest.headRefOid)
+              ) && (
                 <InlineNotice>
-                  The PR head differs from the inspected local revision. Its checks do not verify
-                  this local result.
+                  The {terms.short} head differs from the inspected local revision. Its checks do
+                  not verify this local result.
                 </InlineNotice>
               )}
               <Disclosure>
                 <DisclosureSummary>
-                  CI checks ({status.pullRequest.statusCheckRollup?.length ?? 0})
+                  {gitlab ? 'Pipeline jobs' : 'CI checks'} (
+                  {status.pullRequest.statusCheckRollup?.length ?? 0})
                 </DisclosureSummary>
                 {status.pullRequest.statusCheckRollup?.length ? (
                   <ul>
@@ -255,7 +285,7 @@ export function TaskDelivery({
                     ))}
                   </ul>
                 ) : (
-                  <p>No CI checks reported.</p>
+                  <p>{gitlab ? 'No pipeline jobs reported.' : 'No CI checks reported.'}</p>
                 )}
               </Disclosure>
             </div>

@@ -81,7 +81,6 @@ struct Inner {
 
 #[derive(Clone)]
 pub struct TaskRuntime {
-    pub(crate) access: Arc<super::execution_access::ExecutionAccess>,
     pub(super) knowledge: super::knowledge::KnowledgeStore,
     pub(in crate::commands) mcp_broker: super::mcp_broker::Broker,
     inner: Arc<Mutex<Inner>>,

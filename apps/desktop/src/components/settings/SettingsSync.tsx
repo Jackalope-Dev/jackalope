@@ -11,6 +11,7 @@ import { useEffect } from 'react';
 import { lessonSyncStatus } from '../../lib/lesson-sync';
 import { useLessonSyncStore } from '../../stores/lessonSyncStore';
 import { useSettingsSyncStore } from '../../stores/settingsSyncStore';
+import { AccountRequiredNotice } from '../account/RequiresAccount';
 
 export function SettingsSync() {
   const sync = useSettingsSyncStore();
@@ -38,15 +39,10 @@ export function SettingsSync() {
           </DisclosureSummary>
           <p className="settings-row-description">
             The first sync restores saved preferences. Paths stay local. Sync is optional on each
-            desktop; turning it off keeps local settings and the saved copy. Account access checks
-            continue.
+            desktop; turning it off keeps local settings and the saved copy.
           </p>
         </Disclosure>
-        {!sync.owner && (
-          <p role="status">
-            {sync.enabled ? 'Sync starts after you sign in.' : 'Sign in to sync settings.'}
-          </p>
-        )}
+        {!sync.owner && <AccountRequiredNotice feature="settingsSync" />}
         {sync.owner && (
           <div className="space-y-2">
             <Button variant="outline" disabled={sync.busy} onClick={() => void sync.remove()}>

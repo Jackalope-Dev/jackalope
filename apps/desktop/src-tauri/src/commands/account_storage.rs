@@ -14,6 +14,7 @@ const RECORD_NAMES: &[&str] = &[
     "account.bin",
     "agent-credentials.bin",
     "api-key.bin",
+    "bitbucket.bin",
     "cloudflare-artifacts.bin",
     "cloudflare-postgres.bin",
     "composio.bin",

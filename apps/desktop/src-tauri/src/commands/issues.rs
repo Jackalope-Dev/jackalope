@@ -1,4 +1,8 @@
-use super::{account_storage, github_workflows, tasks::TaskRuntime};
+use super::{
+    account_storage, github_workflows,
+    source_control::{self, bitbucket, gitlab, Route},
+    tasks::TaskRuntime,
+};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::{path::Path, sync::Mutex, time::Duration};
@@ -234,6 +238,24 @@ fn issue(provider: &str, value: &Value, site: &str, kind: &str) -> Issue {
             text(&value["fields"]["status"], "name"),
             jira_text(&value["fields"]["description"]),
         ),
+        "gitlab" => (
+            format!("{}{}", if kind == "pr" { "!" } else { "#" }, value["iid"]),
+            text(value, "title"),
+            text(value, "web_url"),
+            text(value, "state"),
+            text(value, "description"),
+        ),
+        "bitbucket" => (
+            format!("#{}", value["id"]),
+            text(value, "title"),
+            text(&value["links"]["html"], "href"),
+            text(value, "state"),
+            if kind == "pr" {
+                text(value, "description")
+            } else {
+                text(&value["content"], "raw")
+            },
+        ),
         _ => (
             value["number"].to_string(),
             text(value, "title"),
@@ -314,6 +336,52 @@ pub async fn project_issues(
         })
         .await
         .map_err(|e| e.to_string())?;
+    }
+    if provider == "gitlab" || provider == "bitbucket" {
+        let page = cursor
+            .as_deref()
+            .unwrap_or("1")
+            .parse::<usize>()
+            .map_err(|_| "Invalid issue page")?;
+        if !(1..=20).contains(&page) {
+            return Err("Narrow your search to see more issues.".into());
+        }
+        let integration = state.integration_directory();
+        let path = project_path.clone();
+        let route = tauri::async_runtime::spawn_blocking(move || {
+            source_control::route(&integration, Path::new(&path), &path)
+        })
+        .await
+        .map_err(|e| e.to_string())?;
+        let (rows, more) = match (provider.as_str(), route) {
+            ("gitlab", Route::GitLab(repository)) => {
+                let (kind, query) = (kind.clone(), query.clone());
+                tauri::async_runtime::spawn_blocking(move || {
+                    gitlab::list(
+                        Path::new(&project_path),
+                        &repository,
+                        &kind,
+                        &query,
+                        mine,
+                        page,
+                    )
+                })
+                .await
+                .map_err(|e| e.to_string())??
+            }
+            ("bitbucket", Route::Bitbucket(repository)) => {
+                let credentials = bitbucket::require(&state.integration_directory())?;
+                bitbucket::list(&credentials, &repository, &kind, &query, mine, page).await?
+            }
+            _ => return Err("This project's remote is not on that code host.".into()),
+        };
+        return Ok(Page {
+            items: rows
+                .iter()
+                .map(|value| issue(&provider, value, "", &kind))
+                .collect(),
+            next: (more && page < 20).then(|| (page + 1).to_string()),
+        });
     }
     let connection = connections(&state)?
         .into_iter()
@@ -419,6 +487,51 @@ mod tests {
             token: "fixture".into()
         })
         .is_ok());
+    }
+    #[test]
+    fn code_host_rows_keep_their_own_numbering_and_links() {
+        let gitlab = issue(
+            "gitlab",
+            &json!({"iid":7,"title":"Fix","web_url":"https://gitlab.com/a/b/-/issues/7","state":"opened","description":"Body"}),
+            "",
+            "issue",
+        );
+        assert_eq!(
+            (
+                gitlab.id.as_str(),
+                gitlab.url.as_str(),
+                gitlab.body.as_str()
+            ),
+            ("#7", "https://gitlab.com/a/b/-/issues/7", "Body")
+        );
+        let request = issue(
+            "gitlab",
+            &json!({"iid":3,"title":"MR","web_url":"https://gitlab.com/a/b/-/merge_requests/3"}),
+            "",
+            "pr",
+        );
+        assert_eq!(request.id, "!3");
+        let bitbucket = issue(
+            "bitbucket",
+            &json!({"id":4,"title":"Bug","state":"new","content":{"raw":"Steps"},"links":{"html":{"href":"https://bitbucket.org/a/b/issues/4"}}}),
+            "",
+            "issue",
+        );
+        assert_eq!(
+            (
+                bitbucket.id.as_str(),
+                bitbucket.url.as_str(),
+                bitbucket.body.as_str()
+            ),
+            ("#4", "https://bitbucket.org/a/b/issues/4", "Steps")
+        );
+        let pull = issue(
+            "bitbucket",
+            &json!({"id":9,"title":"PR","state":"OPEN","description":"Why","links":{"html":{"href":"https://bitbucket.org/a/b/pull-requests/9"}}}),
+            "",
+            "pr",
+        );
+        assert_eq!(pull.body, "Why");
     }
     #[test]
     fn long_issue_bodies_remain_valid_and_disclose_the_excerpt() {

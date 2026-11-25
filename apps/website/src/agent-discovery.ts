@@ -88,7 +88,7 @@ const skills = (origin: string) => [
   guideSkill(
     'getting-started-in-the-beta',
     'jackalope-getting-started',
-    'Install the Jackalope desktop app, connect a free account, learn its main pages, send feedback and get updates.',
+    'Install the Jackalope desktop app, optionally connect a free account, learn its main pages, send feedback and get updates.',
     origin,
   ),
   guideSkill(

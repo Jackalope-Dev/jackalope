@@ -212,7 +212,7 @@ fn one_launch_records_the_same_result_through_both_runners() {
         ),
     )
     .unwrap();
-    let runtime = TaskRuntime::with_test_access(folder.join("history")).unwrap();
+    let runtime = TaskRuntime::new(folder.join("history")).unwrap();
     computers::credentials::set(
         &runtime.computers_root(),
         "openai-key",
@@ -324,7 +324,7 @@ fn insert_run(runtime: &TaskRuntime, workspace: &Path) -> String {
 fn placement_is_recorded_once_and_continuations_keep_their_host() {
     let folder = std::env::temp_dir().join(format!("jackalope-placed-{}", uuid::Uuid::new_v4()));
     std::fs::create_dir_all(&folder).unwrap();
-    let runtime = TaskRuntime::with_test_access(folder.join("history")).unwrap();
+    let runtime = TaskRuntime::new(folder.join("history")).unwrap();
     let id = insert_run(&runtime, &folder);
     let req = request(&id, &folder);
     // A project without a computer runs here, as before, with nothing to
@@ -429,7 +429,7 @@ fn placed_on(runtime: &TaskRuntime, workspace: &Path, computer: &Computer) -> St
 fn computers_only_never_runs_a_placed_fork_on_this_device() {
     let folder = std::env::temp_dir().join(format!("jackalope-strict-{}", uuid::Uuid::new_v4()));
     std::fs::create_dir_all(&folder).unwrap();
-    let runtime = TaskRuntime::with_test_access(folder.join("history")).unwrap();
+    let runtime = TaskRuntime::new(folder.join("history")).unwrap();
     let computer = fixture_computer(&format!("strict{}", uuid::Uuid::new_v4().simple()));
     save_computer(&runtime, &computer);
     let gemini = |id: &str| RunRequest {
@@ -543,7 +543,7 @@ fn a_computer_that_does_not_answer_is_a_lost_host() {
     let folder = std::env::temp_dir().join(format!("jackalope-lost-{}", uuid::Uuid::new_v4()));
     std::fs::create_dir_all(&folder).unwrap();
     std::fs::write(folder.join("README.md"), "fixture\n").unwrap();
-    let runtime = TaskRuntime::with_test_access(folder.join("history")).unwrap();
+    let runtime = TaskRuntime::new(folder.join("history")).unwrap();
     computers::credentials::set(
         &runtime.computers_root(),
         "openai-key",
@@ -662,7 +662,7 @@ fn changes_left_on_a_lost_computer_are_saved_when_it_answers_never_applied() {
     let folder = root.join("work");
     std::fs::create_dir_all(&folder).unwrap();
     std::fs::write(folder.join("README.md"), "fixture\n").unwrap();
-    let runtime = TaskRuntime::with_test_access(root.join("history")).unwrap();
+    let runtime = TaskRuntime::new(root.join("history")).unwrap();
     let computer = fixture_computer(&format!("left{}", uuid::Uuid::new_v4().simple()));
     let lost = lost_attempt(&runtime, &folder, &computer);
     let all = |runtime: &TaskRuntime| -> Vec<TaskRun> {
@@ -774,7 +774,7 @@ fn a_later_attempt_on_that_computer_never_picks_up_a_lost_attempts_changes() {
     let folder = root.join("work");
     std::fs::create_dir_all(&folder).unwrap();
     std::fs::write(folder.join("README.md"), "fixture\n").unwrap();
-    let runtime = TaskRuntime::with_test_access(root.join("history")).unwrap();
+    let runtime = TaskRuntime::new(root.join("history")).unwrap();
     computers::credentials::set(
         &runtime.computers_root(),
         "openai-key",

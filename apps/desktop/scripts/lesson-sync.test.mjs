@@ -45,7 +45,10 @@ test('lesson sync is off by default and every project is included until excluded
 });
 
 test('status explains prerequisites, progress, resets and what stays local', () => {
-  assert.equal(lessonSyncStatus(EMPTY_LESSON_SYNC, false), 'Sign in to sync learned lessons.');
+  assert.equal(
+    lessonSyncStatus(EMPTY_LESSON_SYNC, false),
+    'Connect your Jackalope account to sync learned lessons.',
+  );
   assert.match(lessonSyncStatus(view({ settingsSync: false }), false), /Turn on settings sync/);
   assert.equal(
     lessonSyncStatus(view({ enabled: false }), false),

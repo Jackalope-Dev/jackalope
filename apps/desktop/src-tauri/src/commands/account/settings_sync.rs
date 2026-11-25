@@ -142,12 +142,11 @@ pub async fn app_settings_sync(
                 view.enabled = enabled;
                 Ok(view)
             }
-            _ => Err("Sign in to Jackalope to sync settings.".into()),
+            _ => Err(AccountFeature::SettingsSync.connect_message()),
         };
     }
-    let mut record = saved.take().unwrap();
     let (api, _) = endpoints(&app)?;
-    bound(&record, &api)?;
+    let mut record = state.admit(saved.take(), &api, AccountFeature::SettingsSync)?;
     let owner = sha256_hex(&format!("{}:{}", record.origin, record.secret));
     view.available = true;
     if record.settings_sync_pending
@@ -262,7 +261,7 @@ pub async fn app_settings_sync(
     )
     .await?;
     if code == 401 {
-        state.access.revoke();
+        state.lease.revoke();
         record.settings_sync = false;
         state.save(&record)?;
         return Err("Your account access changed. Reconnect before syncing settings.".into());
@@ -310,18 +309,12 @@ mod tests {
         let directory =
             std::env::temp_dir().join(format!("jackalope-sync-choice-{}", uuid::Uuid::new_v4()));
         std::fs::create_dir(&directory).unwrap();
-        let state = AccountService::new(
-            directory.join("account.bin"),
-            Arc::new(ExecutionAccess::new()),
-        );
+        let state = AccountService::new(directory.join("account.bin"));
         let fresh = read_choice(&state).unwrap();
         assert!(fresh.enabled);
         assert!(!fresh.explicit);
         save_choice(&state, false).unwrap();
-        let restarted = AccountService::new(
-            directory.join("account.bin"),
-            Arc::new(ExecutionAccess::new()),
-        );
+        let restarted = AccountService::new(directory.join("account.bin"));
         let saved = read_choice(&restarted).unwrap();
         assert!(!saved.enabled);
         assert!(saved.explicit);

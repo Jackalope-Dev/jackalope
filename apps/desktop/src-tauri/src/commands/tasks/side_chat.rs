@@ -159,7 +159,6 @@ fn ask(
     if question.is_empty() || question.chars().count() > QUESTION_LIMIT {
         return Err("Ask a side question of up to 4,000 characters.".into());
     }
-    runtime.access.ensure()?;
     let run = runtime
         .run_snapshot(run_id)
         .ok_or("This work is no longer loaded.")?;

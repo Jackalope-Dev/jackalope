@@ -757,11 +757,16 @@ img[src="/mascot.svg"] {
 }
 
 .shortcut-sheet {
-  width: min(520px, calc(100vw - 32px));
+  width: min(760px, calc(100vw - 32px));
+  max-height: calc(100vh - 48px);
+  overflow-y: auto;
 }
+/* Two columns where they fit, so the whole sheet stays in view. */
 .shortcut-sheet-groups {
   display: grid;
-  gap: 20px;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  align-items: start;
+  gap: 20px 32px;
   margin-bottom: 16px;
 }
 .shortcut-sheet h3 {

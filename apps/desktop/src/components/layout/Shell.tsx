@@ -19,6 +19,11 @@ import {
   useRef,
   useState,
 } from 'react';
+import {
+  type KeybindingHandler,
+  useKeybindingHandlers,
+  useResolvedKeybindings,
+} from '../../hooks/useKeybindings';
 import { useTauriEvent } from '../../hooks/useTauriEvent';
 import { navigateWorkspace, useAppEvent } from '../../lib/app-events';
 import { unreadBotConversations } from '../../lib/bot-conversations';
@@ -27,10 +32,10 @@ import { observeBots } from '../../lib/bot-hub-sync';
 import { editorName, openProjectInEditor } from '../../lib/editor';
 import { openGeneralProject } from '../../lib/general-project';
 import { helperTheme } from '../../lib/helper-actions';
+import { displayBinding, type KeybindingId, withShortcut } from '../../lib/keybindings';
 import type { LiveSession } from '../../lib/live-session';
 import { fileManagerName, isTauriEnvironment, revealInFileManager } from '../../lib/native/env';
 import { planningDraft } from '../../lib/planning';
-import { displayShortcut, matchesShortcut, resolveShortcuts } from '../../lib/shortcuts';
 import { swarmConnection } from '../../lib/swarm';
 import { useFeatureTelemetry } from '../../lib/use-feature-telemetry';
 import { useSavedActionsMigration } from '../../lib/use-saved-actions-migration';
@@ -57,12 +62,12 @@ import {
   useProjectStore,
 } from '../../stores/projectStore';
 import { observePullRequests } from '../../stores/pullRequestStore';
-import { useSettingsStore } from '../../stores/settingsStore';
 import { useTaskStore } from '../../stores/taskStore';
 import { useThemeStore } from '../../stores/themeStore';
 import { observeWorkbenchPreferences } from '../../stores/workbenchStore';
 import { useWorkViewStore } from '../../stores/workViewStore';
 import { AccessNoticeSlot } from '../account/AccessBoundary';
+import { ConnectAccountEntry } from '../account/AccountPrompts';
 import { useTrackOpenWork } from '../tasks/WorkSignals';
 import { ShortcutSheet } from './ShortcutSheet';
 import { WelcomeDialog, welcomePending } from './WelcomeDialog';
@@ -435,8 +440,7 @@ export function Shell({
       return reached;
     },
   );
-  const shortcutSettings = useSettingsStore((state) => state.shortcuts);
-  const shortcuts = resolveShortcuts(shortcutSettings);
+  const shortcuts = useResolvedKeybindings();
   const navCollapsed = useWorkViewStore((state) => state.navCollapsed);
   const toggleNav = useWorkViewStore((state) => state.toggleNav);
   const navWidth = useWorkViewStore((state) => state.sizes.sidebar);
@@ -446,7 +450,7 @@ export function Shell({
     !selectedTaskId &&
     !selectedSessionId &&
     !selectedManagedId;
-  const shortcut = displayShortcut(shortcuts.search);
+  const shortcut = shortcuts.search ? displayBinding(shortcuts.search) : '';
   const remoteHost = useHostContextStore((state) => state.host);
   const toggleSettings = () =>
     activeTab === 'preferences' ? setActiveTab(previousView.current) : navigate('preferences');
@@ -473,23 +477,26 @@ export function Shell({
     const command = findCommand(action);
     if (command) commandRef.current.runCommand(command);
   });
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      const bindings = resolveShortcuts(shortcutSettings);
-      const { commandContext, runCommand } = commandRef.current;
-      const command = COMMANDS.find(
-        (item) =>
-          item.shortcut &&
-          matchesShortcut(event, bindings[item.shortcut]) &&
-          (item.available?.(commandContext) ?? true),
-      );
-      if (!command) return;
-      event.preventDefault();
-      runCommand(command, true);
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [shortcutSettings]);
+  useKeybindingHandlers({
+    ...Object.fromEntries(
+      COMMANDS.flatMap((command) =>
+        command.shortcut
+          ? [
+              [
+                command.shortcut,
+                () => {
+                  const { commandContext, runCommand } = commandRef.current;
+                  if (!(command.available?.(commandContext) ?? true)) return false;
+                  runCommand(command, true);
+                },
+              ],
+            ]
+          : [],
+      ),
+    ),
+    // With no composer on screen, focusing one starts new work.
+    focusComposer: () => commandRef.current.commandContext.focusComposer(),
+  } as Partial<Record<KeybindingId, KeybindingHandler>>);
 
   const page = VIEW_PAGES[view.settings ? 'preferences' : (activeTab as PageTab)];
   const subnavigation = groupViews(view.group, activeTab, swarmConfigured);
@@ -570,11 +577,10 @@ export function Shell({
         history={history}
         settings={{
           open: toggleSettings,
-          shortcut: displayShortcut(shortcuts.settings),
           current: activeTab === 'preferences',
         }}
         center={
-          <Tooltip content={`Search work, projects and commands (${shortcut})`}>
+          <Tooltip content={withShortcut('Search work, projects and commands', shortcuts.search)}>
             <button
               type="button"
               onClick={() => setCommandsOpen(true)}
@@ -585,7 +591,7 @@ export function Shell({
             >
               <SearchIcon className="app-titlebar-search-icon" />
               <span>Search or jump to…</span>
-              <kbd>{shortcut}</kbd>
+              {shortcut && <kbd>{shortcut}</kbd>}
             </button>
           </Tooltip>
         }
@@ -603,7 +609,7 @@ export function Shell({
           }
         >
           <div className="workspace-navigation-top">
-            <Tooltip side="right" content={`New work (${displayShortcut(shortcuts.newWork)})`}>
+            <Tooltip side="right" content={withShortcut('New work', shortcuts.newWork)}>
               <button
                 type="button"
                 className="ui-button workspace-new-work"
@@ -618,7 +624,10 @@ export function Shell({
             </Tooltip>
             <Tooltip
               side="right"
-              content={`${navCollapsed ? 'Expand' : 'Collapse'} sidebar (${displayShortcut(shortcuts.sidebar)})`}
+              content={withShortcut(
+                `${navCollapsed ? 'Expand' : 'Collapse'} sidebar`,
+                shortcuts.sidebar,
+              )}
             >
               <button
                 type="button"
@@ -650,7 +659,7 @@ export function Shell({
               <span>Inbox</span>
               <NeedsYouCount />
             </button>
-            <Tooltip side="right" content={`Overview (${displayShortcut(shortcuts.overview)})`}>
+            <Tooltip side="right" content={withShortcut('Overview', shortcuts.overview)}>
               <button
                 type="button"
                 onClick={() => setActiveTab('overview')}
@@ -730,7 +739,8 @@ export function Shell({
               </button>
             ))}
           </nav>
-          <Tooltip side="right" content={`Settings (${displayShortcut(shortcuts.settings)})`}>
+          <ConnectAccountEntry />
+          <Tooltip side="right" content={withShortcut('Settings', shortcuts.settings)}>
             <button
               type="button"
               className="workspace-nav-item workspace-settings"

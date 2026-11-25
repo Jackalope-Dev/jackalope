@@ -261,7 +261,6 @@ impl Coordinator {
         // Swarm rounds take the plan store and coordinator locks one at a time.
         crate::commands::planning::rounds::tick(self);
         crate::commands::turn_advisor::tick(self);
-        self.runtime.access.ensure()?;
         self.transact(|inner, guard| {
             self.refresh_pool_locked(inner);
             self.runtime.ensure_history_saved()?;
@@ -525,7 +524,6 @@ impl Coordinator {
     }
 
     pub fn start_manual(&self, request: RunRequest) -> Result<String, String> {
-        self.runtime.access.ensure()?;
         self.ensure_storage_loaded()?;
         self.transact(|inner, guard| self.start_manual_locked(inner, guard, request))
     }
@@ -533,7 +531,6 @@ impl Coordinator {
     /// Starts a live session's next attempt, or reports that it waits for a
     /// free execution slot.
     pub(crate) fn start_session(&self, request: RunRequest) -> Result<SessionStart, String> {
-        self.runtime.access.ensure()?;
         self.ensure_storage_loaded()?;
         self.transact(|inner, guard| {
             if self.awaits_capacity(inner, &request)? {

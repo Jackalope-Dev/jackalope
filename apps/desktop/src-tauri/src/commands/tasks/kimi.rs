@@ -1216,7 +1216,7 @@ mod tests {
             std::env::temp_dir().join(format!("jackalope-kimi-risk-{}", uuid::Uuid::new_v4()));
         let workspace = folder.join("work");
         std::fs::create_dir_all(&workspace).unwrap();
-        let runtime = TaskRuntime::with_test_access(folder.join("history")).unwrap();
+        let runtime = TaskRuntime::new(folder.join("history")).unwrap();
         let mut run = super::super::tests::sample("kimi");
         run.id = "kimi-risk".into();
         run.project_id = "fixture".into();
@@ -1418,7 +1418,7 @@ setInterval(()=>{},1000);
             std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o700)).unwrap();
             path
         };
-        let runtime = TaskRuntime::with_test_access(folder.join("history")).unwrap();
+        let runtime = TaskRuntime::new(folder.join("history")).unwrap();
         let mut policy = AgentPolicy::default();
         policy.custom_agents.push(CustomAgent {
             id: "kimi-fixture".into(),
@@ -1547,7 +1547,7 @@ require('readline').createInterface({input:process.stdin}).on('line', line => {
 });
 setInterval(()=>{},1000);
 "#).unwrap();
-        let runtime = TaskRuntime::with_test_access(folder.join("history")).unwrap();
+        let runtime = TaskRuntime::new(folder.join("history")).unwrap();
         let mut policy = AgentPolicy::default();
         policy.custom_agents.push(CustomAgent {
             id: "kimi-fixture".into(),

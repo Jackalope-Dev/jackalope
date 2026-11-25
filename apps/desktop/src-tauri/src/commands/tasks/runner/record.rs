@@ -208,7 +208,7 @@ mod tests {
         let folder =
             std::env::temp_dir().join(format!("jackalope-record-{}", uuid::Uuid::new_v4()));
         std::fs::create_dir_all(&folder).unwrap();
-        let runtime = TaskRuntime::with_test_access(folder.join("history")).unwrap();
+        let runtime = TaskRuntime::new(folder.join("history")).unwrap();
         let shot = uuid::Uuid::new_v4().to_string();
         let relative = format!(".jackalope/artifacts/screenshots/{shot}.png");
         let mut recorded = Vec::new();

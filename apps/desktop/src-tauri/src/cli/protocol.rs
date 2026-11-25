@@ -307,6 +307,10 @@ pub enum Request {
         #[serde(default, skip_serializing_if = "ComputerCommand::is_status")]
         action: ComputerCommand,
     },
+    /// The code host a conversation's work would be delivered to, so a pull
+    /// request is named as that host names it. Answers with `Response::CodeHost`;
+    /// older hosts refuse it, and clients then keep GitHub's words.
+    CodeHost { session_id: String },
 }
 
 impl Request {
@@ -328,7 +332,8 @@ impl Request {
             | Self::SetProjectSettings { .. }
             | Self::Learnings { .. }
             | Self::Learning { .. }
-            | Self::SetLearningArchived { .. } => true,
+            | Self::SetLearningArchived { .. }
+            | Self::CodeHost { .. } => true,
             Self::StartSession { .. }
             | Self::Send { .. }
             | Self::Draft { .. }
@@ -854,6 +859,11 @@ pub enum Response {
     PullRequest {
         url: String,
     },
+    /// `github`, `gitlab` or `bitbucket`. A remote on a host Jackalope does not
+    /// recognize is delivered through the GitHub CLI, so it reads `github`.
+    CodeHost {
+        kind: String,
+    },
     /// Absent `profile` means the project has no browser profile yet.
     BrowserProfile {
         profile: Option<BrowserProfileView>,
@@ -862,6 +872,16 @@ pub enum Response {
     Computer {
         computer: Option<ComputerView>,
     },
+}
+
+/// What a code host calls a change request: GitLab's merge request, otherwise
+/// a pull request.
+pub fn change_request(kind: Option<&str>) -> &'static str {
+    if kind == Some("gitlab") {
+        "merge request"
+    } else {
+        "pull request"
+    }
 }
 
 /// A prepared or applied merge, as a terminal shows it.

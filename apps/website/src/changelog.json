@@ -1,5 +1,37 @@
 [
   {
+    "id": "every-shortcut-is-yours-to-change",
+    "date": "2026-11-24",
+    "title": "Every shortcut is yours to change.",
+    "description": "All keyboard shortcuts can now be rebound, and the composer works from the keyboard.",
+    "items": [
+      "Record any shortcut, including two-key chords, in Settings; clashes are caught and can be swapped.",
+      "Open the agent, model and effort pickers, plan mode and the branch menu without the mouse.",
+      "Import and export your shortcuts as JSON."
+    ]
+  },
+  {
+    "id": "start-without-an-account",
+    "date": "2026-11-24",
+    "title": "Start without an account.",
+    "description": "Jackalope no longer requires an account to run your agents.",
+    "items": [
+      "Choose Continue without an account to run tasks, conversations and terminals with the agents you already have.",
+      "Connect a free account any time for settings, lesson and skill sync, invitations and the Microsoft Store beta."
+    ]
+  },
+  {
+    "id": "work-with-gitlab-and-bitbucket",
+    "date": "2026-11-24",
+    "title": "Work with GitLab and Bitbucket.",
+    "description": "Open, follow and merge GitLab merge requests and Bitbucket Cloud pull requests, and import their issues.",
+    "items": [
+      "GitLab uses your own glab sign-in, on gitlab.com or your own server; merge requests from a fork open on the parent project.",
+      "Bitbucket uses an Atlassian API token kept in your system's credential store.",
+      "Failed pipeline logs and review threads go into the fix draft for the task's agent, like they do for GitHub."
+    ]
+  },
+  {
     "id": "your-projects-found-for-you",
     "date": "2026-11-24",
     "title": "Your projects, found for you.",

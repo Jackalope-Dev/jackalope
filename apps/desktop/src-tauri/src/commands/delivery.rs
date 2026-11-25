@@ -1,6 +1,7 @@
 use super::{
     integration, process_control,
     repo::{self, Policy},
+    source_control::{self, bitbucket, gitlab, Route},
     tasks::TaskRuntime,
 };
 use serde::Serialize;
@@ -160,6 +161,7 @@ macro_rules! tauri_commands {
         $next!($finish [$($done)*
             commands::delivery::task_delivery_status,
             commands::delivery::task_pull_request_create,
+            commands::delivery::task_pull_request_target,
             commands::delivery::task_pull_request_status,
             commands::delivery::task_pull_request_merge,
             commands::delivery::task_merge_locally,
@@ -176,36 +178,98 @@ pub async fn task_delivery_status(
     state: State<'_, TaskRuntime>,
 ) -> Result<DeliveryStatus, String> {
     let runtime = state.inner().clone();
-    tauri::async_runtime::spawn_blocking(move || {
+    let integration = runtime.integration_directory();
+    let (status, bitbucket_route) = tauri::async_runtime::spawn_blocking(move || {
         let runs = runtime.integration_runs()?;
         let run = runs
             .iter()
             .find(|run| run.id == id)
             .ok_or("Task not found")?;
-        inspect(
-            Path::new(if project {
-                &run.project_path
-            } else {
-                &run.workspace
-            }),
-            remote,
-        )
+        let path = Path::new(if project {
+            &run.project_path
+        } else {
+            &run.workspace
+        });
+        let route = if remote {
+            source_control::route(&integration, path, &run.project_path)
+        } else {
+            Route::GitHub
+        };
+        match route {
+            Route::GitHub => inspect(path, remote).map(|status| (status, None)),
+            Route::GitLab(repository) => {
+                let mut status = inspect(path, false)?;
+                match gitlab::find_for_branch(path, &repository, &status.branch) {
+                    Ok(Some(view)) => {
+                        status.pull_request = Some(view.json());
+                        status.remote_note = "Merge request and pipeline read through your GitLab CLI. Deployment has not been verified.".into();
+                    }
+                    Ok(None) => {
+                        status.remote_note = format!(
+                            "GitLab has no merge request from {} in {}.",
+                            status.branch, repository.path
+                        )
+                    }
+                    Err(error) => status.remote_note = error,
+                }
+                Ok((status, None))
+            }
+            Route::Bitbucket(repository) => Ok((inspect(path, false)?, Some(repository))),
+        }
     })
     .await
-    .map_err(|error| error.to_string())?
+    .map_err(|error| error.to_string())??;
+    let mut status = status;
+    if let Some(repository) = bitbucket_route {
+        let found = match bitbucket::require(&state.integration_directory()) {
+            Ok(credentials) => {
+                bitbucket::find_for_branch(&credentials, &repository, &status.branch).await
+            }
+            Err(error) => Err(error),
+        };
+        match found {
+            Ok(Some(view)) => {
+                status.pull_request = Some(view.json());
+                status.remote_note = "Pull request and build statuses read from Bitbucket with your API token. Deployment has not been verified.".into();
+            }
+            Ok(None) => {
+                status.remote_note = format!(
+                    "Bitbucket has no pull request from {} in {}.",
+                    status.branch, repository.path
+                )
+            }
+            Err(error) => status.remote_note = error,
+        }
+    }
+    Ok(status)
 }
 
 /// Checks a pull request's title and description before anything reaches GitHub.
 fn pull_request_text(title: &str, body: &str) -> Result<(String, String), String> {
+    change_request_text(title, body, "pull request")
+}
+
+/// [`pull_request_text`] in the host's own word: "merge request" on GitLab.
+fn change_request_text(title: &str, body: &str, noun: &str) -> Result<(String, String), String> {
     let title = title.trim();
     if title.is_empty() || title.contains('\n') || title.chars().count() > 256 {
-        return Err("Write a one-line pull request title under 256 characters.".into());
+        return Err(format!(
+            "Write a one-line {noun} title under 256 characters."
+        ));
     }
     let body = body.trim();
     if body.chars().count() > 60_000 {
-        return Err("Shorten the pull request description.".into());
+        return Err(format!("Shorten the {noun} description."));
     }
     Ok((title.into(), body.into()))
+}
+
+/// What a route calls its change requests.
+fn noun(route: &Route) -> &'static str {
+    match route {
+        Route::GitLab(_) => "merge request",
+        _ => "pull request",
+    }
 }
 
 /// The pull request URL `gh pr create` prints on its last line.
@@ -218,32 +282,75 @@ fn created_url(stdout: &str) -> Option<String> {
         .map(String::from)
 }
 
+/// What opening a change request led to: its address, or the Bitbucket request
+/// still to send once Git has been read.
+enum Created {
+    Done(String),
+    Bitbucket {
+        repository: source_control::remote::Repository,
+        branch: String,
+        target: Option<String>,
+        title: String,
+        body: String,
+    },
+}
+
 /// Opens a pull request for a task's pushed branch through the person's GitHub
-/// CLI. The branch must already be committed and pushed; this never commits,
-/// pushes or merges, and Git and GitHub never prompt.
+/// CLI, or a merge request through the GitLab CLI or a Bitbucket pull request
+/// through the Bitbucket API when the task's remote is there. The branch must
+/// already be committed and pushed; this never commits, pushes or merges, and
+/// nothing prompts.
 #[tauri::command]
 pub async fn task_pull_request_create(
     id: String,
     title: String,
     body: String,
     draft: bool,
+    in_fork: Option<bool>,
     state: State<'_, TaskRuntime>,
 ) -> Result<String, String> {
     let runtime = state.inner().clone();
-    tauri::async_runtime::spawn_blocking(move || {
-        let (title, body) = pull_request_text(&title, &body)?;
+    let created = tauri::async_runtime::spawn_blocking(move || {
         let runs = runtime.integration_runs()?;
         let run = runs
             .iter()
             .find(|run| run.id == id)
             .ok_or("Task not found")?;
-        if run.status.is_active() {
-            return Err("Wait for the agent to finish before opening a pull request.".into());
-        }
         let path = Path::new(&run.workspace);
+        let route = source_control::route(&runtime.integration_directory(), path, &run.project_path);
+        let noun = noun(&route);
+        let (title, body) = change_request_text(&title, &body, noun)?;
+        if run.status.is_active() {
+            return Err(format!("Wait for the agent to finish before opening a {noun}."));
+        }
         let branch = read(path, &["branch", "--show-current"])?;
         if branch.is_empty() {
-            return Err("Check out the task branch before opening a pull request.".into());
+            return Err(format!("Check out the task branch before opening a {noun}."));
+        }
+        match route {
+            Route::GitHub => {}
+            Route::GitLab(repository) => {
+                return gitlab::create(
+                    path,
+                    &repository,
+                    &branch,
+                    run.target_branch.as_deref(),
+                    in_fork.unwrap_or(false),
+                    &title,
+                    &body,
+                    draft,
+                )
+                .map(Created::Done)
+            }
+            Route::Bitbucket(repository) => {
+                return Ok(Created::Bitbucket {
+                    repository,
+                    branch,
+                    target: run.target_branch.clone(),
+                    title,
+                    body,
+                })
+            }
         }
         let mut command = Command::new("gh");
         command
@@ -268,7 +375,92 @@ pub async fn task_pull_request_create(
             });
         }
         created_url(&result.stdout)
+            .map(Created::Done)
             .ok_or_else(|| "The pull request was created, but GitHub CLI did not print its address.".into())
+    })
+    .await
+    .map_err(|error| error.to_string())??;
+    match created {
+        Created::Done(url) => Ok(url),
+        Created::Bitbucket {
+            repository,
+            branch,
+            target,
+            title,
+            body,
+        } => {
+            let credentials = bitbucket::require(&state.integration_directory())?;
+            bitbucket::create(
+                &credentials,
+                &repository,
+                &branch,
+                target.as_deref(),
+                &title,
+                &body,
+                draft,
+            )
+            .await
+        }
+    }
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChangeRequestTarget {
+    host: String,
+    /// The repository the change request opens in.
+    repository: String,
+    /// The branch it merges into; `None` when the host picks its default.
+    branch: Option<String>,
+    /// Whether the task's remote is a fork and the target is the project it came from.
+    forked: bool,
+    /// The fork itself, when `forked`.
+    fork: Option<String>,
+}
+
+/// Where Create would open a GitLab merge request or Bitbucket pull request, for the
+/// confirmation. Read-only. `None` for GitHub, whose CLI chooses as it always has.
+#[tauri::command]
+pub async fn task_pull_request_target(
+    id: String,
+    in_fork: Option<bool>,
+    state: State<'_, TaskRuntime>,
+) -> Result<Option<ChangeRequestTarget>, String> {
+    let runtime = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let runs = runtime.integration_runs()?;
+        let run = runs
+            .iter()
+            .find(|run| run.id == id)
+            .ok_or("Task not found")?;
+        let path = checkout(&run.workspace, &run.project_path);
+        let target = run
+            .target_branch
+            .as_deref()
+            .filter(|branch| !branch.is_empty());
+        Ok(
+            match source_control::route(&runtime.integration_directory(), path, &run.project_path) {
+                Route::GitHub => None,
+                Route::GitLab(repository) => {
+                    let chosen =
+                        gitlab::target(path, &repository, target, in_fork.unwrap_or(false))?;
+                    Some(ChangeRequestTarget {
+                        host: repository.host.clone(),
+                        repository: chosen.path.clone(),
+                        branch: Some(chosen.branch.clone()),
+                        forked: chosen.forked,
+                        fork: chosen.forked.then(|| repository.path.clone()),
+                    })
+                }
+                Route::Bitbucket(repository) => Some(ChangeRequestTarget {
+                    host: repository.host,
+                    repository: repository.path,
+                    branch: target.map(String::from),
+                    forked: false,
+                    fork: None,
+                }),
+            },
+        )
     })
     .await
     .map_err(|error| error.to_string())?
@@ -281,9 +473,11 @@ pub async fn task_pull_request_status(
     url: String,
     state: State<'_, TaskRuntime>,
 ) -> Result<Value, String> {
+    let (route, number) = source_control::route_url(&url);
     let runtime = state.inner().clone();
-    tauri::async_runtime::spawn_blocking(move || {
-        if !pull_request_url(&url) {
+    let integration = runtime.integration_directory();
+    let route = tauri::async_runtime::spawn_blocking(move || {
+        if route == Route::GitHub && !pull_request_url(&url) {
             return Err("This is not a pull request address.".into());
         }
         let runs = runtime.integration_runs()?;
@@ -291,43 +485,101 @@ pub async fn task_pull_request_status(
             .iter()
             .find(|run| run.id == id)
             .ok_or("Task not found")?;
-        view_pull_request(checkout(&run.workspace, &run.project_path), Some(&url))?.ok_or_else(
-            || "The pull request could not be read. Check GitHub CLI sign-in and network.".into(),
-        )
+        let path = checkout(&run.workspace, &run.project_path);
+        match route {
+            Route::GitHub => view_pull_request(path, Some(&url))?
+                .ok_or_else(|| {
+                    "The pull request could not be read. Check GitHub CLI sign-in and network."
+                        .into()
+                })
+                .map(Ok),
+            Route::GitLab(repository) => {
+                source_control::check_gitlab_host(
+                    &integration,
+                    path,
+                    &run.project_path,
+                    &repository,
+                    false,
+                )?;
+                gitlab::view(path, &repository, number).map(|view| Ok(view.json()))
+            }
+            Route::Bitbucket(repository) => Ok(Err(repository)),
+        }
     })
     .await
-    .map_err(|error| error.to_string())?
+    .map_err(|error| error.to_string())??;
+    match route {
+        Ok(view) => Ok(view),
+        Err(repository) => {
+            let credentials = bitbucket::require(&state.integration_directory())?;
+            Ok(bitbucket::view(&credentials, &repository, number)
+                .await?
+                .json())
+        }
+    }
 }
 
 /// Merges a task's pull request on GitHub through the person's GitHub CLI, with the
 /// method they chose. GitHub enforces the repository's own rules; nothing local changes.
+/// A GitLab merge request or Bitbucket pull request merges through its host the same
+/// way, under that host's own pipeline, approval and merge-check rules, and only at
+/// `head`, the commit the person saw when they confirmed. GitHub ignores `head`.
 #[tauri::command]
 pub async fn task_pull_request_merge(
     id: String,
     url: String,
     method: String,
+    head: Option<String>,
     state: State<'_, TaskRuntime>,
 ) -> Result<(), String> {
+    let (route, number) = source_control::route_url(&url);
+    let head = match head
+        .map(|head| head.trim().to_string())
+        .filter(|head| !head.is_empty() && route != Route::GitHub)
+    {
+        Some(head) if !commit_id(&head) => {
+            return Err("The commit to merge could not be read. Check again, then merge.".into())
+        }
+        head => head,
+    };
+    let pinned = head.clone();
     let runtime = state.inner().clone();
-    tauri::async_runtime::spawn_blocking(move || {
-        if !pull_request_url(&url) {
+    let integration = runtime.integration_directory();
+    let chosen = method.clone();
+    let strategy = method.clone();
+    let bitbucket_route = tauri::async_runtime::spawn_blocking(move || {
+        if route == Route::GitHub && !pull_request_url(&url) {
             return Err("This is not a pull request address.".into());
         }
-        let method = match method.as_str() {
-            "merge" => "--merge",
-            "squash" => "--squash",
-            "rebase" => "--rebase",
-            _ => return Err("Choose merge, squash or rebase.".into()),
+        let method = match (&route, method.as_str()) {
+            (Route::GitHub, "merge") => "--merge",
+            (Route::GitHub, "squash") => "--squash",
+            (Route::GitHub, "rebase") => "--rebase",
+            (Route::GitHub, _) => return Err("Choose merge, squash or rebase.".into()),
+            _ => "",
         };
         let runs = runtime.integration_runs()?;
         let run = runs
             .iter()
             .find(|run| run.id == id)
             .ok_or("Task not found")?;
-        let command = gh(
-            checkout(&run.workspace, &run.project_path),
-            &["pr", "merge", &url, method],
-        );
+        let path = checkout(&run.workspace, &run.project_path);
+        match route {
+            Route::GitHub => {}
+            Route::GitLab(repository) => {
+                source_control::check_gitlab_host(
+                    &integration,
+                    path,
+                    &run.project_path,
+                    &repository,
+                    true,
+                )?;
+                return gitlab::merge(path, &repository, number, &chosen, head.as_deref())
+                    .map(|()| None);
+            }
+            Route::Bitbucket(repository) => return Ok(Some(repository)),
+        }
+        let command = gh(path, &["pr", "merge", &url, method]);
         let result = process_control::run(command, Duration::from_secs(60))?;
         if !result.success {
             let detail = result.stderr.trim();
@@ -340,10 +592,27 @@ pub async fn task_pull_request_merge(
                 )
             });
         }
-        Ok(())
+        Ok(None)
     })
     .await
-    .map_err(|error| error.to_string())?
+    .map_err(|error| error.to_string())??;
+    if let Some(repository) = bitbucket_route {
+        let credentials = bitbucket::require(&state.integration_directory())?;
+        bitbucket::merge(
+            &credentials,
+            &repository,
+            number,
+            &strategy,
+            pinned.as_deref(),
+        )
+        .await?;
+    }
+    Ok(())
+}
+
+/// A full or abbreviated Git commit ID.
+fn commit_id(value: &str) -> bool {
+    (7..=64).contains(&value.len()) && value.bytes().all(|c| c.is_ascii_hexdigit())
 }
 
 /// Runs a Git command that changes the checkout, reporting Git's own message on failure.
@@ -432,7 +701,23 @@ mod tests {
     use super::*;
     #[test]
     fn pull_request_text_and_url_are_checked() {
-        assert!(pull_request_text("", "body").is_err());
+        assert_eq!(
+            pull_request_text("", "body").unwrap_err(),
+            "Write a one-line pull request title under 256 characters."
+        );
+        assert_eq!(
+            change_request_text(
+                "a\nb",
+                "",
+                noun(&Route::GitLab(source_control::remote::Repository {
+                    host: "gitlab.com".into(),
+                    path: "a/b".into()
+                }))
+            )
+            .unwrap_err(),
+            "Write a one-line merge request title under 256 characters."
+        );
+        assert_eq!(noun(&Route::GitHub), "pull request");
         assert!(pull_request_text("two\nlines", "").is_err());
         assert_eq!(
             pull_request_text("  Add search  ", " body ").unwrap(),

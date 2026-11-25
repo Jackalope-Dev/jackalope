@@ -1,12 +1,14 @@
 import { describeError } from '@jackalope/contracts/errors';
 import { Button, Disclosure, DisclosureSummary, Input, Select, SelectItem } from '@jackalope/ui';
 import { useState } from 'react';
+import { useProjectHost } from '../../hooks/useProjectHost';
 import { invokeNative } from '../../lib/native/transport';
+import { hostTerms } from '../../lib/source-control';
 import {
   type RecipeId,
   recipePrompt,
+  recipesFor,
   type WorkflowContext,
-  workflowRecipes,
 } from '../../lib/workflow-recipes';
 import { IssuePicker } from '../tasks/IssuePicker';
 import { ActionError } from '../ui/ActionError';
@@ -25,21 +27,24 @@ export function WorkflowStarter({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [browse, setBrowse] = useState(false);
-  const recipe = workflowRecipes.find((item) => item.id === kind) ?? workflowRecipes[0];
+  const { data: host } = useProjectHost(projectPath);
+  const recipes = recipesFor(host?.kind, host?.capabilities.issues !== false);
+  const recipe = recipes.find((item) => item.id === kind) ?? recipes[0];
+  const terms = hostTerms(host?.kind);
   const prepare = async () => {
     if (busy || !value.trim()) return;
     setBusy(true);
     setError('');
     try {
       const context =
-        kind === 'dependency'
+        recipe.id === 'dependency'
           ? undefined
           : await invokeNative<WorkflowContext>('project_github_context', {
               projectPath,
-              kind,
+              kind: recipe.id,
               number: value,
             });
-      onDraft(recipePrompt(kind, value, context));
+      onDraft(recipePrompt(recipe.id, value, context, host?.kind));
     } catch (cause) {
       setError(describeError(cause));
     } finally {
@@ -54,7 +59,7 @@ export function WorkflowStarter({
         aria-pressed={browse}
         onClick={() => setBrowse(!browse)}
       >
-        {browse ? 'Use an item number' : 'Browse issues and pull requests'}
+        {browse ? 'Use an item number' : `Browse issues and ${terms.noun}s`}
       </Button>
       {browse ? (
         <IssuePicker projectPath={projectPath} onDraft={onDraft} />
@@ -62,7 +67,7 @@ export function WorkflowStarter({
         <>
           <Select
             aria-label="Workflow recipe"
-            value={kind}
+            value={recipe.id}
             disabled={busy}
             onValueChange={(id) => {
               setKind(id as RecipeId);
@@ -70,7 +75,7 @@ export function WorkflowStarter({
               setError('');
             }}
           >
-            {workflowRecipes.map((item) => (
+            {recipes.map((item) => (
               <SelectItem key={item.id} value={item.id}>
                 {item.label}
               </SelectItem>
@@ -91,7 +96,7 @@ export function WorkflowStarter({
               }}
             />
           </label>
-          <p className="task-muted">GitHub items are read from this project's repository.</p>
+          <p className="task-muted">{terms.host} items are read from this project's repository.</p>
           <Button
             type="button"
             variant="outline"

@@ -244,7 +244,6 @@ pub(super) fn start_with_shell(
     slot: &str,
     retain_output: bool,
 ) -> Result<(), String> {
-    runtime.access.ensure()?;
     let _guard = integration::execution_guard()?;
     let runs = runtime.integration_runs()?;
     let run = runs

@@ -50,6 +50,7 @@ import {
   sidebarCategory,
 } from '../../lib/settings-categories';
 import { ArtifactsConnection } from './ArtifactsConnection';
+import { CodeHosts } from './CodeHosts';
 import { ComputersSettings } from './ComputersSettings';
 import { DesktopPreferences } from './DesktopPreferences';
 import { IssueConnections } from './IssueConnections';
@@ -265,7 +266,12 @@ export function SettingsPage({
                   {c === 'Jackalope account' && (
                     <JackalopeAccount onInvitations={() => select('Invitations')} />
                   )}
-                  {c === 'Connected work' && <IssueConnections />}
+                  {c === 'Connected work' && (
+                    <>
+                      <CodeHosts />
+                      <IssueConnections />
+                    </>
+                  )}
                   {c === 'Computers' && <ComputersSettings />}
                   {c === 'Cloudflare' && <ArtifactsConnection />}
                   {c === 'Swarm' && <SwarmSettings />}

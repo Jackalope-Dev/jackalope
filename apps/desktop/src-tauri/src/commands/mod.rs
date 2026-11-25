@@ -101,6 +101,7 @@ pub mod github_workflows;
 pub mod issues;
 pub mod remote;
 pub mod review_progress;
+pub mod source_control;
 pub mod workflow_feedback;
 
 mod resolver_fs;
@@ -108,7 +109,6 @@ mod resolver_fs;
 pub mod account;
 mod account_storage;
 pub mod community;
-pub mod execution_access;
 mod file_lock;
 pub mod first_commit;
 mod git_command;

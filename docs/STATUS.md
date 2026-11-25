@@ -73,7 +73,11 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   theme in Jackalope Violet, which follows the system's light or dark setting. Native macOS acceptance remains
   open.
 - Desktop preferences include interface zoom, editor and shell selection, terminal
-  font size, HTTP links and editable search, new-work and settings shortcuts. Saved
+  font size and HTTP links. Every app shortcut, including tabs, Back/Forward, `?` and the
+  composer's agent, effort, plan and branch pickers, is a named action that can be searched,
+  recorded (including two-key chords), cleared, reset, swapped on a clash, and imported or
+  exported as JSON in Settings → Keyboard shortcuts; the `?` sheet and command search show
+  the person's keys. Saved
   prompts and commands can apply to all projects or one project; commands require an
   explicit Run action. Voice to text inserts editable text at the cursor and never sends
   the task automatically. It transcribes on the computer with a downloaded Whisper model
@@ -278,6 +282,12 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   are recorded. Project settings, the bot editor and `/browser` open, clear and delete
   profiles.
 - Delivery inspects local Git state and optionally reads PR/CI through the GitHub CLI.
+  Delivery, pull request following, issue import and workflow starters also work with
+  GitLab (gitlab.com and self-managed, through the person's glab sign-in, as merge requests
+  and pipelines; a fork's merge request targets the parent project unless kept in the fork)
+  and Bitbucket Cloud (through an API token in protected storage). Merges are pinned to the
+  reviewed commit on GitLab and checked against it on Bitbucket. GitHub is unchanged. Not
+  yet accepted against live GitLab or Bitbucket repositories.
   PR, CI and deployment preparation carry evidence into editable drafts. Failing PR
   checks are listed openly with a draft asking the agent to reproduce and fix them.
   Create pull request drafts an editable title and description from the branch's diff alone
@@ -792,10 +802,11 @@ approval. Connections persist across restarts and detect approval; offline progr
 remains labeled and cannot authorize execution. Installed and deployed acceptance of
 waitlist mode remain open.
 
-New execution requires approved account access in every desktop build. Previously
-verified accounts retain bounded offline access; saved work remains reviewable after
-expiry. Feedback, reporting and settings sync have separate controls. See
-[account access](DESKTOP-ACCOUNT.md) and [service boundaries](BACKEND.md).
+The Jackalope account is optional: local work runs without one in every desktop build,
+and only account features such as settings, lesson and skill sync, invitations and the
+Store beta program need it. Previously verified accounts keep those features for a
+bounded offline period. Feedback, reporting and settings sync have separate controls. See
+[account connection](DESKTOP-ACCOUNT.md) and [service boundaries](BACKEND.md).
 
 The website provides setup and workflow guides, compatibility tables, sample-workspace
 media and account flows. Its content is shared with bundled native help through

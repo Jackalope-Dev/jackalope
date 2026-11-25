@@ -508,7 +508,8 @@ export function syncSummary(page: SkillsPage, busy: boolean): string {
   const { sync } = page;
   if (sync.reset)
     return 'Synced skills were deleted from another computer, so skill sync turned off here.';
-  if (!sync.available) return 'Sign in to sync skills between your computers.';
+  if (!sync.available)
+    return 'Connect your Jackalope account to sync skills between your computers.';
   if (!sync.settingsSync) return 'Turn on settings sync in Settings → Privacy to sync skills.';
   if (!sync.enabled) return 'Skills stay on this computer until you sync one.';
   if (busy) return 'Syncing skills…';

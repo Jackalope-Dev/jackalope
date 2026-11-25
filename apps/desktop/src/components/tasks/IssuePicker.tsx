@@ -1,9 +1,11 @@
 import { Button, Checkbox, InlineNotice, Input, Select, SelectItem } from '@jackalope/ui';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useProjectHost } from '../../hooks/useProjectHost';
 import { openSettings } from '../../lib/app-events';
 import { type Issue, type IssuePage, issuePrompt, issueUrl } from '../../lib/issues';
 import { openExternalUrl } from '../../lib/native/env';
 import { invokeNative } from '../../lib/native/transport';
+import { hostTerms } from '../../lib/source-control';
 import './issue-picker.css';
 import { describeError } from '@jackalope/contracts/errors';
 
@@ -14,8 +16,16 @@ export function IssuePicker({
   projectPath: string;
   onDraft: (text: string) => void;
 }) {
-  const [provider, setProvider] = useState('github');
-  const [kind, setKind] = useState('issue');
+  // `code` is the project's own code host: GitHub, GitLab or Bitbucket.
+  const [provider, setProvider] = useState('code');
+  const [chosenKind, setKind] = useState('issue');
+  const { data: host } = useProjectHost(projectPath);
+  const code = host?.kind ?? 'github';
+  const terms = hostTerms(code);
+  const isCode = provider === 'code';
+  // A Bitbucket repository without its issue tracker still has pull requests to browse.
+  const issues = !isCode || host?.capabilities.issues !== false;
+  const kind = isCode && !issues ? 'pr' : chosenKind;
   const [query, setQuery] = useState('');
   const [mine, setMine] = useState(true);
   const [items, setItems] = useState<Issue[]>([]);
@@ -37,8 +47,8 @@ export function IssuePicker({
       try {
         const result = await invokeNative<IssuePage>('project_issues', {
           projectPath,
-          provider,
-          kind: provider === 'github' ? kind : 'issue',
+          provider: isCode ? code : provider,
+          kind: isCode ? kind : 'issue',
           query,
           mine,
           cursor: cursor ?? null,
@@ -56,7 +66,7 @@ export function IssuePicker({
         if (current === revision.current) setBusy(false);
       }
     },
-    [projectPath, provider, kind, query, mine],
+    [projectPath, provider, isCode, code, kind, query, mine],
   );
   useEffect(() => {
     setSelected(null);
@@ -74,14 +84,14 @@ export function IssuePicker({
     <section className="issue-picker" aria-label="Connected work">
       <div className="issue-picker-controls">
         <Select aria-label="Issue service" value={provider} onValueChange={setProvider}>
-          <SelectItem value="github">GitHub</SelectItem>
+          <SelectItem value="code">{terms.host}</SelectItem>
           <SelectItem value="linear">Linear</SelectItem>
           <SelectItem value="jira">Jira</SelectItem>
         </Select>
-        {provider === 'github' && (
+        {isCode && (
           <Select aria-label="Work type" value={kind} onValueChange={setKind}>
-            <SelectItem value="issue">Issues</SelectItem>
-            <SelectItem value="pr">Pull requests</SelectItem>
+            {issues && <SelectItem value="issue">Issues</SelectItem>}
+            <SelectItem value="pr">{terms.Noun}s</SelectItem>
           </Select>
         )}
         <Input
@@ -104,7 +114,7 @@ export function IssuePicker({
               <Button variant="outline" onClick={() => void load()}>
                 Retry
               </Button>
-              {provider !== 'github' && (
+              {(!isCode || code === 'bitbucket') && (
                 <Button variant="outline" onClick={() => openSettings('Connected work')}>
                   Connection settings
                 </Button>
@@ -157,7 +167,7 @@ export function IssuePicker({
                   }
                 }}
               >
-                Use this {selected.kind === 'pr' ? 'pull request' : 'issue'}
+                Use this {selected.kind === 'pr' ? terms.noun : 'issue'}
               </Button>
               <Button
                 variant="outline"

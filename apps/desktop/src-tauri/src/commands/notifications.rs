@@ -386,19 +386,27 @@ pub async fn notification_test(app: tauri::AppHandle) -> Result<(), String> {
 }
 
 /// Announces that a task's pull request moved to a state worth knowing about, under the
-/// same preferences as task notices. Activation opens the task.
+/// same preferences as task notices. Activation opens the task. GitLab names its
+/// pull requests merge requests and its checks a pipeline.
 #[tauri::command]
 pub async fn notification_pull_request(
     phase: String,
     run_id: String,
+    provider: Option<String>,
     app: tauri::AppHandle,
 ) -> Result<(), String> {
-    let (title, attention) = match phase.as_str() {
-        "failing" => ("A pull request's checks failed", true),
-        "changes" => ("A pull request has changes requested", true),
-        "conflict" => ("A pull request has conflicts", true),
-        "ready" => ("A pull request is ready to merge", false),
-        "merged" => ("A pull request was merged", false),
+    let gitlab = provider.as_deref() == Some("gitlab");
+    let (title, attention) = match (phase.as_str(), gitlab) {
+        ("failing", false) => ("A pull request's checks failed", true),
+        ("changes", false) => ("A pull request has changes requested", true),
+        ("conflict", false) => ("A pull request has conflicts", true),
+        ("ready", false) => ("A pull request is ready to merge", false),
+        ("merged", false) => ("A pull request was merged", false),
+        ("failing", true) => ("A merge request's pipeline failed", true),
+        ("changes", true) => ("A merge request has changes requested", true),
+        ("conflict", true) => ("A merge request has conflicts", true),
+        ("ready", true) => ("A merge request is ready to merge", false),
+        ("merged", true) => ("A merge request was merged", false),
         _ => return Err("Unknown pull request state.".into()),
     };
     let notice = Notice {

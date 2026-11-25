@@ -51,7 +51,22 @@ const SHAPES: &[Shape] = &[
     },
     Shape {
         label: "GitLab token",
-        pattern: r"glpat-[A-Za-z0-9_-]{20,}",
+        // Every prefix GitLab documents, including glab's personal access tokens.
+        // Routable tokens carry `.`-separated parts, so a dot may sit inside one
+        // but never end it.
+        pattern: r"gl(?:pat|oas|dt|rtr?|cbt|ptt|ft|imt|agent|wt|soat|ffct)-[A-Za-z0-9_-][A-Za-z0-9_.-]{18,}[A-Za-z0-9_-]|GR1348941[A-Za-z0-9_-]{20,}",
+        kind: Kind::Token,
+    },
+    Shape {
+        label: "GitLab session",
+        pattern: r"\b_gitlab_session=([0-9a-f]{32,})",
+        kind: Kind::Credential,
+    },
+    Shape {
+        label: "Atlassian token",
+        // API tokens (Jira, Bitbucket) and Bitbucket repository, project and
+        // workspace access tokens.
+        pattern: r"AT(?:ATT|CTT)[A-Za-z0-9_=-]{40,}",
         kind: Kind::Token,
     },
     Shape {
@@ -674,6 +689,46 @@ mod tests {
         assert_masked(&format!("glpat-{}", random(20)), "GitLab token");
         assert_kept(&format!("glpat-{}", random(12)));
         assert_kept(&format!("glpat-{}", "example-token-value-here"));
+        for prefix in [
+            "gloas-",
+            "gldt-",
+            "glrt-",
+            "glrtr-",
+            "glcbt-",
+            "glptt-",
+            "glft-",
+            "glimt-",
+            "glagent-",
+            "glwt-",
+            "glsoat-",
+            "glffct-",
+            "GR1348941",
+        ] {
+            assert_masked(&format!("{prefix}{}", random(24)), "GitLab token");
+        }
+        // Routable tokens have dotted parts; a sentence's full stop is not one.
+        let routable = format!("glpat-{}.01.{}", random(27), random(9));
+        assert_masked(&routable, "GitLab token");
+        assert_eq!(
+            masked(&format!("Use {routable}.")),
+            "Use [redacted GitLab token]."
+        );
+        assert_kept(&format!("xglpat-{}", random(24)));
+        assert_kept(&format!("glxyz-{}", random(24)));
+        assert_eq!(
+            masked(&format!("Cookie: _gitlab_session={}", "0a1b2c3d".repeat(4))),
+            "Cookie: _gitlab_session=[redacted GitLab session]"
+        );
+    }
+
+    #[test]
+    fn atlassian_tokens() {
+        let body = format!("3xFfGF0{}={}", random(160), "1A2B3C4D");
+        assert_masked(&format!("ATATT{body}"), "Atlassian token");
+        assert_masked(&format!("ATCTT{body}"), "Atlassian token");
+        assert_kept(&format!("ATATT{}", random(20)));
+        assert_kept(&format!("XATATT{body}"));
+        assert_kept("ATATT_TOKEN_PLACEHOLDER_FOR_THE_BITBUCKET_API_DOCS_EXAMPLE");
     }
 
     #[test]

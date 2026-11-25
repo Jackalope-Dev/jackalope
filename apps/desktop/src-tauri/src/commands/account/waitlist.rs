@@ -75,8 +75,8 @@ fn parse(data: serde_json::Value, web: &reqwest::Url, now: i64) -> Result<Waitli
 
 #[cfg(test)]
 mod tests {
+    use super::super::lease::AccountLease;
     use super::*;
-    use crate::commands::execution_access::ExecutionAccess;
 
     fn record() -> SavedAccount {
         serde_json::from_value(serde_json::json!({
@@ -95,7 +95,7 @@ mod tests {
     }
 
     #[test]
-    fn waiting_survives_restart_without_execution_and_promotes_only_on_approval() {
+    fn waiting_survives_restart_without_account_features_and_promotes_only_on_approval() {
         let now = chrono::Utc::now().timestamp_millis();
         let web = reqwest::Url::parse("https://jackalope.dev/").unwrap();
         let mut saved = record();
@@ -106,10 +106,9 @@ mod tests {
             serde_json::from_slice(&serde_json::to_vec(&saved).unwrap()).unwrap();
         assert_eq!(restored.waitlist.as_ref().unwrap().position, Some(42));
         assert!(restored.verification.is_empty());
-        let access = ExecutionAccess::new();
-        access.update(restored.verified_at, restored.expires_at);
-        assert!(!access.status().allowed);
-        assert!(access.ensure().is_err());
+        let lease = AccountLease::default();
+        lease.update(restored.verified_at, restored.expires_at);
+        assert!(!lease.current_at(now));
         let visible =
             serde_json::to_value(super::super::status("waiting-offline", Some(&restored))).unwrap();
         assert_eq!(visible["waitlist"]["checkedAt"], now);
@@ -122,8 +121,8 @@ mod tests {
         );
         assert!(restored.waitlist.is_none());
         assert!(restored.settings_sync_pending);
-        access.update(restored.verified_at, restored.expires_at);
-        assert!(access.status().allowed);
+        lease.update(restored.verified_at, restored.expires_at);
+        assert!(lease.current_at(chrono::Utc::now().timestamp_millis()));
     }
 
     #[test]

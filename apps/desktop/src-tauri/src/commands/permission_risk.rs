@@ -1008,6 +1008,7 @@ impl Context {
                 }
             }
             "gh" => github(&lower),
+            "glab" => gitlab(&lower),
             "terraform" | "tofu" | "terragrunt"
                 if matches!(
                     first.as_str(),
@@ -1646,6 +1647,55 @@ fn github(lower: &[String]) -> Verdict {
                 .any(|arg| arg.starts_with("--method=") && !arg.ends_with("get")) =>
         {
             risky("it changes GitHub through the API")
+        }
+        _ => Routine,
+    }
+}
+
+/// The GitLab CLI's writes, mirroring [`github`].
+fn gitlab(lower: &[String]) -> Verdict {
+    let words: Vec<&str> = lower
+        .iter()
+        .filter(|arg| !arg.starts_with('-'))
+        .map(String::as_str)
+        .collect();
+    match words.as_slice() {
+        ["release", action, ..] if !matches!(*action, "list" | "view" | "download") => {
+            risky("it creates or changes a GitLab release")
+        }
+        ["mr", "merge" | "approve", ..] => risky("it merges or approves a merge request"),
+        ["repo", action, ..]
+            if matches!(
+                *action,
+                "delete" | "archive" | "transfer" | "update" | "edit" | "create"
+            ) =>
+        {
+            risky("it creates or changes a GitLab project")
+        }
+        ["variable" | "securefile", action, ..] if !matches!(*action, "list" | "get") => {
+            risky("it changes project variables or secure files")
+        }
+        ["ci", action, ..] if matches!(*action, "run" | "retry" | "cancel" | "delete") => {
+            risky("it starts or changes a GitLab pipeline")
+        }
+        ["auth", "status", ..] if lower.iter().any(|arg| arg == "--show-token" || arg == "-t") => {
+            risky("it reads stored credentials")
+        }
+        ["api", ..]
+            if lower.windows(2).any(|pair| {
+                matches!(pair[0].as_str(), "-x" | "--method")
+                    && matches!(pair[1].as_str(), "post" | "put" | "patch" | "delete")
+            }) || lower
+                .iter()
+                .any(|arg| arg.starts_with("--method=") && !arg.ends_with("get"))
+                || lower.iter().any(|arg| {
+                    matches!(arg.as_str(), "-f" | "--field" | "--raw-field" | "--input")
+                        || arg.starts_with("--field=")
+                        || arg.starts_with("--raw-field=")
+                        || arg.starts_with("--input=")
+                }) =>
+        {
+            risky("it changes GitLab through the API")
         }
         _ => Routine,
     }
@@ -2550,6 +2600,8 @@ mod tests {
             "wrangler dev",
             "kubectl get pods",
             "gh pr view 12",
+            "glab mr view 12",
+            "glab api projects/1/merge_requests/2",
             "gh pr create --title x --body y",
             "terraform plan",
             "aws s3 ls s3://bucket",
@@ -2823,6 +2875,10 @@ mod tests {
             "gh repo delete owner/repo --yes",
             "gh api -X DELETE repos/o/r/git/refs/heads/x",
             "gh workflow run release.yml",
+            "glab mr merge 12 --squash --yes",
+            "glab api --method PUT projects/1/merge_requests/2/merge",
+            "glab api projects/1/issues -f title=x",
+            "glab ci retry 9",
             "terraform apply -auto-approve",
             "terraform destroy",
             "pulumi up --yes",

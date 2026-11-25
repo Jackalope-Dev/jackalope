@@ -39,9 +39,11 @@ node scripts/verification/verify-agent-accounts.mjs
 | verify-core-flows.mjs | Desktop 5188; JACKALOPE_PREVIEW_URL override | Project scope, unified work, keyboard search, preview readiness and delivery drafts |
 | verify-decisions.mjs | Desktop 5198; JACKALOPE_PREVIEW_URL override | Decision settings, project inheritance, key retry and removal |
 | verify-external-sessions.mjs | Desktop 5193; JACKALOPE_PREVIEW_URL override | Outside Jackalope sidebar group, transcript, continue and unavailable states, keyboard and appearance |
+| verify-optional-account.mjs | Desktop 5195; JACKALOPE_PREVIEW_URL override | Welcome actions, continuing without an account, gated Invitations, sidebar entry, one-time suggestion snooze and retirement, waitlist progress, themes, keyboard and narrow layouts |
 | verify-history-import.mjs | Desktop 5194; JACKALOPE_PREVIEW_URL override | One-time import offer, project groups, select-all, date filter, Add project, progress and cancel, Imported sidebar group, imported transcript and continue, narrow widths and appearance |
 | verify-project-discovery.mjs | Own Vite server; JACKALOPE_PREVIEW_URL override | First-run repository step (scanning, preselection, keyboard, Add another folder, Skip, adding with detected commands), Find projects dialog, narrow widths and appearance |
 | verify-task-cleanup.mjs | Desktop 5199; JACKALOPE_PREVIEW_URL override | Bulk archive and restore, undo, saved ideas and focus |
+| verify-keybindings.mjs | Desktop 5281; JACKALOPE_PREVIEW_URL override | Default shortcuts, terminal and text-field guards, rebinding without a reload, clashes and swap, chords, import, the ? sheet and command search, keyboard-operated composer pickers, narrow widths and appearance |
 | performance.mjs --production | Builds and starts its own fixture | History lists, output, rich rendering and production CSP |
 
 Some scripts create temporary entry files and remove them on completion. If one

@@ -4,7 +4,7 @@ use crate::commands::scope_path::any_overlap;
 #[test]
 fn unreadable_queue_keeps_the_app_available_without_overwriting_assignments() {
     let folder = std::env::temp_dir().join(format!("jackalope-queue-recovery-{}", Uuid::new_v4()));
-    let runtime = TaskRuntime::with_test_access(folder.join("history")).unwrap();
+    let runtime = TaskRuntime::new(folder.join("history")).unwrap();
     let queue = folder.join("coordination");
     std::fs::create_dir_all(&queue).unwrap();
     let path = queue.join("queue.json");
@@ -30,7 +30,7 @@ fn unreadable_queue_keeps_the_app_available_without_overwriting_assignments() {
 #[test]
 fn queue_concurrency_defaults_to_automatic_and_keeps_a_saved_choice() {
     let folder = std::env::temp_dir().join(format!("jackalope-queue-limit-{}", Uuid::new_v4()));
-    let runtime = TaskRuntime::with_test_access(folder.join("history")).unwrap();
+    let runtime = TaskRuntime::new(folder.join("history")).unwrap();
     let queue = folder.join("coordination");
     let recommended = device_slots::recommended();
     // A queue saved before the setting existed follows the device.
@@ -169,7 +169,7 @@ fn queue_is_durable_exclusively_owned_and_paused_after_restart() {
         .unwrap()
         .status
         .success());
-    let runtime = TaskRuntime::with_test_access(dir.join("runs")).unwrap();
+    let runtime = TaskRuntime::new(dir.join("runs")).unwrap();
     let service = Coordinator::new(dir.join("queue"), runtime.clone()).unwrap();
     assert!(Coordinator::new(dir.join("queue"), runtime.clone()).is_err());
     let id = service
@@ -232,7 +232,7 @@ fn plan_import_is_atomic_and_dispatch_waits_for_integrated_dependencies_and_scop
         .unwrap()
         .status
         .success());
-    let runtime = TaskRuntime::with_test_access(dir.join("runs")).unwrap();
+    let runtime = TaskRuntime::new(dir.join("runs")).unwrap();
     let service = Coordinator::new(dir.join("queue"), runtime).unwrap();
     let feature_id = Uuid::new_v4().to_string();
     let request = |items| PlanRequest {

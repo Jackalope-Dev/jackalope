@@ -76,7 +76,6 @@ macro_rules! with_commands {
             commands::desktop_control::attach,
             commands::desktop_integration,
             commands::dictation,
-            commands::execution_access,
             commands::external_sessions,
             commands::first_commit,
             commands::git,
@@ -111,6 +110,7 @@ macro_rules! with_commands {
             commands::review_progress,
             commands::schedules,
             commands::skills,
+            commands::source_control,
             commands::system,
             commands::task_strategy,
             commands::tasks,
@@ -314,7 +314,6 @@ pub fn run(launch: Launch) {
             std::fs::create_dir_all(&preferences)?;
             app.manage(commands::account::AccountService::new(
                 preferences.join("account.bin"),
-                runtime.access.clone(),
             ));
             commands::account::launch_refresh(app.handle().clone());
             app.manage(WindowBehavior::load(preferences.join("desktop.json")));

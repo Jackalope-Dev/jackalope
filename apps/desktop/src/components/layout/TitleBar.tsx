@@ -10,7 +10,9 @@ import {
   X,
 } from 'lucide-react';
 import { type ReactNode, useEffect, useState } from 'react';
+import { useResolvedKeybindings } from '../../hooks/useKeybindings';
 import { DISCORD_URL } from '../../lib/community';
+import { withShortcut } from '../../lib/keybindings';
 import { isTauriEnvironment, openExternalUrl } from '../../lib/native/env';
 import { openHelp } from '../../lib/navigation';
 import { isMacPlatform } from '../../lib/platform-shortcuts';
@@ -18,7 +20,6 @@ import { useSettingsStore } from '../../stores/settingsStore';
 import { availableUpdateId, useUpdateStore } from '../../stores/updateStore';
 import { useUpdateBlockers } from '../settings/UpdateBlockers';
 import { ArcColorPicker } from '../theme/ArcColorPicker';
-import { HISTORY_KEYS } from './useWorkspaceHistory';
 
 const isMac = isMacPlatform();
 
@@ -48,12 +49,13 @@ export function TitleBar({
   /** Workspace controls centred in the bar, such as search. */
   center?: ReactNode;
   /** Opens Settings from the bar; screens without a settings page leave it out. */
-  settings?: { open: () => void; shortcut: string; current: boolean };
+  settings?: { open: () => void; current: boolean };
   /** Back and Forward through visited pages; a step that is not there is left undefined. */
   history?: { back?: () => void; forward?: () => void };
 }) {
   const [isMaximized, setIsMaximized] = useState(false);
   const showThemePicker = useSettingsStore((state) => state.showThemePickerInToolbar);
+  const shortcuts = useResolvedKeybindings();
   const beta = useUpdateStore((state) => state.release?.channel === 'beta');
   const updateReady = useUpdateStore(
     (state) =>
@@ -113,7 +115,7 @@ export function TitleBar({
             onMouseDown={(event) => event.stopPropagation()}
             onDoubleClick={(event) => event.stopPropagation()}
           >
-            <Tooltip content={`Back (${HISTORY_KEYS.back})`}>
+            <Tooltip content={withShortcut('Back', shortcuts.back)}>
               <button
                 type="button"
                 className="app-titlebar-history-step"
@@ -124,7 +126,7 @@ export function TitleBar({
                 <ArrowLeft size={14} aria-hidden="true" />
               </button>
             </Tooltip>
-            <Tooltip content={`Forward (${HISTORY_KEYS.forward})`}>
+            <Tooltip content={withShortcut('Forward', shortcuts.forward)}>
               <button
                 type="button"
                 className="app-titlebar-history-step"
@@ -176,7 +178,7 @@ export function TitleBar({
         )}
         {themePicker && showThemePicker && <ArcColorPicker variant="titlebar" />}
         {settings && (
-          <Tooltip content={`Settings (${settings.shortcut})`}>
+          <Tooltip content={withShortcut('Settings', shortcuts.settings)}>
             <button
               type="button"
               className="app-titlebar-button"

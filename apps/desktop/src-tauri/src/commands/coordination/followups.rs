@@ -81,7 +81,6 @@ impl Coordinator {
         reasoning_effort: Option<String>,
     ) -> Result<(), String> {
         let reasoning_effort = crate::commands::tasks::effort::chosen(reasoning_effort)?;
-        self.runtime.access.ensure()?;
         self.ensure_storage_loaded()?;
         Uuid::parse_str(&id).map_err(|_| "Invalid follow-up identifier")?;
         let prompt = prompt.trim().to_string();
@@ -193,7 +192,6 @@ impl Coordinator {
             match action {
                 "cancel" => item.dispatched = true,
                 "resume" => {
-                    self.runtime.access.ensure()?;
                     let runs = self.runtime.integration_runs()?;
                     let run = latest(&runs, &item.task_id)?;
                     resumable(run)?;
@@ -273,7 +271,6 @@ impl Coordinator {
             if item.paused {
                 continue;
             }
-            self.runtime.access.ensure()?;
             self.runtime.ensure_history_saved()?;
             let run = match latest(&runs, &item.task_id).and_then(|run| {
                 resumable(run)?;

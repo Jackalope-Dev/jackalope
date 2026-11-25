@@ -156,7 +156,7 @@ export const knowledgeGuides: KnowledgeGuide[] = [
     title: 'Get started with Jackalope',
     shortTitle: 'Getting started',
     description:
-      'Install Jackalope, create a free account, find your way around and send feedback.',
+      'Install Jackalope, optionally connect a free account, find your way around and send feedback.',
     readingTime: '3 min read',
     sections: [
       {
@@ -170,10 +170,10 @@ export const knowledgeGuides: KnowledgeGuide[] = [
       },
       {
         id: 'connect',
-        question: 'How do I connect my account?',
+        question: 'Do I need a Jackalope account?',
         paragraphs: [
-          'Running tasks needs a Jackalope account. Anyone can create one for free. Choose Connect account; your browser opens and the app shows a code. Sign in or create your account, check that the code matches and confirm. The app then shows your email and Signed in.',
-          'Saved work stays readable without a connection. After you connect, new tasks keep working offline for up to 72 hours.',
+          'No. Tasks, conversations, terminals and the jackalope command run with your own agent CLIs without one. Choose Continue without an account on the welcome screen, and connect later from Settings → Jackalope account or the sidebar.',
+          'A free account syncs settings, lessons and skills across your computers and adds invitations and the Microsoft Store beta. To connect, choose Connect account; your browser opens and the app shows a code. Sign in or create your account, check that the code matches and confirm. Account features keep working offline for up to 72 hours.',
         ],
       },
       {
@@ -220,6 +220,15 @@ export const knowledgeGuides: KnowledgeGuide[] = [
           'The sidebar lists each project with its work. Inside a project, work that needs you comes first, then running work, then a few recent results. Select an item to open its result, with review, preview, terminal and activity beside the conversation. A project with no work yet shows a launchpad of ways to start and links to its pages.',
           'The work list on the page can show a list or a board. Use the board when several agents are running and you want every stage in view.',
           'Collapse the sidebar with Ctrl+B (Cmd+B on macOS) to keep one conversation on screen, and press it again to bring your work back.',
+        ],
+      },
+      {
+        id: 'keyboard',
+        question: 'Which keyboard shortcuts can I use?',
+        paragraphs: [
+          'Press ? outside a text field to see every shortcut with your own keys. These use Cmd on macOS; use Ctrl on Windows and Linux.',
+          'In the new-work composer, Cmd+Shift+M opens the agent and model picker and Cmd+Shift+P turns plan mode on or off. Cmd+Shift+E opens the effort picker wherever the agent offers effort levels, Cmd+I puts the cursor in the composer and Cmd+Enter sends from any composer. Cmd+Shift+G opens the branch menu. In an open picker the arrow keys move, Enter chooses and Escape closes; in the agent picker, Left and Right move between the agents and their models.',
+          'Change a shortcut in Settings → Keyboard shortcuts: record new keys, clear it or reset it. Keys another action already uses are named, with the option to swap. Copy as JSON and Import move your shortcuts to another computer.',
         ],
       },
       {
@@ -457,7 +466,7 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         id: 'start-chat',
         question: 'How do I start a conversation in Jackalope?',
         paragraphs: [
-          'Open Work, choose your project and agent account, and send the first message. The conversation keeps its messages and successive batches in one isolated Git workspace. You need a Jackalope account, a supported installed agent, and a usable provider account to run work.',
+          'Open Work, choose your project and agent account, and send the first message. The conversation keeps its messages and successive batches in one isolated Git workspace. You need a supported installed agent and a usable provider account to run work; a Jackalope account is optional.',
           'Describe one observable change and how it should be checked. Use New task for a structured brief or a reviewed plan when the work needs separate assignments. A conversation processes batches in order; it is not a parallel plan. Each row in the work list shows its shape: Conversation, Task, Planned task or Draft.',
         ],
         links: [
@@ -1575,7 +1584,7 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         question: 'How do I discuss specific changes or start from an issue?',
         paragraphs: [
           'In Review, use the line gutter or Add comment to attach feedback to a file and line. Add the unresolved comments to one follow-up, then review and send it. Earlier-patch comments retain their original location and ask the agent to recheck it. Show conversation keeps the result alongside Review or Preview; smaller windows stack the panes.',
-          'Open Start from an issue on Project, or Browse issues and pull requests in task workflows. GitHub uses your signed-in GitHub CLI. Connect Linear or Jira Cloud in Settings → Connected work. Choose an issue to prepare an editable task draft; Linked work opens its source later. Browsing does not update the issue or publish code.',
+          'Open Start from an issue on Project, or Browse issues and pull requests in task workflows. GitHub uses your signed-in GitHub CLI, GitLab your signed-in GitLab CLI (glab), and Bitbucket Cloud the API token you connect in Settings → Connected work. Connect Linear or Jira Cloud there too. Choose an issue to prepare an editable task draft; Linked work opens its source later. Browsing does not update the issue or publish code.',
         ],
       },
       {
@@ -1605,7 +1614,7 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         id: 'delivery-state',
         question: 'Are my changes published after a local merge?',
         paragraphs: [
-          'A local merge integrates changes into your target branch. It does not push, publish or deploy them. Delivery can inspect the local branch and, through your installed and signed-in GitHub CLI, read the PR and its checks. A PR with a different head does not verify your current local result.',
+          'A local merge integrates changes into your target branch. It does not push, publish or deploy them. Delivery can inspect the local branch and read the PR and its checks: through your signed-in GitHub CLI, through the GitLab CLI (glab) for a merge request and its pipeline, or with your Bitbucket API token. A PR with a different head does not verify your current local result.',
           'Prepare a PR, CI verification or deployment to create an editable handoff with the result and recorded checks. Review the draft before starting it. The handoff asks for concrete destinations and effects before any publishing action. Deployment stays unverified until behavior is checked in the intended environment.',
         ],
       },

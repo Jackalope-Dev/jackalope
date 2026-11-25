@@ -42,10 +42,10 @@ fn task_terminal_reconnects_and_reserves_its_workspace_until_stopped() {
     run.workspace = workspace.to_string_lossy().into_owned();
     run.project_path = run.workspace.clone();
     run.status = RunStatus::Review;
-    let runtime = TaskRuntime::with_test_access(root.join("history")).unwrap();
+    let runtime = TaskRuntime::new(root.join("history")).unwrap();
     runtime.save(&run).unwrap();
     drop(runtime);
-    let runtime = TaskRuntime::with_test_access(root.join("history")).unwrap();
+    let runtime = TaskRuntime::new(root.join("history")).unwrap();
     work_terminal::start(&runtime, &run.id).unwrap();
     struct Stop(String, String);
     impl Drop for Stop {
@@ -221,10 +221,10 @@ fn finishing_a_task_stops_only_a_terminal_that_ran_a_command_marked_for_it() {
     run.workspace = workspace.to_string_lossy().into_owned();
     run.project_path = run.workspace.clone();
     run.status = RunStatus::Review;
-    let runtime = TaskRuntime::with_test_access(root.join("history")).unwrap();
+    let runtime = TaskRuntime::new(root.join("history")).unwrap();
     runtime.save(&run).unwrap();
     drop(runtime);
-    let runtime = TaskRuntime::with_test_access(root.join("history")).unwrap();
+    let runtime = TaskRuntime::new(root.join("history")).unwrap();
     work_terminal::start(&runtime, &run.id).unwrap();
     let status = || {
         serde_json::to_value(

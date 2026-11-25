@@ -486,7 +486,7 @@ impl Fixture {
             }
             path
         };
-        let runtime = TaskRuntime::with_test_access(folder.join("history")).unwrap();
+        let runtime = TaskRuntime::new(folder.join("history")).unwrap();
         let mut policy = AgentPolicy::default();
         policy.default_meta_agent = "codex-fixture".into();
         policy.custom_agents.push(CustomAgent {

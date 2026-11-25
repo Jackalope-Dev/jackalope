@@ -343,7 +343,6 @@ fn start_sign_in(
     cols: Option<u16>,
     rows: Option<u16>,
 ) -> Result<String, String> {
-    runtime.access.ensure()?;
     if agent == "antigravity" {
         return Err("Connect this account with a provider API key in Jackalope.".into());
     }

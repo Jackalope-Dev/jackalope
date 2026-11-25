@@ -21,6 +21,7 @@ import { ContextMeter } from '../composer/ContextMeter';
 import { PastedTextChips } from '../composer/PastedTextChips';
 import { SideQuestion } from '../composer/SideQuestion';
 import { useComposerAssist } from '../composer/useComposerAssist';
+import { useComposerKeybindings } from '../composer/useComposerKeybindings';
 import { AttachButton } from '../tasks/AttachButton';
 import { useManagedPreview } from '../tasks/useManagedPreview';
 import { DismissButton } from '../ui/DismissButton';
@@ -278,9 +279,19 @@ export function SessionComposer({
       setSaving(false);
     }
   };
+  useComposerKeybindings(form, {
+    focus: () => input.current?.focus(),
+    send: () => void send(),
+    effortPicker: () => {
+      if (saving || session.closed || !efforts.levels.length) return false;
+      setEffortOpen(!effortOpen);
+      if (effortOpen) input.current?.focus();
+    },
+  });
   return (
     <form
       ref={form}
+      data-composer
       className="live-composer"
       data-dragging={attachments.dragging || undefined}
       onSubmit={(event) => {

@@ -273,7 +273,6 @@ pub async fn openai_endpoint_connect(
     model: String,
     api_key: Option<String>,
 ) -> Result<EndpointConnection, String> {
-    runtime.access.ensure()?;
     let name = name.trim().to_string();
     if name.is_empty() || name.chars().count() > 80 {
         return Err("Give the endpoint a name up to 80 characters.".into());

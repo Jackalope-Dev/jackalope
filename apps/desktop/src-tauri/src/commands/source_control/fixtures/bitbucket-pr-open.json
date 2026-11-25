@@ -1,0 +1,66 @@
+{
+  "type": "pullrequest",
+  "id": 52,
+  "title": "Add saved carts",
+  "description": "Keeps a cart between visits.",
+  "state": "OPEN",
+  "draft": false,
+  "close_source_branch": false,
+  "comment_count": 3,
+  "task_count": 0,
+  "created_on": "2026-11-24T06:21:15.232591+00:00",
+  "updated_on": "2026-11-24T06:37:00.601014+00:00",
+  "author": {
+    "type": "user",
+    "display_name": "Ana Author",
+    "uuid": "{11111111-1111-4111-8111-111111111111}"
+  },
+  "source": {
+    "branch": { "name": "feature/saved-carts" },
+    "commit": { "hash": "113ce9372ea0", "type": "commit" },
+    "repository": { "type": "repository", "full_name": "acme/web", "name": "web" }
+  },
+  "destination": {
+    "branch": {
+      "name": "main",
+      "merge_strategies": ["merge_commit", "squash", "rebase_merge"],
+      "default_merge_strategy": "squash"
+    },
+    "commit": { "hash": "fdd0efb82073", "type": "commit" },
+    "repository": { "type": "repository", "full_name": "acme/web", "name": "web" }
+  },
+  "reviewers": [
+    {
+      "type": "user",
+      "display_name": "Rae Viewer",
+      "uuid": "{22222222-2222-4222-8222-222222222222}"
+    },
+    {
+      "type": "user",
+      "display_name": "Mo Maintainer",
+      "uuid": "{33333333-3333-4333-8333-333333333333}"
+    }
+  ],
+  "participants": [
+    {
+      "type": "participant",
+      "user": { "display_name": "Rae Viewer" },
+      "role": "REVIEWER",
+      "approved": false,
+      "state": "changes_requested",
+      "participated_on": "2026-11-24T06:37:00.601014+00:00"
+    },
+    {
+      "type": "participant",
+      "user": { "display_name": "Mo Maintainer" },
+      "role": "REVIEWER",
+      "approved": true,
+      "state": "approved",
+      "participated_on": "2026-11-24T06:30:00.000000+00:00"
+    }
+  ],
+  "links": {
+    "self": { "href": "https://api.bitbucket.org/2.0/repositories/acme/web/pullrequests/52" },
+    "html": { "href": "https://bitbucket.org/acme/web/pull-requests/52" }
+  }
+}

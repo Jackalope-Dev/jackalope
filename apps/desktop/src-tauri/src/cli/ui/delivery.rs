@@ -138,7 +138,8 @@ impl App {
     }
 
     /// `/pr [title]`: commits what is left with the project's commit settings,
-    /// pushes the branch and opens a draft pull request after asking.
+    /// pushes the branch and opens a draft pull request (a merge request on
+    /// GitLab) after asking.
     pub(super) fn pull_request(&mut self, title: &str) {
         let Some(view) = self.view.clone().filter(|_| self.session.is_some()) else {
             self.flash(
@@ -154,6 +155,8 @@ impl App {
             );
             return;
         }
+        let host = self.session.clone().and_then(|id| self.code_host(id));
+        let noun = protocol::change_request(host.as_deref());
         let title = Some(title.trim())
             .filter(|title| !title.is_empty())
             .unwrap_or(view.title.trim())
@@ -171,10 +174,10 @@ impl App {
         };
         self.picker = Some(Picker {
             kind: PickerKind::Delivery,
-            title: format!("Push {branch} and open a pull request · {title}"),
+            title: format!("Push {branch} and open a {noun} · {title}"),
             items: vec![
                 item(
-                    "Open a draft pull request",
+                    &format!("Open a draft {noun}"),
                     "commits what is left first",
                     true,
                 ),
@@ -194,6 +197,15 @@ impl App {
             subject: view.run_id.clone(),
             checked: Vec::new(),
         });
+    }
+
+    /// The code host the conversation's work goes to. Asked quietly: an older host
+    /// does not know the request, and the prompt then keeps GitHub's words.
+    fn code_host(&mut self, session_id: String) -> Option<String> {
+        match self.connection.send(&Request::CodeHost { session_id }) {
+            Ok(Response::CodeHost { kind }) => Some(kind),
+            _ => None,
+        }
     }
 
     pub(super) fn open_pull_request(&mut self, title: String, draft: bool) {

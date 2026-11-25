@@ -513,8 +513,7 @@ mod tests {
         .unwrap();
         assert!(halted(&directory, &project).unwrap().contains("paused"));
         let reason = autonomy::accept_before_merge(
-            &crate::commands::tasks::TaskRuntime::with_test_access(directory.join("history"))
-                .unwrap(),
+            &crate::commands::tasks::TaskRuntime::new(directory.join("history")).unwrap(),
             &directory,
             &project,
             "HEAD",

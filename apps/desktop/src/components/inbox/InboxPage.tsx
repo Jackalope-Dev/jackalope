@@ -516,7 +516,7 @@ export function InboxPage({ onNewWork }: { onNewWork: () => void }) {
               project={projectOf(item)}
               detail={
                 item.pullRequest
-                  ? pullRequestPhaseView(item.pullRequest.phase).label
+                  ? pullRequestPhaseView(item.pullRequest.phase, item.pullRequest.provider).label
                   : item.statusLabel || 'In review'
               }
             />

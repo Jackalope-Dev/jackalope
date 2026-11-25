@@ -35,7 +35,7 @@ fn fixture() -> Fixture {
             .status
             .success());
     }
-    let runtime = TaskRuntime::with_test_access(root.join("history")).unwrap();
+    let runtime = TaskRuntime::new(root.join("history")).unwrap();
     let coordinator = Coordinator::new(root.join("coordination"), runtime.clone()).unwrap();
     let sessions = LiveSessions::new(
         root.join("sessions/sessions.json"),

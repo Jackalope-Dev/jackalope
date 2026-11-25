@@ -5,14 +5,15 @@ import { SearchField } from '@jackalope/ui';
 import * as Dialog from '@radix-ui/react-dialog';
 import { FileText, Folder, MessageSquare, Paperclip } from 'lucide-react';
 import { useRef, useState } from 'react';
+import { useResolvedKeybindings } from '../../hooks/useKeybindings';
 import { useProjectFiles } from '../../hooks/useProjectFiles';
 import { emitAppEvent } from '../../lib/app-events';
 import { searchFiles } from '../../lib/file-search';
+import { displayBinding } from '../../lib/keybindings';
 import { invokeNative } from '../../lib/native/transport';
 import { type ActiveTab, WORKSPACE_VIEWS } from '../../lib/navigation';
 import { projectNameHints } from '../../lib/project-name-hints';
 import { attachmentReference } from '../../lib/prompt-attachments';
-import { displayShortcut, resolveShortcuts } from '../../lib/shortcuts';
 import { workShape } from '../../lib/task-collection';
 import { taskDecision } from '../../lib/task-workflow';
 import { showWork, useWorkspaceWork, workProjectId } from '../../lib/work-selection';
@@ -40,7 +41,7 @@ export function CommandPalette({
   onCommand: (command: Command) => void;
 }) {
   const [query, setQuery] = useState('');
-  const shortcuts = useSettingsStore((state) => state.shortcuts);
+  const shortcuts = useResolvedKeybindings();
   const previousFocus = useRef<HTMLElement | null>(null);
   const setTheme = useThemeStore((state) => state.setTheme);
   const search = query.trim().toLowerCase();
@@ -295,12 +296,8 @@ export function CommandPalette({
               >
                 <command.icon className="size-4 text-[var(--color-accent-ink)]" />
                 <span>{command.label(context)}</span>
-                {(command.shortcut || command.key) && (
-                  <kbd>
-                    {command.shortcut
-                      ? displayShortcut(resolveShortcuts(shortcuts)[command.shortcut])
-                      : command.key}
-                  </kbd>
+                {command.shortcut && shortcuts[command.shortcut] && (
+                  <kbd>{displayBinding(shortcuts[command.shortcut])}</kbd>
                 )}
               </button>
             ))}
