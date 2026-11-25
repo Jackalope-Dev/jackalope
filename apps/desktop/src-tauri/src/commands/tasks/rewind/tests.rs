@@ -686,7 +686,8 @@ fn removed_workspaces_lose_their_rewind_refs_unless_still_needed() {
         &["for-each-ref", "--format=%(refname)", "refs/jackalope"],
     );
     let left: Vec<&str> = left.lines().collect();
-    // Only the removed task's refs go, and a task whose name extends it is not touched.
+    // Only the removed task's checkpoints go; its safety snapshot stays because plain
+    // removal does not archive it, and a task whose name extends it is not touched.
     assert_eq!(
         left,
         [
@@ -694,13 +695,14 @@ fn removed_workspaces_lose_their_rewind_refs_unless_still_needed() {
             "refs/jackalope/checkpoints/open/ref",
             "refs/jackalope/checkpoints/pending/ref",
             "refs/jackalope/rewinds/gone-1/ref",
+            "refs/jackalope/rewinds/gone/ref",
             "refs/jackalope/rewinds/open/ref",
             "refs/jackalope/rewinds/pending/ref",
         ]
     );
     assert!(notes
         .iter()
-        .any(|note| note.contains("Removed 2 rewind refs of task gone")));
+        .any(|note| note.contains("Removed 1 rewind ref of task gone")));
     assert!(notes.iter().any(|note| note.contains("still exists")));
     assert!(notes.iter().any(|note| note.contains("can still undo")));
     assert!(notes.iter().any(|note| note.contains("cannot name a ref")));

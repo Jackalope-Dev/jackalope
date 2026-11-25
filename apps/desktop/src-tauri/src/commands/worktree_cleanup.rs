@@ -2297,10 +2297,14 @@ mod tests {
         let entry = f.entries(std::slice::from_ref(&run)).remove(1);
         f.remove(&entry, &[run, other]).unwrap();
         assert!(!f.worktree.exists());
-        // Another task's refs stay while its workspace exists.
+        // Another task's refs stay while its workspace exists, and the removed task keeps
+        // its safety snapshot because only Archive & remove bundles and deletes those.
         assert_eq!(
             hidden_refs(&f),
-            ["refs/jackalope/checkpoints/task-other/run-other"]
+            [
+                "refs/jackalope/checkpoints/task-other/run-other",
+                "refs/jackalope/rewinds/task-fixture/rewind-1",
+            ]
         );
     }
 

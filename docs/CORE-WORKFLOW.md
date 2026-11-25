@@ -477,11 +477,12 @@ restored under an agent that still remembers the later turns (`tasks/rewind.rs`)
   composer below any draft. **Undo rewind** restores the saved files (saving the replaced
   ones the same way) and lets the next turn continue the original conversation, until the
   next turn starts.
-- Removing a task's worktree (Clean up, cleanup after a merge, automatic cleanup or Archive
-  & remove) deletes that task's `refs/jackalope/checkpoints/<task>/` and
-  `refs/jackalope/rewinds/<task>/` refs, best effort and logged. Archive & remove first
-  saves the rewind snapshots as `rewinds-<task>.bundle` in the archive. A task keeps its refs
-  while any of its workspaces still exists or while Undo is still offered for its rewind.
+- Removing a task's worktree (Clean up, cleanup after a merge or automatic cleanup) deletes
+  that task's `refs/jackalope/checkpoints/<task>/` refs, best effort and logged. Its
+  `refs/jackalope/rewinds/<task>/` safety snapshots can hold the person's own edits, so they
+  stay until Archive & remove, which saves them as `rewinds-<task>.bundle` in the archive
+  before deleting both. A task keeps its refs while any of its workspaces still exists or
+  while Undo is still offered for its rewind.
 
 `cargo test --no-default-features --lib rewind` covers planning, gating, restore, the safety
 snapshot, Undo and restart with fixture agents; `real_claude_rewind` and `real_codex_rewind`

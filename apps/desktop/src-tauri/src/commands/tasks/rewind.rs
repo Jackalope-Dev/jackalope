@@ -732,7 +732,13 @@ fn forget_task(
     };
     let checkpoints = list("refs/jackalope/checkpoints")?;
     let mut rewinds = list("refs/jackalope/rewinds")?;
-    if let (Some(archive), false) = (archive, rewinds.is_empty()) {
+    // Safety snapshots can hold the person's own edits, so only Archive & remove, which
+    // bundles them first, deletes them; plain removal drops just the turn checkpoints.
+    let Some(archive) = archive else {
+        rewinds.clear();
+        return delete_refs(repo, &checkpoints);
+    };
+    if !rewinds.is_empty() {
         let bundle = archive.join(format!("rewinds-{task}.bundle"));
         let bundle = bundle.to_string_lossy();
         let mut args = vec!["bundle", "create", &*bundle];
@@ -746,8 +752,14 @@ fn forget_task(
             rewinds.clear();
         }
     }
+    let mut references = checkpoints;
+    references.extend(rewinds);
+    delete_refs(repo, &references)
+}
+
+fn delete_refs(repo: &Path, references: &[String]) -> Result<usize, String> {
     let mut removed = 0;
-    for reference in checkpoints.iter().chain(&rewinds) {
+    for reference in references {
         match repo::git(repo, &["update-ref", "-d", reference], Policy::Isolated) {
             Ok(_) => removed += 1,
             Err(error) => eprintln!("Could not remove {reference}: {error}"),
