@@ -21,21 +21,14 @@ function names(missing: DesktopPermission[]) {
 }
 
 /**
- * Shown after the agent's desktop control was refused for missing macOS permissions,
- * while this device still lacks them. macOS applies a grant only after a restart.
+ * The macOS permissions desktop control still lacks on this device, read while `enabled`
+ * and again whenever the person comes back from System Settings. Null until read.
  */
-export function DesktopPermissionNotice({ run }: { run: TaskRun }) {
-  const reasonId = useId();
-  const recorded = run.desktopPermissions ?? [];
-  const needed = recorded.length > 0;
+export function useMissingDesktopPermissions(enabled: boolean): DesktopPermission[] | null {
   const [current, setCurrent] = useState<DesktopPermission[] | null>(null);
-  const [dismissed, setDismissed] = useState(false);
-  const [restarting, setRestarting] = useState(false);
-  const [error, setError] = useState('');
   useEffect(() => {
-    if (!needed) return;
+    if (!enabled) return;
     let live = true;
-    // Re-read when the person comes back from System Settings.
     const check = () =>
       void getSystemInfo()
         .then((info) => {
@@ -50,10 +43,25 @@ export function DesktopPermissionNotice({ run }: { run: TaskRun }) {
       live = false;
       window.removeEventListener('focus', check);
     };
-  }, [needed]);
-  const missing = current ?? recorded;
-  if (!needed || dismissed || !missing.length) return null;
-  const running = isActive(run);
+  }, [enabled]);
+  return enabled ? current : null;
+}
+
+/**
+ * Opens each missing permission's System Settings pane and restarts Jackalope, which macOS
+ * needs before it applies them. With nothing missing, it offers only the restart.
+ */
+export function DesktopPermissionPrompt({
+  missing,
+  restartBlocked,
+}: {
+  missing: DesktopPermission[];
+  /** Why restarting isn't possible right now. */
+  restartBlocked?: string;
+}) {
+  const reasonId = useId();
+  const [restarting, setRestarting] = useState(false);
+  const [error, setError] = useState('');
   const open = async (permission: DesktopPermission) => {
     setError('');
     try {
@@ -73,15 +81,11 @@ export function DesktopPermissionNotice({ run }: { run: TaskRun }) {
     }
   };
   return (
-    <InlineNotice
-      tone="warning"
-      action={
-        <DismissButton label="Dismiss desktop permissions" onDismiss={() => setDismissed(true)} />
-      }
-    >
+    <>
       <p>
-        For desktop control, allow Jackalope under {names(missing)} in System Settings. macOS
-        applies this after Jackalope restarts.
+        {missing.length
+          ? `For desktop control, allow Jackalope under ${names(missing)} in System Settings. macOS applies this after Jackalope restarts.`
+          : 'Try again now. If it still fails, restart Jackalope so macOS applies the permission.'}
       </p>
       <div className="mt-2 flex flex-wrap gap-2">
         {missing.map((permission) => (
@@ -97,8 +101,8 @@ export function DesktopPermissionNotice({ run }: { run: TaskRun }) {
         <Button
           variant="outline"
           size="sm"
-          disabled={running || restarting}
-          aria-describedby={running ? reasonId : undefined}
+          disabled={!!restartBlocked || restarting}
+          aria-describedby={restartBlocked ? reasonId : undefined}
           loading={restarting}
           loadingLabel="Restarting…"
           onClick={() => void restart()}
@@ -106,12 +110,40 @@ export function DesktopPermissionNotice({ run }: { run: TaskRun }) {
           Restart Jackalope
         </Button>
       </div>
-      {running && (
+      {restartBlocked && (
         <p id={reasonId} className="task-muted mt-2">
-          Restart is available once this work finishes or is stopped.
+          {restartBlocked}
         </p>
       )}
       <ActionError error={error} />
+    </>
+  );
+}
+
+/**
+ * Shown after the agent's desktop control was refused for missing macOS permissions,
+ * while this device still lacks them. macOS applies a grant only after a restart.
+ */
+export function DesktopPermissionNotice({ run }: { run: TaskRun }) {
+  const recorded = run.desktopPermissions ?? [];
+  const needed = recorded.length > 0;
+  const current = useMissingDesktopPermissions(needed);
+  const [dismissed, setDismissed] = useState(false);
+  const missing = current ?? recorded;
+  if (!needed || dismissed || !missing.length) return null;
+  return (
+    <InlineNotice
+      tone="warning"
+      action={
+        <DismissButton label="Dismiss desktop permissions" onDismiss={() => setDismissed(true)} />
+      }
+    >
+      <DesktopPermissionPrompt
+        missing={missing}
+        restartBlocked={
+          isActive(run) ? 'Restart is available once this work finishes or is stopped.' : undefined
+        }
+      />
     </InlineNotice>
   );
 }
