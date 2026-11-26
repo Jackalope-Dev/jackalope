@@ -79,6 +79,9 @@ pub(super) fn close_all() {
 fn preview(id: &str) -> Result<(u16, String), String> {
     let mut previews = super::sessions().lock().map_err(|e| e.to_string())?;
     let preview = previews.get_mut(id).ok_or("Start the preview first.")?;
+    if preview.view.kind != super::PreviewKind::Web {
+        return Err("Use Select on the Simulator screen to pick an element.".into());
+    }
     if !super::view(preview)?.running {
         return Err("The preview has stopped. Restart it to inspect the page.".into());
     }
@@ -90,9 +93,7 @@ pub async fn task_preview_design_open(
     id: String,
     path: String,
     theme: Option<Value>,
-    state: State<'_, TaskRuntime>,
 ) -> Result<(), String> {
-    state.access.ensure()?;
     if theme
         .as_ref()
         .is_some_and(|theme| theme.to_string().len() > 2000)
@@ -106,11 +107,9 @@ pub async fn task_preview_design_open(
     {
         return Err("Choose a local preview page beginning with /.".into());
     }
-    let runtime = state.inner().clone();
     let reserve_id = id.clone();
     let (port, identity, session) = tauri::async_runtime::spawn_blocking(move || {
         let _guard = integration::execution_guard()?;
-        runtime.access.ensure()?;
         let id = reserve_id;
         let (port, identity) = preview(&id)?;
         let mut sessions = sessions().lock().map_err(|e| e.to_string())?;

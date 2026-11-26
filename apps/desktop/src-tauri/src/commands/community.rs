@@ -212,12 +212,93 @@ pub enum Metric {
         operation: Option<Operation>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         feature: Option<Feature>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        kind: Option<ErrorKind>,
     },
     OperationResult {
         id: String,
         operation: Operation,
         outcome: OperationOutcome,
     },
+    WorkSent {
+        id: String,
+        shape: WorkShape,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        agent: Option<TelemetryAgent>,
+        attachments: CountBucket,
+        window: bool,
+    },
+    ActionUsed {
+        id: String,
+        action: Action,
+    },
+    SettingChanged {
+        id: String,
+        setting: SettingName,
+    },
+}
+#[derive(Clone, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ErrorKind {
+    Type,
+    Reference,
+    Range,
+    Syntax,
+    Network,
+    Timeout,
+    Permission,
+    NotFound,
+    Aborted,
+    Other,
+}
+#[derive(Clone, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum WorkShape {
+    Conversation,
+    Plan,
+    Comparison,
+    Planned,
+}
+#[derive(Clone, Deserialize, Serialize)]
+pub enum CountBucket {
+    #[serde(rename = "0")]
+    Zero,
+    #[serde(rename = "1")]
+    One,
+    #[serde(rename = "2_plus")]
+    TwoPlus,
+}
+#[derive(Clone, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Action {
+    WindowAttached,
+    VoiceDictation,
+    ReadAloud,
+    DevicePaired,
+    ComputerConnected,
+    CloudMachinePaired,
+    BotCreated,
+}
+#[derive(Clone, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SettingName {
+    MascotReactions,
+    FrostedWindow,
+    ThemePickerInToolbar,
+    Notifications,
+    OsNotifications,
+    InterfaceZoom,
+    TerminalFontSize,
+    TerminalShell,
+    PreferredEditor,
+    TerminalLinks,
+    RetainTerminalOutput,
+    Shortcuts,
+    VoiceModel,
+    DefaultRunner,
+    ConcurrencyLimit,
+    TaskTimeout,
+    McpMarketplace,
 }
 #[derive(Clone, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -344,7 +425,10 @@ impl Metric {
             | Self::TaskState { id, .. }
             | Self::FeatureUsed { id, .. }
             | Self::OperationResult { id, .. }
-            | Self::AppError { id, .. } => id,
+            | Self::AppError { id, .. }
+            | Self::WorkSent { id, .. }
+            | Self::ActionUsed { id, .. }
+            | Self::SettingChanged { id, .. } => id,
         }
     }
 }
@@ -435,17 +519,34 @@ pub struct FeedbackRequest {
     message: String,
     diagnostics: Option<FeedbackCounts>,
 }
+/// The longest report, in UTF-16 units as the form and the server count it.
+const MAX_FEEDBACK: usize = 8000;
+
+/// The report as it is sent: checked as the person wrote it, then masked and,
+/// if masking lengthened it, cut to the server's limit.
+fn feedback_message(message: &str) -> Result<String, String> {
+    if message.trim().is_empty() || message.encode_utf16().count() > MAX_FEEDBACK {
+        return Err("Enter a report of 1–8,000 characters.".into());
+    }
+    let mut units = 0;
+    Ok(crate::commands::redaction::outbound(message)
+        .chars()
+        .take_while(|c| {
+            units += c.len_utf16();
+            units <= MAX_FEEDBACK
+        })
+        .collect())
+}
+
 #[tauri::command]
 pub async fn app_submit_feedback(
     app: AppHandle,
-    request: FeedbackRequest,
+    mut request: FeedbackRequest,
 ) -> Result<String, String> {
-    if !valid_id(&request.id)
-        || request.message.trim().is_empty()
-        || request.message.encode_utf16().count() > 8000
-    {
+    if !valid_id(&request.id) {
         return Err("Enter a report of 1–8,000 characters.".into());
     }
+    request.message = feedback_message(&request.message)?;
     let id = request.id.clone();
     let mut body = serde_json::to_value(request).map_err(|_| "Could not encode report.")?;
     if body["diagnostics"].is_null() {
@@ -461,6 +562,18 @@ pub async fn app_submit_feedback(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn feedback_is_checked_as_written_and_masked_within_the_limit() {
+        // Built at runtime so the repository's secret scan ignores it.
+        let token = format!("Bearer {}", "a1B2c3D4e5".repeat(2));
+        let message = format!("{} {token}", "x".repeat(MAX_FEEDBACK - token.len() - 1));
+        assert_eq!(message.encode_utf16().count(), MAX_FEEDBACK);
+        let sent = feedback_message(&message).unwrap();
+        assert_eq!(sent.encode_utf16().count(), MAX_FEEDBACK);
+        assert!(sent.ends_with(" Bearer [redacted bearer tok"), "{sent}");
+        assert!(feedback_message(&format!("{message}x")).is_err());
+        assert!(feedback_message("  ").is_err());
+    }
     #[test]
     fn telemetry_contract_round_trips_without_private_dimensions() {
         let fixtures: Vec<serde_json::Value> = serde_json::from_str(include_str!(
@@ -479,6 +592,12 @@ mod tests {
             serde_json::json!({"name":"operation_result","id":"x","operation":"private_command","outcome":"accepted"}),
             serde_json::json!({"name":"task_state","id":"x","state":"running","agent":"private_account"}),
             serde_json::json!({"name":"app_error","id":"x","code":"ui_render_error","feature":"private_project"}),
+            serde_json::json!({"name":"app_error","id":"x","code":"ui_error","message":"/Users/me/secret"}),
+            serde_json::json!({"name":"setting_changed","id":"x","setting":"dictation_endpoint"}),
+            serde_json::json!({"name":"action_used","id":"x","action":"private_action"}),
+            serde_json::json!({"name":"work_sent","id":"x","shape":"plan","attachments":"3","window":false}),
+            serde_json::json!({"name":"work_sent","id":"x","shape":"plan","attachments":"1","window":false,"prompt":"hi"}),
+            serde_json::json!({"name":"work_sent","id":"x","shape":"task","attachments":"1","window":false}),
         ] {
             assert!(serde_json::from_value::<Metric>(private).is_err());
         }

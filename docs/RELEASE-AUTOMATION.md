@@ -80,10 +80,11 @@ SHA to stable." It follows the same commands and leaves commits to the maintaine
 
 ## Windows Store releases
 
-Set `RELEASE_DISTRIBUTION=store` and configure Cloud targets to
-`["darwin-aarch64","darwin-x86_64","linux-x86_64"]`. Cloud builds exclude Windows in
-this mode. Existing EXE tooling remains available for separately configured direct
-distribution; it is not needed for Windows Store signing or updates.
+Set `RELEASE_DISTRIBUTION=store`. Store distribution does not need Azure signing.
+With `windows-x86_64` in the Cloud targets, Cloud also publishes the NSIS installer
+alongside the Store build, Azure-signed or under the unsigned opt-in; see
+[direct Windows installer](CROSS-PLATFORM-RELEASES.md#direct-windows-installer).
+Without it, Cloud builds only macOS and Linux.
 
 **Store release** follows the same release-branch pushes as Cloud:
 `beta` selects the tester flight and `stable` selects the base Store product. Manual
@@ -121,15 +122,17 @@ select rehearsal, candidate, draft or publish; the selected branch determines th
 channel. The optional Windows-only selection supports initial installer testing.
 
 The default Cloud matrix builds macOS Apple Silicon and Intel DMGs plus app
-updater archives, and Linux x64 AppImage. Windows x64 NSIS remains available only
-for separately configured direct distribution with `RELEASE_DISTRIBUTION=cloud`. AppImage is the supported Linux
+updater archives, and Linux x64 AppImage. Windows x64 NSIS is built only when
+`CLOUD_RELEASE_TARGETS` lists `windows-x86_64`. AppImage is the supported Linux
 in-app update path; OS-managed package upgrades and Store updates are separate.
-Every candidate runs the native account-access tests. Repository and platform checks
+Every candidate runs the native account tests, including local work without an account. Repository and platform checks
 run once per commit in **Verify platforms**, not again in each Cloud or Store build;
 publication and Store submission wait up to 45 minutes for those checks on the exact
 source commit and stop if any failed. Release builds start without a Rust cache.
 On master and ordinary pull requests, Verify skips trial packages and reports Intel
-macOS from a quick job, and a newer master push cancels the older run. Pushes to beta
+macOS from a quick job, and checks only what the change can affect (see
+[Contributing](../CONTRIBUTING.md)). A newer master push waits for the running one
+instead of cancelling it. Pushes to beta
 or stable, pull requests into them and manual runs build trial packages and run Intel
 macOS. Windows runs its native tests once, with the Store build's features when
 `RELEASE_DISTRIBUTION=store`.
@@ -143,7 +146,8 @@ all required source checks, remote asset bytes and platform/signature metadata.
 It then reserves `beta-vVERSION` or `stable-vVERSION` at the exact source commit,
 publishes the complete Cloud draft, and checks each public update feed and its bytes.
 Tags are not moved or deleted. A reserved tag alone does not prove publication.
-CrabNebula is the release catalog; this workflow does not create GitHub Releases.
+CrabNebula is the release catalog. After a stable publication, a separate job mirrors
+it to a public GitHub Release; see [GitHub Releases mirror](CROSS-PLATFORM-RELEASES.md#github-releases-mirror).
 
 Beta builds/publication use the `cloud-beta` environment without a manual approval.
 This environment also supplies shared signing credentials to stable candidate jobs
@@ -163,9 +167,10 @@ Keep these repository variables disabled until their prerequisites pass:
 
 | Variable | Purpose |
 | --- | --- |
-| `RELEASE_DISTRIBUTION=store` | Windows uses Store; Cloud handles Mac/Linux. `cloud` additionally permits direct Windows EXE builds. Legacy R2 publication has no Actions workflow |
-| `CLOUD_RELEASE_TARGETS` | JSON array of intended targets; the Store configuration contains the three Mac/Linux targets |
-| `CLOUD_SIGNING_READY` | Optional direct Windows Azure signing is configured; unnecessary for Store/Mac/Linux |
+| `RELEASE_DISTRIBUTION=store` | Windows uses Store; Cloud handles Mac/Linux and, when listed in the targets, the direct Windows installer. Legacy R2 publication has no Actions workflow |
+| `CLOUD_RELEASE_TARGETS` | JSON array of intended targets; the release configuration lists all four, including the direct Windows installer |
+| `CLOUD_SIGNING_READY` | Direct Windows Azure signing is configured; when the targets include Windows, this or `WINDOWS_AUTHENTICODE=unsigned` is required. Unnecessary for Store/Mac/Linux |
+| `WINDOWS_AUTHENTICODE` | `unsigned` publishes the direct Windows installer without Authenticode while `CLOUD_SIGNING_READY` is not `true`; leave unset for the signed path. See [unsigned installer](CRABNEBULA-RELEASE.md#unsigned-direct-windows-installer) |
 | `APPLE_SIGNING_READY` | Developer ID signing and notarization are configured |
 | `CLOUD_DRAFT_UPLOAD_ENABLED` | Permit validated candidates to be uploaded |
 | `CLOUD_PUBLISH_ENABLED` | Permit publication, including manually dispatched beta trials |
@@ -211,8 +216,8 @@ pnpm release:setup --apply
 
 The first command audits; `--apply` configures the release branches/protections,
 branch-scoped environments, default-off missing gates and immutable tag rules.
-It selects Store Windows distribution,
-removes Windows from Cloud target/acceptance lists and preserves Unix target choices. It creates missing beta/stable branches from current remote master; existing branches
+It selects Store Windows distribution and
+preserves existing Cloud target choices; missing target lists default to Mac/Linux. It creates missing beta/stable branches from current remote master; existing branches
 are never reset. Bootstrap branches are not evidence of a tested release. Existing enablement flags and secrets are preserved.
 The command does not change visibility or commit code. For initial migration, keep
 publication gates off, commit/push the new workflows to master, apply setup, then

@@ -179,7 +179,6 @@ pub async fn routing_connect(
     revision: u64,
     project_id: Option<String>,
 ) -> Result<RoutingSettings, String> {
-    runtime.access.ensure()?;
     settings::validate_project(project_id.as_deref())?;
     if !valid_key(&key) {
         return Err("Enter a valid TypeSafe API key.".into());
@@ -270,7 +269,9 @@ async fn evaluate_at(
     payload: &Value,
     canceled: impl Fn() -> bool,
 ) -> Result<Value, String> {
-    let body = serde_json::to_vec(payload).map_err(|_| "Could not prepare Jev routing.")?;
+    let mut payload = payload.clone();
+    super::redaction::outbound_value(&mut payload);
+    let body = serde_json::to_vec(&payload).map_err(|_| "Could not prepare Jev routing.")?;
     if body.len() > MAX_BYTES {
         return Err("This routing context is too large for Jev routing.".into());
     }

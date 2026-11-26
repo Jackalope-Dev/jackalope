@@ -47,6 +47,9 @@ export interface ConnectedDevice {
   lastSeenAt: number | null;
   settingsCheckedAt: number | null;
   settingsSync: number;
+  /** Connections on the same computer share this label within one response. It is not the
+   *  machine key and means nothing outside the list it came with. */
+  computer?: string;
 }
 
 export interface Invitation {

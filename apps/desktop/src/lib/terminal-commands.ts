@@ -3,6 +3,10 @@ export interface TerminalCommand {
   id: string;
   name: string;
   command: string;
+  /** Runs in each new task worktree as part of preparation. Undefined means off. */
+  runOnWorktreeCreate?: boolean;
+  /** Running it marks the terminal to stop when the task is merged or archived. Undefined means off. */
+  stopWhenFinished?: boolean;
 }
 
 function validTerminalCommand(value: unknown): value is TerminalCommand {
@@ -36,4 +40,16 @@ export function projectTerminalCommands(
     ? preferences.terminalCommands.filter(validTerminalCommand)
     : [];
   return [...fixed, ...extra];
+}
+
+/** The saved commands that run in each new task worktree, in order, for the native mirror. */
+export function worktreeCommandsForRegistry(
+  commands: unknown,
+): { name: string; command: string }[] | undefined {
+  if (!Array.isArray(commands)) return undefined;
+  const marked = commands
+    .filter(validTerminalCommand)
+    .filter((item) => item.runOnWorktreeCreate === true)
+    .map((item) => ({ name: item.name.trim(), command: item.command.trim() }));
+  return marked.length ? marked : undefined;
 }

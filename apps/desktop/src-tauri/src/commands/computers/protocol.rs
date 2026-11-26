@@ -17,6 +17,7 @@ pub(crate) struct Protocol {
     pub slots_max: u64,
     pub transfer: Transfer,
     pub relay: Relay,
+    pub provider_proxy: ProviderProxy,
     pub git_identity: GitIdentity,
     pub sync: GitSync,
     pub search: Search,
@@ -53,6 +54,29 @@ pub(crate) struct Relay {
     pub too_large: String,
     /// Request headers forwarded to the bridge.
     pub headers: Vec<String>,
+}
+
+/// Model provider requests an agent on a computer sends through the relay
+/// (see [`super::provider_proxy`]).
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct ProviderProxy {
+    /// Relay paths under this prefix, followed by a provider name, are provider requests.
+    pub prefix: String,
+    pub providers: Vec<String>,
+    pub request_limit: usize,
+    /// Response bytes per `run_answer` piece.
+    pub piece_limit: usize,
+    /// Headers carrying the run's per-attempt token. They are checked here and
+    /// never forwarded.
+    pub credential_headers: Vec<String>,
+    /// Request headers forwarded to the provider.
+    pub headers: Vec<String>,
+    /// Provider response headers passed back to the agent.
+    pub response_headers: Vec<String>,
+    /// `anthropic-beta` families forwarded, each followed by its date
+    /// (`claude-code-` matches `claude-code-20250219`); others are dropped.
+    pub anthropic_betas: Vec<String>,
 }
 
 #[derive(Deserialize)]
@@ -167,6 +191,7 @@ mod tests {
             runner::POLICY_CALLBACKS,
             runner::GIT_SYNC,
             runner::ARTIFACTS,
+            runner::PROVIDER_PROXY,
         ];
         known.sort();
         assert_eq!(capabilities, known);

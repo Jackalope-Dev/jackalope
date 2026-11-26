@@ -1,5 +1,5 @@
 use super::{integration, process_control::ProcessTree, tasks::TaskRuntime};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::{
     collections::HashMap,
     io::{BufReader, Read, Write},
@@ -12,23 +12,75 @@ use tauri::State;
 pub mod design;
 pub mod features;
 pub mod review;
+pub mod simulator;
 
-#[derive(Clone, Serialize)]
+/// Which kind of preview runs: a local web server, or the app in the task's
+/// iOS Simulator.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum PreviewKind {
+    #[default]
+    Web,
+    Simulator,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PreviewView {
     pub run_id: String,
     pub command: String,
+    /// Absent in views from before Simulator previews, which were all web.
+    #[serde(default)]
+    pub kind: PreviewKind,
+    /// The web preview's local port; 0 for a Simulator preview.
+    #[serde(default)]
     pub port: u16,
     pub running: bool,
     pub ready: bool,
     pub exit_code: Option<i32>,
     pub output: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub simulator: Option<simulator::SimulatorPreview>,
 }
+
+/// What a preview runs: a web server's process tree, or a Simulator session
+/// with its build, app, device and driver.
+enum Process {
+    Web { child: Child, tree: ProcessTree },
+    Simulator(Arc<simulator::Session>),
+}
+
+impl Process {
+    /// Whether the preview still holds its workspace or device.
+    fn alive(&mut self) -> Result<bool, String> {
+        match self {
+            Process::Web { child, tree } => {
+                if child.try_wait().map_err(|e| e.to_string())?.is_some() {
+                    tree.terminate();
+                    Ok(false)
+                } else {
+                    Ok(true)
+                }
+            }
+            Process::Simulator(session) => Ok(session.phase().active() || session.busy()),
+        }
+    }
+
+    fn end(&mut self, wait: bool) {
+        match self {
+            Process::Web { child, tree } => {
+                tree.terminate();
+                let _ = child.wait();
+            }
+            Process::Simulator(session) => session.stop(wait),
+        }
+    }
+}
+
 struct Preview {
     identity: String,
     workspace: String,
-    child: Child,
-    tree: ProcessTree,
+    process: Process,
     view: PreviewView,
     output: Arc<Mutex<String>>,
 }
@@ -46,13 +98,7 @@ pub(super) fn ensure_preview_idle(workspace: &str) -> Result<(), String> {
     let mut sessions = sessions().lock().map_err(|e| e.to_string())?;
     for preview in sessions.values_mut() {
         if dunce::canonicalize(&preview.workspace).ok().as_ref() == Some(&path) {
-            if preview
-                .child
-                .try_wait()
-                .map_err(|e| e.to_string())?
-                .is_some()
-            {
-                preview.tree.terminate();
+            if !preview.process.alive()? {
                 continue;
             }
             return Err("Stop this workspace's managed preview before continuing work, integrating or removing it.".into());
@@ -65,8 +111,7 @@ pub fn close_all() {
     design::close_all();
     if let Ok(mut sessions) = sessions().lock() {
         for preview in sessions.values_mut() {
-            preview.tree.terminate();
-            let _ = preview.child.wait();
+            preview.process.end(false);
         }
         sessions.clear();
     }
@@ -77,12 +122,13 @@ pub fn active_ports() -> Vec<(String, u16)> {
         .map(|mut sessions| {
             sessions
                 .values_mut()
+                .filter(|preview| preview.view.kind == PreviewKind::Web)
                 .filter_map(|preview| {
                     preview
-                        .child
-                        .try_wait()
+                        .process
+                        .alive()
                         .ok()
-                        .filter(Option::is_none)
+                        .filter(|alive| *alive)
                         .map(|_| (preview.view.run_id.clone(), preview.view.port))
                 })
                 .collect()
@@ -91,10 +137,20 @@ pub fn active_ports() -> Vec<(String, u16)> {
 }
 
 fn view(preview: &mut Preview) -> Result<PreviewView, String> {
-    if let Some(status) = preview.child.try_wait().map_err(|e| e.to_string())? {
-        preview.view.running = false;
-        preview.view.exit_code = status.code();
-        preview.tree.terminate();
+    match &mut preview.process {
+        Process::Web { child, tree } => {
+            if let Some(status) = child.try_wait().map_err(|e| e.to_string())? {
+                preview.view.running = false;
+                preview.view.exit_code = status.code();
+                tree.terminate();
+            }
+        }
+        Process::Simulator(session) => {
+            let phase = session.phase();
+            preview.view.running = phase.active();
+            preview.view.ready = phase == simulator::Phase::Running;
+            preview.view.simulator = Some(session.view());
+        }
     }
     let mut result = preview.view.clone();
     result.output = preview.output.lock().map_err(|e| e.to_string())?.clone();
@@ -113,6 +169,13 @@ macro_rules! tauri_commands {
             commands::previews::task_preview_inspect_cancel,
             commands::previews::design::task_preview_design_open,
             commands::previews::design::task_preview_design_capture,
+            commands::previews::simulator_preview_target,
+            commands::previews::task_preview_simulator_start,
+            commands::previews::task_preview_simulator_reload,
+            commands::previews::task_preview_simulator_frame,
+            commands::previews::task_preview_simulator_act,
+            commands::previews::task_preview_simulator_elements,
+            commands::previews::task_preview_simulator_select,
         ] $($rest)*)
     };
 }
@@ -132,7 +195,10 @@ fn preview_status(id: String) -> Result<Option<PreviewView>, String> {
         .get_mut(&id)
         .map(view)
         .transpose()?;
-    if let Some(value) = result.as_mut() {
+    if let Some(value) = result
+        .as_mut()
+        .filter(|value| value.kind == PreviewKind::Web)
+    {
         value.ready = value.running && http_ready(value.port);
     }
     Ok(result)
@@ -210,7 +276,6 @@ fn start_preview(
     command: String,
     port: u16,
 ) -> Result<PreviewView, String> {
-    runtime.access.ensure()?;
     let _guard = integration::execution_guard()?;
     if command.trim().is_empty()
         || command.len() > 4000
@@ -283,19 +348,20 @@ fn start_preview(
     let result = PreviewView {
         run_id: id.clone(),
         command: expanded,
+        kind: PreviewKind::Web,
         port,
         running: true,
         ready: false,
         exit_code: None,
         output: String::new(),
+        simulator: None,
     };
     sessions.insert(
         id,
         Preview {
             identity: uuid::Uuid::new_v4().to_string(),
             workspace: run.workspace.clone(),
-            child,
-            tree,
+            process: Process::Web { child, tree },
             view: result.clone(),
             output,
         },
@@ -326,6 +392,11 @@ fn preview_process(expanded: &str, workspace: &str, port: u16) -> Command {
         .env("PORT", port.to_string())
         .env_remove("JACKALOPE_BRIDGE_TOKEN")
         .env_remove("JACKALOPE_BRIDGE_URL");
+    super::xcode::apply_for(&mut cmd, std::path::Path::new(workspace));
+    if let Some(device) = super::simulators::assigned(workspace) {
+        cmd.envs(device.environment());
+        super::xcode::apply(&mut cmd);
+    }
     cmd
 }
 
@@ -381,7 +452,6 @@ async fn inspect_preview(
     narrow: bool,
 ) -> Result<PreviewInspection, String> {
     use super::harness::{BrowserConfigureRequest, BrowserInspectRequest, BrowserSnapshotRequest};
-    runtime.access.ensure()?;
     uuid::Uuid::parse_str(&request_id).map_err(|_| "Invalid preview inspection")?;
     if !path.starts_with('/')
         || path.starts_with("//")
@@ -395,6 +465,9 @@ async fn inspect_preview(
         let preview = sessions
             .get_mut(&id)
             .ok_or("Start this task's preview before capturing evidence.")?;
+        if preview.view.kind != PreviewKind::Web {
+            return Err("Fresh page captures are for web previews.".into());
+        }
         if !view(preview)?.running {
             return Err("The preview has stopped.".into());
         }
@@ -505,8 +578,7 @@ fn stop_preview(runtime: &TaskRuntime, id: String) -> Result<(), String> {
     let Some(preview) = sessions.get_mut(&id) else {
         return Ok(());
     };
-    preview.tree.terminate();
-    let _ = preview.child.wait();
+    preview.process.end(true);
     preview.view.running = false;
     let output = preview.output.lock().map_err(|e| e.to_string())?.clone();
     runtime.update_checked(&id, |r| {
@@ -517,6 +589,254 @@ fn stop_preview(runtime: &TaskRuntime, id: String) -> Result<(), String> {
     })?;
     sessions.remove(&id);
     Ok(())
+}
+
+/// How a workspace runs in the iOS Simulator, or `None` when it is not an
+/// iOS app project.
+#[tauri::command]
+pub async fn simulator_preview_target(path: String) -> Result<Option<simulator::Target>, String> {
+    tauri::async_runtime::spawn_blocking(move || simulator::target(std::path::Path::new(&path)))
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// Builds the task's app for its own Simulator and launches it. `command`
+/// replaces the detected build; empty uses it.
+#[tauri::command]
+pub async fn task_preview_simulator_start(
+    id: String,
+    command: Option<String>,
+    state: State<'_, TaskRuntime>,
+) -> Result<PreviewView, String> {
+    let runtime = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || start_simulator_preview(&runtime, id, command))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+fn start_simulator_preview(
+    runtime: &TaskRuntime,
+    id: String,
+    command: Option<String>,
+) -> Result<PreviewView, String> {
+    let _guard = integration::execution_guard()?;
+    let custom = command
+        .as_deref()
+        .map(str::trim)
+        .filter(|command| !command.is_empty())
+        .map(simulator::valid_command)
+        .transpose()?
+        .map(str::to_string);
+    let runs = runtime.integration_runs()?;
+    let run = runs.iter().find(|r| r.id == id).ok_or("Task not found")?;
+    if runs
+        .iter()
+        .any(|r| r.workspace == run.workspace && r.status.is_live())
+    {
+        return Err("Finish active work and resolve interrupted ownership before starting a managed preview.".into());
+    }
+    let target = simulator::target(std::path::Path::new(&run.workspace))
+        .ok_or("This workspace has no Xcode project that builds an iOS app.")?;
+    if let Some(issue) = target.issue.as_ref().filter(|_| {
+        custom.is_none() || !super::simulator::supported() || super::xcode::toolchain().is_none()
+    }) {
+        return Err(issue.clone());
+    }
+    let mut previews = sessions().lock().map_err(|e| e.to_string())?;
+    if let Some(existing) = previews.get_mut(&id) {
+        if existing.process.alive()? {
+            return Err("Stop the current preview before starting another.".into());
+        }
+    }
+    if previews.len() >= 8 && !previews.contains_key(&id) {
+        return Err(
+            "Stop and clear an existing preview before opening another (limit eight).".into(),
+        );
+    }
+    drop(previews);
+    ensure_idle(&run.workspace)?;
+    super::verification::ensure_idle(&run.workspace)?;
+    runtime.update_checked(&id, |r| {
+        r.activity.push("Simulator preview requested.".to_string())
+    })?;
+    let display = custom.clone().unwrap_or(target.build_command);
+    let output = Arc::new(Mutex::new(String::new()));
+    let session =
+        simulator::Session::new(runtime.clone(), &id, &run.workspace, custom, output.clone());
+    let mut preview = Preview {
+        identity: uuid::Uuid::new_v4().to_string(),
+        workspace: run.workspace.clone(),
+        process: Process::Simulator(session.clone()),
+        view: PreviewView {
+            run_id: id.clone(),
+            command: display,
+            kind: PreviewKind::Simulator,
+            port: 0,
+            running: true,
+            ready: false,
+            exit_code: None,
+            output: String::new(),
+            simulator: None,
+        },
+        output,
+    };
+    session.start();
+    let result = view(&mut preview)?;
+    let mut previews = sessions().lock().map_err(|e| e.to_string())?;
+    if let Some(mut old) = previews.insert(id, preview) {
+        old.process.end(false);
+    }
+    Ok(result)
+}
+
+/// The task's Simulator preview session, or why there is none.
+fn simulator_session(id: &str) -> Result<(Arc<simulator::Session>, String), String> {
+    let sessions = sessions().lock().map_err(|e| e.to_string())?;
+    match sessions
+        .get(id)
+        .map(|preview| (&preview.process, &preview.identity))
+    {
+        Some((Process::Simulator(session), identity)) => Ok((session.clone(), identity.clone())),
+        Some(_) => Err("This task's preview is a web preview.".into()),
+        None => Err("Start the Simulator preview first.".into()),
+    }
+}
+
+async fn blocking<T: Send + 'static>(
+    work: impl FnOnce() -> Result<T, String> + Send + 'static,
+) -> Result<T, String> {
+    tauri::async_runtime::spawn_blocking(work)
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+/// Builds, installs and launches the app again, for changes made since.
+#[tauri::command]
+pub async fn task_preview_simulator_reload(id: String) -> Result<(), String> {
+    blocking(move || {
+        let _guard = integration::execution_guard()?;
+        let (session, _) = simulator_session(&id)?;
+        session.start();
+        Ok(())
+    })
+    .await
+}
+
+/// The Simulator screen now, scaled for the Preview tab. Never saved.
+#[tauri::command]
+pub async fn task_preview_simulator_frame(id: String) -> Result<simulator::Frame, String> {
+    blocking(move || simulator_session(&id)?.0.frame()).await
+}
+
+/// A tap, typing, Home, rotation or a device setting from the person.
+#[tauri::command]
+pub async fn task_preview_simulator_act(
+    id: String,
+    action: simulator::Action,
+) -> Result<(), String> {
+    blocking(move || simulator_session(&id)?.0.act(&action)).await
+}
+
+/// The elements on screen with their frames, for Select mode.
+#[tauri::command]
+pub async fn task_preview_simulator_elements(id: String) -> Result<simulator::Elements, String> {
+    blocking(move || simulator_session(&id)?.0.elements()).await
+}
+
+/// A selection note for the element at a frame position: a cropped capture
+/// and `.selection.json` saved with the task's evidence.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SimulatorSelection {
+    selection: serde_json::Value,
+    screenshot: super::harness::ScreenshotArtifact,
+    context_path: String,
+}
+
+#[tauri::command]
+pub async fn task_preview_simulator_select(
+    id: String,
+    x: f64,
+    y: f64,
+    state: State<'_, TaskRuntime>,
+) -> Result<SimulatorSelection, String> {
+    let runtime = state.inner().clone();
+    blocking(move || select_simulator_element(&runtime, &id, x, y)).await
+}
+
+fn select_simulator_element(
+    runtime: &TaskRuntime,
+    id: &str,
+    x: f64,
+    y: f64,
+) -> Result<SimulatorSelection, String> {
+    let (session, identity) = simulator_session(id)?;
+    let selected = session.select(x, y)?;
+    let _guard = integration::execution_guard()?;
+    if simulator_session(id)?.1 != identity {
+        return Err("The preview changed during capture. Select the element again.".into());
+    }
+    let runs = runtime.integration_runs()?;
+    let run = runs
+        .iter()
+        .find(|run| run.id == id)
+        .ok_or("Task not found")?;
+    let directory = super::artifacts::evidence_folder(std::path::Path::new(&run.workspace))?;
+    let (width, height) = super::harness::png_dimensions(&selected.png)?;
+    let artifact_id = uuid::Uuid::new_v4().to_string();
+    let destination = directory.join(format!("{artifact_id}.png"));
+    std::fs::write(&destination, &selected.png).map_err(|e| e.to_string())?;
+    let selection = selected.selection(&artifact_id);
+    let context_path = directory.join(format!("{artifact_id}.selection.json"));
+    std::fs::write(
+        &context_path,
+        serde_json::to_vec_pretty(&selection).map_err(|e| e.to_string())?,
+    )
+    .map_err(|e| e.to_string())?;
+    let screenshot = super::harness::ScreenshotArtifact {
+        id: artifact_id,
+        name: format!(
+            "Selected {}",
+            selection["tag"].as_str().unwrap_or("element")
+        ),
+        url: format!("simulator://{}", selected.udid),
+        file_path: destination.to_string_lossy().into_owned(),
+        width,
+        height,
+        timestamp: chrono::Utc::now().to_rfc3339(),
+    };
+    runtime.update_checked(id, |run| run.screenshots.push(screenshot.clone()))?;
+    Ok(SimulatorSelection {
+        selection,
+        screenshot,
+        context_path: context_path.to_string_lossy().into_owned(),
+    })
+}
+
+/// Entry points the Simulator preview's native test drives.
+#[cfg(test)]
+pub(in crate::commands::previews) mod tests_support {
+    use super::*;
+
+    pub fn start(runtime: &TaskRuntime, id: &str) {
+        start_simulator_preview(runtime, id.to_string(), None).unwrap();
+    }
+
+    pub fn status(id: &str) -> PreviewView {
+        preview_status(id.to_string()).unwrap().unwrap()
+    }
+
+    pub fn session(id: &str) -> Arc<simulator::Session> {
+        simulator_session(id).unwrap().0
+    }
+
+    pub fn select(runtime: &TaskRuntime, id: &str, x: f64, y: f64) -> serde_json::Value {
+        serde_json::to_value(select_simulator_element(runtime, id, x, y).unwrap()).unwrap()
+    }
+
+    pub fn stop(runtime: &TaskRuntime, id: &str) {
+        stop_preview(runtime, id.to_string()).unwrap();
+    }
 }
 
 #[cfg(test)]
@@ -624,7 +944,7 @@ mod tests {
             serde_json::to_vec(&record).unwrap(),
         )
         .unwrap();
-        let runtime = TaskRuntime::with_test_access(history).unwrap();
+        let runtime = TaskRuntime::new(history).unwrap();
         (runtime, root, id)
     }
 

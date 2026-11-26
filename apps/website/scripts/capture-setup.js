@@ -203,8 +203,6 @@ async function _captureSetup(page) {
       invoke: async (command, args) => {
         window.__auditCalls.push({ command, args });
         if (window.__auditErrors[command]) throw new Error(window.__auditErrors[command]);
-        if (command === 'app_execution_access')
-          return { required: false, allowed: true, validUntil: null };
         if (command === 'app_account_status')
           return (
             window.__accountStatus ?? {

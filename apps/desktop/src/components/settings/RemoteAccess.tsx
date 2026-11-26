@@ -2,12 +2,14 @@ import {
   Button,
   Checkbox,
   ChoiceGrid,
+  ConfirmDialog,
   Disclosure,
   DisclosureSummary,
   FlowDiagram,
   FormField,
   InlineNotice,
   Input,
+  DropdownMenu as Menu,
   SettingGroup,
   SettingRow,
   SetupIntro,
@@ -25,12 +27,15 @@ import { projectNameHints } from '../../lib/project-name-hints';
 import { thisComputerLabel } from '../../lib/remote-checks';
 import { syncProjectIcons } from '../../lib/remote-project-icons';
 import type { RunRequest } from '../../lib/run-types';
+import { useDevicesStore } from '../../stores/devicesStore';
 import { agentAccountFor, type Project, useProjectStore } from '../../stores/projectStore';
 import { ProjectMark } from '../projects/ProjectMark';
 import { type PairingCode, PairingView } from '../remote/PairingCode';
+import { OptionsMenu } from '../ui/OptionsMenu';
 import { TailscaleSetup } from './TailscaleSetup';
 import '../remote/remote.css';
 import { describeError } from '@jackalope/contracts/errors';
+import { trackAction } from '../../lib/usage-events';
 
 interface Status {
   enabled: boolean;
@@ -85,8 +90,21 @@ export function RemoteAccess() {
   const [notice, setNotice] = useState('');
   const [pair, setPair] = useState<PairingCode | null>(null);
   const [expires, setExpires] = useState(0);
+  const [revoking, setRevoking] = useState<Status['devices'][number] | null>(null);
   const pairingDevices = useRef(new Set<string>());
+  const changed = useDevicesStore((state) => state.changed);
+  const setWaiting = useDevicesStore((state) => state.setWaitingForPhone);
+  useEffect(() => {
+    setWaiting(Boolean(pair));
+    return () => setWaiting(false);
+  }, [pair, setWaiting]);
+  // Device ids already seen, so a newly paired one is counted once; the first load only records.
+  const known = useRef<Set<string> | null>(null);
   const apply = useCallback((next: Status) => {
+    const ids = next.devices.map((device) => device.id);
+    if (known.current)
+      for (const id of ids) if (!known.current.has(id)) trackAction('device_paired');
+    known.current = new Set(ids);
     setStatus(next);
     // Before remote access is first turned on, every project starts selected.
     setSelected(
@@ -144,11 +162,12 @@ export function RemoteAccess() {
     if (connected) {
       setPair(null);
       setNotice(`${connected.name} paired.`);
+      changed();
       return;
     }
     const timer = setTimeout(() => setPair(null), Math.max(0, expires - Date.now()));
     return () => clearTimeout(timer);
-  }, [expires, pair, status?.devices]);
+  }, [changed, expires, pair, status?.devices]);
   const perform = async (operation: () => Promise<void>) => {
     if (busy) return;
     setBusy(true);
@@ -191,6 +210,7 @@ export function RemoteAccess() {
     });
     apply(next);
     setPair(null);
+    changed();
     // The host keeps icons only for shared projects, so newly shared ones need theirs.
     syncProjectIcons(true);
     return next;
@@ -467,6 +487,7 @@ export function RemoteAccess() {
                         pair={pair}
                         expires={expires}
                         origin={status?.publicOrigin ?? ''}
+                        waiting
                       />
                     )}
                     {!!status?.devices.length && (
@@ -479,18 +500,14 @@ export function RemoteAccess() {
                               device.invitedBy ? ` · invited by ${device.invitedBy}` : ''
                             }`}
                           >
-                            <Button
-                              variant="outline"
-                              disabled={busy}
-                              onClick={() =>
-                                void perform(async () => {
-                                  await invokeNative('remote_revoke', { id: device.id });
-                                  setStatus(await invokeNative<Status>('remote_status'));
-                                })
-                              }
-                            >
-                              Revoke access
-                            </Button>
+                            <OptionsMenu label={`${device.name} options`} disabled={busy}>
+                              <Menu.Item
+                                className="workspace-menu-item"
+                                onSelect={() => setRevoking(device)}
+                              >
+                                Revoke access…
+                              </Menu.Item>
+                            </OptionsMenu>
                           </SettingRow>
                         ))}
                       </div>
@@ -532,6 +549,21 @@ export function RemoteAccess() {
           {notice}
         </p>
       )}
+      <ConfirmDialog
+        open={!!revoking}
+        onOpenChange={(open) => !open && setRevoking(null)}
+        title={`Revoke ${revoking?.name ?? 'this device'}?`}
+        description="It can no longer reach this computer and needs a new pairing code to come back. Any phones it invited lose access too."
+        label="Revoke access"
+        busyLabel="Revoking…"
+        onConfirm={async () => {
+          if (!revoking) return;
+          await invokeNative('remote_revoke', { id: revoking.id });
+          setRevoking(null);
+          setStatus(await invokeNative<Status>('remote_status'));
+          changed();
+        }}
+      />
     </SettingGroup>
   );
 }

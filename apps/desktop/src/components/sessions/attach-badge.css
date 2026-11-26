@@ -174,7 +174,7 @@
   font: inherit;
   font-size: var(--text-sm);
 }
-.attach-badge-ask textarea:focus-visible {
+.attach-badge-ask textarea:focus {
   outline: none;
   box-shadow: none;
 }

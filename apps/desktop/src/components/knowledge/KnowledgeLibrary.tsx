@@ -24,7 +24,7 @@ import { invokeNative } from '../../lib/native/transport';
 import { useExecutionStore } from '../../stores/executionStore';
 import type { Project } from '../../stores/projectStore';
 import { WorkspaceSectionHeading } from '../ui/WorkspaceSectionHeading';
-import { KnowledgeEditor, newKnowledge } from './KnowledgeEditor';
+import { KnowledgeEditor, newKnowledge, newToolRule, toolRuleSummary } from './KnowledgeEditor';
 import { LearnedHistory } from './LearnedHistory';
 import { LearningMetrics } from './LearningMetrics';
 
@@ -204,6 +204,13 @@ export function KnowledgeLibrary({ project }: { project: Project }) {
                     </Badge>
                   )}
                   {enforcedBy && <Badge variant="success">Enforced</Badge>}
+                  {entry.toolRule && (
+                    <Badge variant="outline">
+                      {entry.toolRule.action === 'deny'
+                        ? 'Blocks tool calls'
+                        : 'Warns on tool calls'}
+                    </Badge>
+                  )}
                   {attention && (
                     <Badge variant="warning">
                       {entry.stale
@@ -306,6 +313,14 @@ export function KnowledgeLibrary({ project }: { project: Project }) {
                         Make it a check
                       </Button>
                     )}
+                    {entry.kind === 'memory' && !entry.toolRule && (
+                      <Button
+                        variant="ghost"
+                        onClick={() => setEditing({ ...entry, toolRule: newToolRule(entry) })}
+                      >
+                        Add tool rule
+                      </Button>
+                    )}
                     {status && (
                       <Button
                         variant="ghost"
@@ -351,6 +366,24 @@ export function KnowledgeLibrary({ project }: { project: Project }) {
                   </div>
                   {entry.keywords.length > 0 && (
                     <p className="task-muted mt-2">Matches: {entry.keywords.join(', ')}</p>
+                  )}
+                  {entry.toolRule && (
+                    <p className="task-muted mt-2 break-words">
+                      Tool rule: {toolRuleSummary(entry.toolRule)}
+                      {entry.toolRule.pattern && (
+                        <>
+                          {' '}
+                          matching <code>{entry.toolRule.pattern}</code>
+                        </>
+                      )}
+                      {entry.toolRule.path && (
+                        <>
+                          {' '}
+                          in <code>{entry.toolRule.path}</code>
+                        </>
+                      )}
+                      .
+                    </p>
                   )}
                 </div>
                 {entry.automatic && (
@@ -420,6 +453,7 @@ export function KnowledgeLibrary({ project }: { project: Project }) {
             value={query}
             maxLength={200}
             placeholder="Search instructions and results…"
+            busy={searching}
             onValueChange={(value) => setQuery(value)}
             containerClassName="context-history-field"
           />

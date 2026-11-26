@@ -1,14 +1,15 @@
-use super::{account_storage, execution_access::ExecutionAccess};
+use super::account_storage;
+use lease::AccountLease;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
 use std::{path::PathBuf, time::Duration};
 use tauri::Manager;
 use tauri::{AppHandle, State};
 use tauri_plugin_opener::OpenerExt;
 pub mod beta;
 pub mod feedback;
+mod lease;
 pub mod lesson_sync;
 pub mod settings_sync;
 pub mod skill_sync;
@@ -21,17 +22,54 @@ fn sha256_hex(value: &str) -> String {
         .collect()
 }
 
+/// Everything that calls the Jackalope service for a member. These are the only
+/// features that need a Jackalope account; local tasks, conversations, terminals,
+/// previews, checks, swarms, MCP and remote pairing run without one. The
+/// renderer mirrors this list in `lib/account.ts`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum AccountFeature {
+    /// Preferences stored on the account so other desktops can restore them.
+    SettingsSync,
+    /// Learned lessons stored on the account, on top of settings sync.
+    LessonSync,
+    /// Chosen skills stored on the account, on top of settings sync.
+    SkillSync,
+    /// The member's share link, Instant Access Passes and their progress.
+    Invitations,
+    /// Member feedback invitations, coordinated with the service's cooldowns.
+    MemberFeedback,
+    /// Microsoft Store beta flight requests, which the operator handles.
+    BetaProgram,
+}
+
+impl AccountFeature {
+    fn purpose(self) -> &'static str {
+        match self {
+            Self::SettingsSync => "sync settings",
+            Self::LessonSync => "sync learned lessons",
+            Self::SkillSync => "sync skills",
+            Self::Invitations => "view invitations",
+            Self::MemberFeedback => "manage feedback invitations",
+            Self::BetaProgram => "manage beta access",
+        }
+    }
+
+    pub(super) fn connect_message(self) -> String {
+        format!("Connect your Jackalope account to {}.", self.purpose())
+    }
+}
+
 pub struct AccountService {
     path: PathBuf,
-    access: Arc<ExecutionAccess>,
+    lease: AccountLease,
     restored: AtomicBool,
     operation: tokio::sync::Mutex<()>,
 }
 impl AccountService {
-    pub fn new(path: PathBuf, access: Arc<ExecutionAccess>) -> Self {
+    pub fn new(path: PathBuf) -> Self {
         Self {
             path,
-            access,
+            lease: AccountLease::default(),
             restored: AtomicBool::new(false),
             operation: tokio::sync::Mutex::new(()),
         }
@@ -41,6 +79,53 @@ impl AccountService {
     }
     fn save(&self, record: &SavedAccount) -> Result<(), String> {
         account_storage::write_json(&self.path, record)
+    }
+    /// Starts the lease from the last saved verification once per launch, so a
+    /// feature used before the first background check still honors it.
+    fn restore_lease(&self, record: &SavedAccount) {
+        if record.waitlist.is_none() && !self.restored.swap(true, Ordering::SeqCst) {
+            self.lease.update(record.verified_at, record.expires_at);
+        }
+    }
+    /// The one gate for account features. It refuses before any request unless an
+    /// approved account is connected to this service, its device credential has
+    /// not expired and its lease is current, so nothing reaches the service for
+    /// someone who has not connected.
+    fn admit(
+        &self,
+        record: Option<SavedAccount>,
+        api: &reqwest::Url,
+        feature: AccountFeature,
+    ) -> Result<SavedAccount, String> {
+        let record = record.ok_or_else(|| feature.connect_message())?;
+        bound(&record, api)?;
+        let now = chrono::Utc::now().timestamp_millis();
+        if record.email.is_none() || record.expires_at <= now {
+            return Err(feature.connect_message());
+        }
+        if record.waitlist.is_some() {
+            return Err(format!(
+                "You can {} once your Jackalope account is approved.",
+                feature.purpose()
+            ));
+        }
+        self.restore_lease(&record);
+        if !self.lease.current_at(now) {
+            return Err(format!(
+                "Jackalope could not check your account recently. Reconnect to the internet to {}.",
+                feature.purpose()
+            ));
+        }
+        Ok(record)
+    }
+    fn require(
+        &self,
+        app: &AppHandle,
+        feature: AccountFeature,
+    ) -> Result<(reqwest::Url, reqwest::Url, SavedAccount), String> {
+        let (api, web) = endpoints(app)?;
+        let record = self.admit(self.read()?, &api, feature)?;
+        Ok((api, web, record))
     }
 }
 #[derive(Serialize, Deserialize)]
@@ -359,13 +444,11 @@ async fn sync_device_name(api: &reqwest::Url, secret: &str, data: &serde_json::V
     if data.get("deviceName").is_none() {
         return;
     }
-    let name: String = super::system::device_name()
-        .trim()
-        .chars()
-        .filter(|character| !character.is_control())
-        .take(120)
-        .collect();
-    if name.is_empty() || data["deviceName"].as_str() == Some(name.as_str()) {
+    // Nothing sensible to send: the website and the app fall back to the platform's name.
+    let Some(name) = super::system::computer_name() else {
+        return;
+    };
+    if data["deviceName"].as_str() == Some(name.as_str()) {
         return;
     }
     let _ = request(
@@ -417,25 +500,25 @@ impl AccountService {
         let _guard = self.operation.lock().await;
         let result = self.refresh_locked(app).await;
         if result.is_err() {
-            self.access.revoke();
+            self.lease.revoke();
         }
         result
     }
 
     async fn refresh_locked(&self, app: &AppHandle) -> Result<AccountStatus, String> {
         if endpoints(app).is_err() {
-            self.access.revoke();
+            self.lease.revoke();
             return Ok(status("unavailable", None));
         }
         let (api, web) = endpoints(app)?;
         let Some(mut record) = self.read()? else {
-            self.access.revoke();
+            self.lease.revoke();
             return Ok(status("disconnected", None));
         };
         bound(&record, &api)?;
         let now = chrono::Utc::now().timestamp_millis();
         if record.email.is_none() {
-            self.access.revoke();
+            self.lease.revoke();
             return Ok(status(
                 if record.expires_at > now {
                     "pending"
@@ -447,9 +530,9 @@ impl AccountService {
         }
         // Only a previous server verification can authorize a bounded offline lease.
         if record.waitlist.is_some() {
-            self.access.revoke();
-        } else if !self.restored.swap(true, Ordering::SeqCst) {
-            self.access.update(record.verified_at, record.expires_at);
+            self.lease.revoke();
+        } else {
+            self.restore_lease(&record);
         }
         match request(
             &api,
@@ -476,17 +559,17 @@ impl AccountService {
                     }
                 };
                 self.save(&record)?;
-                self.access.update(record.verified_at, record.expires_at);
+                self.lease.update(record.verified_at, record.expires_at);
                 sync_device_name(&api, &record.secret, &data).await;
                 Ok(status(next, Some(&record)))
             }
             Ok((401, _)) => {
-                self.access.revoke();
+                self.lease.revoke();
                 account_storage::remove(&self.path)?;
                 Ok(status("disconnected", None))
             }
             Ok((200, _)) => {
-                self.access.revoke();
+                self.lease.revoke();
                 record.verified_at = 0;
                 self.save(&record)?;
                 Err("The account service returned an invalid approval. Please retry.".into())
@@ -631,14 +714,7 @@ pub async fn app_account_referrals(
     state: State<'_, AccountService>,
 ) -> Result<ReferralView, String> {
     let _guard = state.operation.lock().await;
-    let (api, web) = endpoints(&app)?;
-    let record = state
-        .read()?
-        .ok_or("Connect your Jackalope account to view invitations.")?;
-    bound(&record, &api)?;
-    if record.email.is_none() || record.waitlist.is_some() {
-        return Err("Finish connecting your Jackalope account to view invitations.".into());
-    }
+    let (api, web, record) = state.require(&app, AccountFeature::Invitations)?;
     let (code, data) = request(
         &api,
         "/v1/desktop/referrals",
@@ -648,7 +724,7 @@ pub async fn app_account_referrals(
     )
     .await?;
     if code == 401 {
-        state.access.revoke();
+        state.lease.revoke();
         account_storage::remove(&state.path)?;
         return Err("Your account connection expired. Connect again to view invitations.".into());
     }
@@ -712,7 +788,7 @@ pub async fn app_account_poll(
         202 if data["status"] == "waiting" => Ok(status("waiting", Some(&record))),
         202 | 429 => Ok(status("pending", Some(&record))),
         410 | 401 => {
-            state.access.revoke();
+            state.lease.revoke();
             account_storage::remove(&state.path)?;
             Ok(status("expired", None))
         }
@@ -724,7 +800,7 @@ pub async fn app_account_poll(
                 chrono::Utc::now().timestamp_millis(),
             )?;
             state.save(&record)?;
-            state.access.update(record.verified_at, record.expires_at);
+            state.lease.update(record.verified_at, record.expires_at);
             sync_device_name(&api, &record.secret, &data).await;
             Ok(status(next, Some(&record)))
         }
@@ -752,10 +828,101 @@ pub async fn app_account_disconnect(
             return Err(failure(code));
         }
         settings_sync::preserve_choice(&state, &record)?;
-        state.access.revoke();
+        state.lease.revoke();
         account_storage::remove(&state.path)?;
     }
     Ok(status("disconnected", None))
+}
+
+/// Account states that local work must never depend on, held in memory so tests
+/// never touch the OS credential store.
+#[cfg(test)]
+pub(crate) mod fixture {
+    use super::*;
+
+    #[derive(Clone, Copy, Debug)]
+    pub(crate) enum State {
+        /// Never connected.
+        None,
+        /// Connected, but the device credential has expired.
+        Expired,
+        /// Connected, but not verified within the offline lease.
+        Lapsed,
+        /// Connected, but the service refused the approval, so the lease was revoked.
+        Revoked,
+    }
+    pub(crate) const STATES: [State; 4] =
+        [State::None, State::Expired, State::Lapsed, State::Revoked];
+    pub(crate) const FEATURES: [AccountFeature; 6] = [
+        AccountFeature::SettingsSync,
+        AccountFeature::LessonSync,
+        AccountFeature::SkillSync,
+        AccountFeature::Invitations,
+        AccountFeature::MemberFeedback,
+        AccountFeature::BetaProgram,
+    ];
+
+    pub(super) fn api() -> reqwest::Url {
+        reqwest::Url::parse("https://api.jackalope.dev/").unwrap()
+    }
+
+    pub(super) fn approved(verified_at: i64, expires_at: i64) -> SavedAccount {
+        SavedAccount {
+            origin: api().to_string(),
+            secret: "a".repeat(64),
+            verification: String::new(),
+            user_code: String::new(),
+            expires_at,
+            email: Some("member@example.invalid".into()),
+            verified_at,
+            waitlist: None,
+            feedback: feedback::LocalFeedback::default(),
+            settings_sync: true,
+            settings_sync_pending: false,
+            settings_sync_automatic: false,
+        }
+    }
+
+    pub(crate) struct Account {
+        pub(super) service: AccountService,
+        pub(super) record: Option<SavedAccount>,
+    }
+
+    impl Account {
+        pub(crate) fn new(state: State) -> Self {
+            let now = chrono::Utc::now().timestamp_millis();
+            let service = AccountService::new(std::env::temp_dir().join(format!(
+                "jackalope-account-fixture-{}.bin",
+                uuid::Uuid::new_v4()
+            )));
+            let record = match state {
+                State::None => None,
+                State::Expired => Some(approved(now - 1000, now - 1)),
+                State::Lapsed => Some(approved(
+                    now - lease::OFFLINE_GRACE_MS - 1,
+                    now + lease::OFFLINE_GRACE_MS,
+                )),
+                State::Revoked => {
+                    let record = approved(now, now + lease::OFFLINE_GRACE_MS);
+                    service.restore_lease(&record);
+                    service.lease.revoke();
+                    Some(record)
+                }
+            };
+            Self { service, record }
+        }
+
+        /// What `feature` answers in this state: the refusal, or `Ok` when admitted.
+        pub(crate) fn admit(&self, feature: AccountFeature) -> Result<(), String> {
+            self.service
+                .admit(self.record.as_ref().map(clone_record), &api(), feature)
+                .map(|_| ())
+        }
+    }
+
+    fn clone_record(record: &SavedAccount) -> SavedAccount {
+        serde_json::from_value(serde_json::to_value(record).unwrap()).unwrap()
+    }
 }
 
 #[cfg(test)]
@@ -792,16 +959,16 @@ mod tests {
         assert_eq!(isolated.as_object().unwrap().len(), 4);
     }
     #[test]
-    fn legacy_saved_accounts_need_online_verification_before_beta_execution() {
+    fn legacy_saved_accounts_need_online_verification_before_account_features() {
         let record: SavedAccount = serde_json::from_value(serde_json::json!({
             "origin": "https://api.jackalope.dev/", "secret": "a".repeat(64),
             "verification": "", "user_code": "", "expires_at": i64::MAX,
             "email": "member@example.invalid"
         }))
         .unwrap();
-        let access = ExecutionAccess::new();
-        access.update(record.verified_at, record.expires_at);
-        assert!(!access.status().allowed);
+        let lease = AccountLease::default();
+        lease.update(record.verified_at, record.expires_at);
+        assert!(!lease.current_at(chrono::Utc::now().timestamp_millis()));
         assert!(!record.settings_sync);
         assert!(!record.settings_sync_pending);
         assert_eq!(record.email.as_deref(), Some("member@example.invalid"));
@@ -903,5 +1070,58 @@ mod tests {
             )
             .is_err());
         }
+    }
+
+    #[test]
+    fn account_features_refuse_cleanly_without_a_current_approved_account() {
+        use fixture::{Account, State, FEATURES, STATES};
+        for state in STATES {
+            let account = Account::new(state);
+            for feature in FEATURES {
+                let refusal = account.admit(feature).unwrap_err();
+                assert!(
+                    refusal.contains(feature.purpose()),
+                    "{state:?} {feature:?}: {refusal}"
+                );
+                assert!(!refusal.contains(&"a".repeat(64)));
+                if matches!(state, State::None | State::Expired) {
+                    assert_eq!(refusal, feature.connect_message());
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn a_current_approved_account_is_admitted_until_revoked() {
+        let now = chrono::Utc::now().timestamp_millis();
+        let account = fixture::Account {
+            service: AccountService::new(std::env::temp_dir().join("jackalope-unused.bin")),
+            record: Some(fixture::approved(now, now + lease::OFFLINE_GRACE_MS)),
+        };
+        for feature in fixture::FEATURES {
+            account.admit(feature).unwrap();
+        }
+        account.service.lease.revoke();
+        assert!(account.admit(AccountFeature::SettingsSync).is_err());
+
+        let mut waiting = fixture::approved(now, now + lease::OFFLINE_GRACE_MS);
+        waiting.waitlist = Some(serde_json::from_value(serde_json::json!({
+            "position": 4, "referrals": 0, "pending": 0, "priorityDays": 0,
+            "shareUrl": format!("https://jackalope.dev/?ref={}", "c".repeat(64)), "checkedAt": now
+        })).unwrap());
+        let service = AccountService::new(std::env::temp_dir().join("jackalope-unused.bin"));
+        assert!(service
+            .admit(Some(waiting), &fixture::api(), AccountFeature::Invitations)
+            .err()
+            .unwrap()
+            .contains("once your Jackalope account is approved"));
+
+        let mut other = fixture::approved(now, now + lease::OFFLINE_GRACE_MS);
+        other.origin = "https://other.example/".into();
+        assert!(service
+            .admit(Some(other), &fixture::api(), AccountFeature::SettingsSync)
+            .err()
+            .unwrap()
+            .contains("different service"));
     }
 }

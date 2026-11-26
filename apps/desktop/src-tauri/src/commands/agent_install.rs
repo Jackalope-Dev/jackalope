@@ -119,8 +119,6 @@ pub async fn agent_install(
 ) -> Result<String, String> {
     use tauri::Manager;
     tauri::async_runtime::spawn_blocking(move || {
-        let runtime: State<'_, super::tasks::TaskRuntime> = app.state();
-        runtime.access.ensure()?;
         let service: State<'_, SignInService> = app.state();
         let npm = find_npm().ok_or(NODE_MISSING)?;
         let command = install_command(&agent, &npm)?;

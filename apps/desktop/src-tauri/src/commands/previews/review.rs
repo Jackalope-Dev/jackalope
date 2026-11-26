@@ -1,6 +1,7 @@
 //! Before/after review screenshots of finished work.
 //!
-//! When an attempt with changes finishes and its project saves a preview command,
+//! iOS apps without a web preview command are captured in the Simulator by
+//! [`ios`]. When an attempt with changes finishes and its project saves a preview command,
 //! Jackalope runs that command on a free local port, opens a few pages in a
 //! disposable headless task browser and keeps a first-screen PNG of each. The
 //! "before" side runs the same command in the project checkout, only when that
@@ -46,8 +47,10 @@ pub struct ReviewCaptures {
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ReviewCapture {
+    /// The preview path, or for an iOS app `First screen` or a deep link.
     pub path: String,
-    /// `desktop` or `narrow`.
+    /// `desktop` or `narrow`; for an iOS app `iphone-light`, `iphone-dark` or
+    /// `iphone-large-text` (`ipad-…` on an iPad).
     pub viewport: String,
     pub width: u32,
     pub height: u32,
@@ -126,7 +129,10 @@ pub fn settings(record: &project_registry::ProjectRecord) -> Option<Settings> {
         command: command.to_string(),
         pages,
         viewports,
-        features: super::features::usable(&record.feature_map),
+        features: super::features::usable(&record.feature_map)
+            .into_iter()
+            .filter(|feature| feature.page.starts_with('/'))
+            .collect(),
     })
 }
 
@@ -457,7 +463,7 @@ fn before_source(runtime: &TaskRuntime, run: &TaskRun) -> Result<String, String>
 }
 
 #[derive(Clone, Copy, PartialEq)]
-enum Side {
+pub(super) enum Side {
     Before,
     After,
 }
@@ -672,12 +678,24 @@ pub fn criterion_steps(run: &TaskRun, captures: &ReviewCaptures) -> Vec<Validati
         .collect()
 }
 
-/// Whether this attempt should get review screenshots: its project saves a
-/// usable preview command and captures are on.
+/// Whether this attempt should get review screenshots: captures are on and
+/// its project saves a usable preview command, or it is an iOS app and the
+/// attempt changed the app's native files.
 pub(in crate::commands) fn wanted(runtime: &TaskRuntime, run: &TaskRun) -> bool {
     project_registry::record(runtime, &run.project_id)
-        .and_then(|record| settings(&record))
-        .is_some()
+        .is_some_and(|record| settings(&record).is_some() || ios::wanted(&record, run))
+}
+
+/// How an attempt is captured: through its web preview, or in the Simulator.
+enum Plan {
+    Web(Settings),
+    Simulator(ios::Settings),
+}
+
+fn plan(record: &project_registry::ProjectRecord, run: &TaskRun) -> Option<Plan> {
+    settings(record).map(Plan::Web).or_else(|| {
+        ios::settings(record, std::path::Path::new(&run.workspace)).map(Plan::Simulator)
+    })
 }
 
 /// Whether a capture already under way should keep going: the attempt is still
@@ -699,15 +717,18 @@ fn capture(runtime: &TaskRuntime, id: &str) {
     let Some(run) = runtime.run_snapshot(id) else {
         return;
     };
-    let Some(settings) =
-        project_registry::record(runtime, &run.project_id).and_then(|record| settings(&record))
+    let Some(plan) =
+        project_registry::record(runtime, &run.project_id).and_then(|record| plan(&record, &run))
     else {
         runtime.update(id, |r| r.review_capturing = false);
         return;
     };
     let captures = runtime
         .timed(id, "reviewCapture", || {
-            Ok(collect(runtime, &run, &settings))
+            Ok(match &plan {
+                Plan::Web(settings) => collect(runtime, &run, settings),
+                Plan::Simulator(settings) => ios::collect(runtime, &run, settings),
+            })
         })
         .unwrap_or_else(|error| ReviewCaptures {
             captured_at: chrono::Utc::now().to_rfc3339(),
@@ -747,5 +768,6 @@ pub(in crate::commands) fn recover(run: &mut TaskRun) -> bool {
     true
 }
 
+pub mod ios;
 #[cfg(test)]
 mod tests;

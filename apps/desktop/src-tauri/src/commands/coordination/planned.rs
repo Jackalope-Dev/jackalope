@@ -42,7 +42,6 @@ pub struct PlanDelivery {
 
 impl Coordinator {
     pub(crate) fn launch_plan(&self, launch: PlanLaunch) -> Result<String, String> {
-        self.runtime.access.ensure()?;
         self.ensure_storage_loaded()?;
         let request = launch.request;
         if Uuid::parse_str(&request.id).is_err() {
@@ -191,6 +190,20 @@ impl Coordinator {
                         })
                 });
             owned.then(|| (link.plan_id.clone(), task.id.clone()))
+        })
+    }
+
+    /// Whether `run` works for a managed task: its planner, an assignment or a
+    /// follow-up on one, or a delivery repair.
+    pub(in crate::commands) fn managed_attempt(
+        &self,
+        run: &crate::commands::tasks::TaskRun,
+    ) -> bool {
+        let Ok(inner) = self.inner.lock() else {
+            return false;
+        };
+        super::managed_delivery::managed_attempt(&inner.ledger, run, |id| {
+            self.runtime.run_snapshot(id).map(|root| root.task_id)
         })
     }
 

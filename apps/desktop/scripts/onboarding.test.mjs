@@ -168,3 +168,21 @@ test('reconfiguring an existing repository saves only setup preferences and does
   assert.equal(completed.preferences.preferredRunner, 'claude');
   assert.equal(completed.preferences.customInstructions, 'Updated while setup was open.');
 });
+
+test('finishing setup offers the history import once', async () => {
+  store.setState({ historyOffer: 'unseen' });
+  store.getState().begin();
+  store.getState().finish();
+  assert.equal(store.getState().historyOffer, 'due');
+  store.getState().settleHistoryOffer();
+  store.getState().begin();
+  store.getState().finish();
+  assert.equal(store.getState().historyOffer, 'done');
+  const saved = values.get('jackalope-onboarding-v1');
+  values.set(
+    'jackalope-onboarding-v1',
+    saved.replace('"historyOffer":"done"', '"historyOffer":"unknown"'),
+  );
+  await store.persist.rehydrate();
+  assert.equal(store.getState().historyOffer, 'unseen');
+});

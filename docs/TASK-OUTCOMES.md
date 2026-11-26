@@ -53,13 +53,15 @@ latest one as "Safe because".
 ### Goal restatement
 
 Every bridged task launch carries a one-line reporting contract
-(`outcomes::RESTATEMENT_CONTRACT`): the agent's first message restates the goal, the
+(`outcomes::RESTATEMENT_CONTRACT`) unless the task is small and fully specified (a
+request of up to 800 characters with no requirements, workflow inputs or Thorough
+effort), where the request already says what it is: the agent's first message restates the goal, the
 problem and the smallest change it expects to make, records it once with `restate_goal`
 (HTTP `POST /v1/goal-restatement` with `goal`, `problem`, `smallestChange`), then
 continues without waiting for confirmation. Each field is whitespace-collapsed and
 limited to 400 bytes; a later call replaces the earlier one. The task page shows it as
 "Understood as" so a misread is visible while work runs. Tasks without a restatement,
-including all earlier history, show nothing.
+including small, fully specified tasks and all earlier history, show nothing.
 
 ## Read the decision trail
 
@@ -88,6 +90,18 @@ batch's log under its reply. Entries are saved with the attempt through the hist
 journal, included in recovery exports and summarized in recovery handoffs. Older
 attempts have no trail and show nothing. `decision_trail.rs` owns the entry contract,
 validation and pointer checks.
+
+## See where the time went
+
+Once a task's latest attempt ends, the task page adds a Report tab, and the result
+links to it with the total time and a small breakdown. The report covers every
+attempt: start-to-finish time, the agent's session, saved checks, setup, time spent
+waiting for the person's answers, tokens, reported cost and changed files. Its time
+breakdown shows the agent's working time by activity with the longest single call of
+each kind, and its tool table lists each tool's calls and measured time. A short note
+names an activity that dominated, such as slow checks, when one did. Attempts recorded
+before activity was timed show stages and tool counts only. See
+[agent working time](USAGE-AND-ROUTING.md#agent-working-time) for how it is measured.
 
 ## Repeat a process with approval gates
 
@@ -124,7 +138,9 @@ outcomes and prior checks without claiming those checks still describe current f
 
 Workspace readiness performs bounded, read-only local Git, manifest and environment
 name inspection. It suggests installation, check and development commands; it never
-executes detected scripts. Choosing a suggestion saves the existing explicit project
+executes detected scripts. For an Xcode project it may run `xcodebuild -list` through
+the resolved Xcode, with a timeout, to choose a scheme, and it reports a missing Xcode
+(see [iOS development](IOS-DEVELOPMENT.md#xcode-toolchain-and-project-detection)). Choosing a suggestion saves the existing explicit project
 preparation/check preference. Missing configuration reports names, never values, and
 presence does not prove a value is valid.
 

@@ -19,8 +19,10 @@ import { LEARNING_CADENCES, learningSettings } from '../../lib/learning';
 import { syncsLessons } from '../../lib/lesson-sync';
 import { isTauriEnvironment } from '../../lib/native/env';
 import { type PlanSettings, planCommands } from '../../lib/plan-mode';
+import { isMacPlatform } from '../../lib/platform-shortcuts';
 import { checksAutomatically } from '../../lib/project-automation';
 import { REVIEW_PAGE_LIMIT, reviewCapturesOn } from '../../lib/review-captures';
+import { simulatorTarget } from '../../lib/simulator-preview';
 import { VETTED_SKILLS } from '../../lib/skills/catalog';
 import { type WorkspaceMode, workspaceModeFor } from '../../lib/workspace-mode';
 import { useProjectStore } from '../../stores/projectStore';
@@ -29,17 +31,23 @@ import { ProjectSwarmHosts } from '../computers/ProjectSwarmHosts';
 import { WorkspaceHeading } from '../ui/WorkspaceHeading';
 import { WorkspacePage } from '../ui/WorkspacePage';
 import { WorkspaceTabs } from '../ui/WorkspaceTabs';
+import { AppStoreConnectSettings } from './AppStoreConnectSettings';
 import { ArtifactsProjectSettings } from './ArtifactsProjectSettings';
 import { BrowserProfileSettings } from './BrowserProfileSettings';
 import { CloudResourcesCard } from './CloudResourcesCard';
 import { DesktopProjectSettings } from './DesktopProjectSettings';
+import { DeviceProjectSettings } from './DeviceProjectSettings';
 import { FeatureMapSettings } from './FeatureMapSettings';
 import { ProjectAutomationPreset } from './ProjectAutomationPreset';
+import { ProjectCodeHost } from './ProjectCodeHost';
 import { ProjectGitSettings } from './ProjectGitSettings';
 import { ProjectPlanningSettings } from './ProjectPlanningSettings';
 import { ProjectSecretsSettings } from './ProjectSecretsSettings';
+import { ProjectSimulatorSettings } from './ProjectSimulatorSettings';
 import { ProjectTerminalCommands } from './ProjectTerminalCommands';
+import { ProjectTimeLimitsSettings } from './ProjectTimeLimits';
 import { RemoveProjectAction } from './RemoveProjectAction';
+import { WorktreeRetentionSetting } from './WorktreeRetentionSetting';
 import '../settings/settings.css';
 
 const WORKSPACE_MODES: Record<WorkspaceMode, { label: string; description: string }> = {
@@ -94,6 +102,23 @@ function usePlanSettings(projectId: string | undefined) {
   return [plan, setPlan] as const;
 }
 
+/** Whether the project is an iOS app the Simulator can preview and capture. */
+function useIosApp(path: string | undefined) {
+  const [ios, setIos] = useState(false);
+  useEffect(() => {
+    setIos(false);
+    if (!path || !isTauriEnvironment()) return;
+    let current = true;
+    simulatorTarget(path)
+      .then((target) => current && setIos(!!target))
+      .catch(() => {});
+    return () => {
+      current = false;
+    };
+  }, [path]);
+  return ios;
+}
+
 export function ProjectPreferences({
   embedded = false,
   projectId,
@@ -113,6 +138,7 @@ export function ProjectPreferences({
   const Container = embedded ? 'section' : WorkspacePage;
   const [tab, setTab] = useState<Tab>(rememberedTab);
   const [plan, setPlan] = usePlanSettings(project?.id);
+  const iosApp = useIosApp(project?.path);
   /** Remounts the planning controls after a preset rewrites their stored settings. */
   const [planVersion, setPlanVersion] = useState(0);
   return (
@@ -177,6 +203,7 @@ export function ProjectPreferences({
                   </Select>
                 </SettingRow>
               )}
+              {!project.plainFolder && <WorktreeRetentionSetting project={project} />}
               <SettingRow
                 title="Target branch"
                 description="Starting branch for new tasks and their review."
@@ -257,7 +284,7 @@ export function ProjectPreferences({
             >
               <SettingRow
                 title="Workspace preparation"
-                description="Runs before new tasks, with your OS permissions. Five-minute limit; skipped for continuations."
+                description="Runs before new tasks, with your OS permissions. Skipped for continuations."
                 controlId="preparation-command"
                 descriptionId="preparation-command-description"
               >
@@ -275,7 +302,7 @@ export function ProjectPreferences({
               <SettingBody>
                 <FormField
                   label="Copy ignored setup files"
-                  description="One relative file per line. Only these Git-ignored files are copied into new worktrees before preparation; existing files are never overwritten. Keep credentials out of saved prompts and commands."
+                  description="One relative file per line. Only these Git-ignored files are copied into new worktrees before preparation; existing files are never overwritten. A .worktreeinclude file at the project root, in .gitignore syntax, also lists files to copy. Keep credentials out of saved prompts and commands."
                 >
                   <Textarea
                     rows={3}
@@ -291,7 +318,7 @@ export function ProjectPreferences({
               </SettingBody>
               <SettingRow
                 title="Verification command"
-                description="Runs with your OS permissions. Five-minute limit."
+                description="Runs with your OS permissions."
                 controlId="verification-command"
                 descriptionId="verification-command-description"
               >
@@ -328,6 +355,7 @@ export function ProjectPreferences({
                 />
               </SettingRow>
             </SettingGroup>
+            <ProjectTimeLimitsSettings projectId={project.id} />
             <SettingGroup title="Preview">
               <SettingRow
                 title="Preview command"
@@ -414,6 +442,33 @@ export function ProjectPreferences({
                 </>
               )}
             </SettingGroup>
+            <ProjectSimulatorSettings project={project} />
+            {isMacPlatform() && (
+              <SettingGroup title="iPhone and iPad">
+                <SettingRow
+                  title="Development team"
+                  description="Your Apple team ID, such as ABCDE12345. Run on device builds with it and lets Xcode register the device and create a development profile. Leave empty to use the team set in the Xcode project."
+                  controlId="project-development-team"
+                  descriptionId="project-development-team-description"
+                >
+                  <Input
+                    id="project-development-team"
+                    aria-describedby="project-development-team-description"
+                    className="project-setting-input"
+                    value={project.preferences?.developmentTeam ?? ''}
+                    maxLength={10}
+                    placeholder="ABCDE12345"
+                    autoCapitalize="characters"
+                    spellCheck={false}
+                    onChange={(event) =>
+                      updateProjectPreferences(project.id, {
+                        developmentTeam: event.target.value.toUpperCase(),
+                      })
+                    }
+                  />
+                </SettingRow>
+              </SettingGroup>
+            )}
             <ProjectTerminalCommands project={project} />
           </WorkspaceTabs.Content>
           <WorkspaceTabs.Content value="automation" className="project-settings-panel">
@@ -593,6 +648,9 @@ export function ProjectPreferences({
           </WorkspaceTabs.Content>
           <WorkspaceTabs.Content value="integrations" className="project-settings-panel">
             {!project.plainFolder && (
+              <ProjectCodeHost key={`code-host-${project.path}`} projectPath={project.path} />
+            )}
+            {!project.plainFolder && (
               <ArtifactsProjectSettings
                 key={`artifacts-${project.path}`}
                 projectPath={project.path}
@@ -604,10 +662,18 @@ export function ProjectPreferences({
               owner={{ kind: 'project', id: project.id, name: project.name }}
             />
             <DesktopProjectSettings key={`desktop-${project.id}`} projectId={project.id} />
+            {isMacPlatform() && (
+              <DeviceProjectSettings key={`devices-${project.id}`} projectId={project.id} />
+            )}
             <CloudResourcesCard
               key={`cloud-${project.path}`}
               projectId={project.id}
               projectPath={project.path}
+            />
+            <AppStoreConnectSettings
+              key={`asc-${project.id}`}
+              projectId={project.id}
+              developmentTeam={project.preferences?.developmentTeam}
             />
             <ProjectComputerSettings
               key={`computer-${project.id}`}
@@ -616,7 +682,7 @@ export function ProjectPreferences({
             <ProjectSwarmHosts key={`swarm-hosts-${project.id}`} projectId={project.id} />
           </WorkspaceTabs.Content>
           <WorkspaceTabs.Content value="feature-map" className="project-settings-panel">
-            {reviewCapturesOn(project.preferences) ? (
+            {reviewCapturesOn(project.preferences, iosApp) ? (
               <FeatureMapSettings project={project} />
             ) : (
               <SettingGroup

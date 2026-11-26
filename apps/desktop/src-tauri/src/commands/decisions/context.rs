@@ -42,7 +42,7 @@ pub fn repository(request: &RunRequest) -> Value {
     .ok();
     let map = crate::commands::codebase::map::task_map(root, &request.prompt, &[], 6000);
     json!({"sourceHead":head,"instructions":instructions,"map":map,
-        "changeScope":diff.as_ref().map(|text| text.chars().take(4000).collect::<String>()),
+        "changeScope":diff.as_ref().map(|text| crate::commands::redaction::outbound_clipped(text,4000)),
         "changeScopeTruncated":diff.as_ref().is_some_and(|text| text.chars().count()>4000),
         "evidenceBoundary":"Root guidance and a bounded advisory map. Nested instructions and current files still require worker inspection."})
 }

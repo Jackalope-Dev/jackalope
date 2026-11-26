@@ -5,6 +5,7 @@ import { resolve } from 'node:path';
 import test from 'node:test';
 import { sha256 } from './catalog.mjs';
 import {
+  authenticodeInstallers,
   collectCandidates,
   publishCloud,
   releaseTargets,
@@ -18,7 +19,8 @@ const publicKey = Buffer.from('test public key').toString('base64');
 const source = 'a'.repeat(40);
 const id = '01JSGWMMTRBTD4YSBEVE3W5B7V';
 
-async function fixture(t, selectedTargets = targets, flat = false) {
+async function fixture(t, selectedTargets = targets, flat = false, authenticode) {
+  const windows = (target) => target === 'windows-x86_64' && authenticode;
   const directory = await mkdtemp(resolve(tmpdir(), 'jackalope-multiplatform-'));
   t.after(() => rm(directory, { recursive: true, force: true }));
   for (const target of selectedTargets) {
@@ -40,6 +42,7 @@ async function fixture(t, selectedTargets = targets, flat = false) {
           : 'appimage',
       approvalRequired: true,
       publicSigned: true,
+      ...(windows(target) ? { authenticode } : {}),
       files: {},
     };
     const config = cloudConfig({
@@ -48,6 +51,7 @@ async function fixture(t, selectedTargets = targets, flat = false) {
       target,
       publicKey,
       signScript: 'C:/repo/sign.ps1',
+      ...(windows(target) ? { authenticode } : {}),
     });
     for (const name of cloudFiles(target, '0.2.0', 'candidate')) {
       const text =
@@ -63,7 +67,13 @@ async function fixture(t, selectedTargets = targets, flat = false) {
     }
     await writeFile(resolve(path, 'receipt.json'), JSON.stringify(receipt));
   }
-  const options = { expectedTargets: selectedTargets, source, channel: 'beta', publicKey };
+  const options = {
+    expectedTargets: selectedTargets,
+    source,
+    channel: 'beta',
+    publicKey,
+    allowUnsignedWindows: authenticode === 'unsigned',
+  };
   return { directory, options, plan: await collectCandidates(directory, options) };
 }
 
@@ -152,6 +162,35 @@ test('candidate collection requires complete targets with matching source, notes
     await assert.rejects(collectCandidates(directory, { ...options, ...overrides }));
   await writeFile(resolve(directory, 'linux-x86_64', 'notes.md'), 'changed');
   await assert.rejects(collectCandidates(directory, options), /Artifact changed/);
+});
+
+test('an unsigned Windows installer is collected only with the explicit opt-in', async (t) => {
+  // Receipts without the field and explicitly signed ones keep Authenticode verification.
+  for (const authenticode of [undefined, 'azure']) {
+    const signed = await fixture(t, targets, false, authenticode);
+    assert.deepEqual(
+      authenticodeInstallers(signed.plan.assets).map((asset) => asset.name),
+      ['Jackalope_0.2.0_x64-setup.exe'],
+    );
+  }
+  const unsigned = await fixture(t, targets, false, 'unsigned');
+  const installer = unsigned.plan.assets.find((asset) => asset.updatePlatform === 'windows-x86_64');
+  assert.equal(installer.authenticode, 'unsigned');
+  assert.match(installer.signature, /^[A-Za-z0-9+/]+={0,2}$/);
+  assert.deepEqual(authenticodeInstallers(unsigned.plan.assets), []);
+  await assert.rejects(
+    collectCandidates(unsigned.directory, { ...unsigned.options, allowUnsignedWindows: false }),
+    /WINDOWS_AUTHENTICODE=unsigned/,
+  );
+  // The signing mode is part of the publication identity.
+  const signed = await fixture(t, targets, false, 'azure');
+  assert.notEqual(unsigned.plan.digest, signed.plan.digest);
+  // Digests and the updater signature still bind the unsigned installer.
+  await writeFile(installer.path, 'changed');
+  await assert.rejects(collectCandidates(unsigned.directory, unsigned.options), /Artifact changed/);
+  await writeFile(installer.path, `fixture bytes: ${installer.name}`);
+  await writeFile(installer.signaturePath, 'not base64!');
+  await assert.rejects(collectCandidates(unsigned.directory, unsigned.options));
 });
 
 test('target selections reject duplicates, empty sets and unsupported platforms', () => {

@@ -1,0 +1,78 @@
+.turn-advisor {
+  display: grid;
+  gap: 10px;
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--color-border-subtle);
+}
+.turn-advisor-status {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+}
+.turn-advisor-status > svg {
+  flex: none;
+  margin-top: 3px;
+}
+.turn-advisor-status strong {
+  color: var(--color-text-primary);
+  font-weight: 600;
+}
+.turn-advisor-group {
+  display: grid;
+  gap: 6px;
+}
+.turn-advisor-group-title {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: var(--text-xs);
+  font-weight: 600;
+}
+.turn-advisor-notes {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+}
+.turn-advisor-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-width: 0;
+  padding: 10px 12px;
+}
+.turn-advisor-note + .turn-advisor-note {
+  border-top: 1px solid var(--color-border-subtle);
+}
+.turn-advisor-note .ui-badge {
+  flex: none;
+}
+.turn-advisor-note-body {
+  display: grid;
+  flex: 1;
+  gap: 4px;
+  min-width: 0;
+}
+.turn-advisor-note-body p {
+  margin: 0;
+  overflow-wrap: anywhere;
+  line-height: 1.5;
+}
+.turn-advisor-repeated {
+  color: var(--color-text-secondary);
+}
+.turn-advisor-path {
+  justify-self: start;
+  max-width: 100%;
+  overflow: hidden;
+  color: var(--color-text-secondary);
+  font: var(--text-xs) / 1.6 var(--font-mono);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

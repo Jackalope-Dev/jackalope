@@ -134,12 +134,25 @@ agents' profile variables, `PATH` and `HOME`. A project holds at most 64 secrets
 to 16,000 characters each. Each has **Available to**: all agents (the default), agents
 on this device, or agents on the project's computer.
 
+A secret is a **Value** (the default) or a **File**. A file secret holds a text file of
+up to 64 KB, picked from disk or pasted, such as an App Store Connect `AuthKey_*.p8` or
+a service-account JSON; its file name is kept. It is available to agents on this
+device only and is never sent to a computer. When a local attempt starts, Jackalope
+writes it to `secret-files/<attempt>/<NAME>/<file name>` in the task profile, outside
+every workspace, with the folders readable by this user only (`0700`) and the file
+`0600`, and sets `NAME` to that path. The folder is deleted when the attempt ends or is
+stopped, and any left by a crash are deleted at the next startup. Because the path
+differs per attempt, a follow-up starts a new persistent Claude Code process instead of
+reusing a warm one while a project has file secrets. A record from an older version
+reads as values; values are saved exactly as before.
+
 `commands/project_secrets.rs` keeps each project's secrets in one protected record
 (`project-secrets/<project>.bin` in the task profile, through the same Windows DPAPI,
 macOS Keychain or Linux Secret Service storage as other Jackalope-owned keys), never in
 project JSON, saved task requests or task history. The renderer receives names,
 availability and save times only; a saved value can be replaced or removed but is never
-shown again. Removing the last secret removes the record.
+shown again. Removing the last secret removes the record. The record, file secrets
+included, is limited to 512 KB.
 
 Secrets go only into the environment of task agent processes: local attempts, including
 persistent Claude Code sessions, and [agents on a computer](BOT-COMPUTERS.md#agents-on-a-computer).
@@ -158,7 +171,10 @@ attempt's record: project secrets and every credential variable Jackalope sets
 account's provider key or the bridge token). Values of at least eight characters
 are replaced with `[redacted]` as written, JSON-escaped, base64 and URL-encoded in
 the result, activity, diagnostics, errors, questions, decisions, checks and
-streaming text before they are saved, shown or exported. Identifiers, statuses,
+streaming text before they are saved, shown or exported. A file secret's contents are
+redacted whole, line by line (lines of at least 16 characters, without PEM armor
+lines) and with the lines joined, so a key printed a line at a time or as one base64
+string is caught; its path is not secret and stays in the record. Identifiers, statuses,
 timestamps and the person's own prompt are kept. The values live only in memory for
 the attempt. Redaction protects the record, not the value. The agent can still use
 or send what it can read, a value it transforms some other way is not recognized,

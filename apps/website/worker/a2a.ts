@@ -93,7 +93,7 @@ const METHODS: Record<Version, Record<string, string>> = {
 
 /** Keyword routing for plain-text messages. */
 export function routeText(text: string, origin: string) {
-  const host = new URL(origin).host.replace(/\./g, '\\.');
+  const host = new URL(origin).host.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const path =
     text.match(new RegExp(`https?://${host}(/[^\\s]*)?`))?.[1] ??
     text.match(/(?:^|\s)(\/[a-z0-9][a-z0-9/_-]*)/i)?.[1];

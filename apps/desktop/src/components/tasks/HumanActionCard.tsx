@@ -16,6 +16,7 @@ const kindLabels = {
   sign_in: 'Sign in',
   payment: 'Payment',
   account: 'Create an account',
+  signing: 'Signing setup',
   other: 'A step only you can take',
 } as const;
 
@@ -103,6 +104,12 @@ export function HumanActionCard({
                 </>
               ) : null}
               . Never paste a secret into a conversation.
+            </p>
+          )}
+          {action.kind === 'signing' && (
+            <p className="human-action-hint">
+              Signing settings live in Xcode under Signing &amp; Capabilities; the App Store Connect
+              key goes in Project settings → Integrations, never in a conversation.
             </p>
           )}
           {action.url && (!settingsLink || onOpenLink) && (

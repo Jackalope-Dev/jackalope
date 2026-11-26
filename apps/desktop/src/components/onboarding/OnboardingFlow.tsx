@@ -13,7 +13,7 @@ import { useAgentConfigStore } from '../../stores/agentConfigStore';
 import { useExecutionStore } from '../../stores/executionStore';
 import { useMascotStore } from '../../stores/mascotStore';
 import { type OnboardingStep, useOnboardingStore } from '../../stores/onboardingStore';
-import { useProjectStore } from '../../stores/projectStore';
+import { type Project, useProjectStore } from '../../stores/projectStore';
 import { useThemeStore } from '../../stores/themeStore';
 import { LocalAiSetup } from '../agents/LocalAiSetup';
 import { ProviderConnections } from '../agents/ProviderConnections';
@@ -25,6 +25,7 @@ import { AgentInstallCatalog, CommandCopy } from './AgentInstallCatalog';
 import { OnboardingAgentAccount } from './OnboardingAgentAccount';
 import { OnboardingDetectedKeys } from './OnboardingDetectedKeys';
 import { OnboardingProjectStep } from './OnboardingProjectStep';
+import { OnboardingRepositoryStep, useRepositoryStep } from './OnboardingRepositoryStep';
 import './onboarding.css';
 import { describeError } from '@jackalope/contracts/errors';
 import { projectReadiness } from '../../lib/readiness';
@@ -98,6 +99,12 @@ export function OnboardingFlow({
   const tipIndex = useRef(0);
   const desktop = isTauriEnvironment();
   const step = !project ? 'project' : onboarding.step;
+  // Only first-run setup offers the repositories it found; adding one from the workspace
+  // goes straight to choosing a folder.
+  const [firstRun] = useState(() => useProjectStore.getState().projects.length === 0);
+  const repositories = useRepositoryStep(
+    desktop && firstRun && step === 'project' && !onboarding.pendingProject,
+  );
   const index = steps.findIndex((item) => item.id === step);
   const draft =
     onboarding.firstTask ?? (project ? (execution.drafts[project.id]?.prompt ?? '') : '');
@@ -264,6 +271,20 @@ export function OnboardingFlow({
     window.addEventListener('focus', rescan);
     return () => window.removeEventListener('focus', rescan);
   }, [desktop, step, discover]);
+  const projectOpened = async (opened: Project, created: boolean) => {
+    onboarding.stageProject(
+      opened,
+      created
+        ? 'Help me plan what to build in this new project. Ask about my goals, then suggest a small first milestone.'
+        : opened.id === onboarding.projectId
+          ? draft
+          : (execution.drafts[opened.id]?.prompt ?? ''),
+    );
+    setAgent(opened.preferences?.preferredRunner ?? config.defaultMetaAgent);
+    setAllowedAgents(opened.preferences?.allowedAgents ?? null);
+    await execution.discover();
+    advance(() => onboarding.go('agent'));
+  };
   const completeSetup = (action: () => void) => advance(action);
   const finish = () => {
     if (!project || !runner?.available || !available(agent) || !projectEnabled(agent)) {
@@ -326,7 +347,11 @@ export function OnboardingFlow({
           <div className="onboarding-heading-row">
             <h2 id="onboarding-heading" ref={heading} data-step={step} tabIndex={-1}>
               {step === 'project'
-                ? 'Choose a project'
+                ? repositories === 'scanning'
+                  ? 'Looking for your repositories'
+                  : repositories
+                    ? 'We found these repositories'
+                    : 'Choose a project'
                 : step === 'agent'
                   ? 'Choose agents for this project'
                   : 'Describe your first task'}
@@ -345,7 +370,15 @@ export function OnboardingFlow({
               </Button>
             )}
           </div>
-          {step === 'project' && (
+          {step === 'project' && repositories && (
+            <OnboardingRepositoryStep
+              busy={busy}
+              attempt={attempt}
+              errorNotice={errorNotice}
+              onOpened={(opened) => projectOpened(opened, false)}
+            />
+          )}
+          {step === 'project' && !repositories && (
             <OnboardingProjectStep
               initialPath={project?.path ?? ''}
               pendingProject={onboarding.pendingProject}
@@ -354,20 +387,7 @@ export function OnboardingFlow({
               attempt={attempt}
               clearError={() => setError('')}
               errorNotice={errorNotice}
-              onOpened={async (opened, created) => {
-                onboarding.stageProject(
-                  opened,
-                  created
-                    ? 'Help me plan what to build in this new project. Ask about my goals, then suggest a small first milestone.'
-                    : opened.id === onboarding.projectId
-                      ? draft
-                      : (execution.drafts[opened.id]?.prompt ?? ''),
-                );
-                setAgent(opened.preferences?.preferredRunner ?? config.defaultMetaAgent);
-                setAllowedAgents(opened.preferences?.allowedAgents ?? null);
-                await execution.discover();
-                advance(() => onboarding.go('agent'));
-              }}
+              onOpened={projectOpened}
             />
           )}
           {step === 'agent' && (

@@ -48,6 +48,10 @@ import {
   revealAttached,
   startGlob,
 } from '../../lib/window-attach';
+import {
+  DesktopPermissionPrompt,
+  useMissingDesktopPermissions,
+} from '../tasks/DesktopPermissionNotice';
 import { GlobFigure } from './GlobFigure';
 import { GlobMotion, prefersReducedMotion } from './glob-motion';
 import './window-glob.css';
@@ -552,7 +556,7 @@ export function WindowGlob({
           <button
             type="button"
             className="window-glob-attached-name"
-            title={`${attached.title} · waits ${attached.minutesLeft} more min. Click to show it.`}
+            title={`${attached.title} · ${attached.kept ? 'attached to this conversation' : `waits ${attached.minutesLeft} more min`}. Click to show it.`}
             onClick={() => {
               globLog(`revealing the attached ${attached.app} window`);
               void revealAttached(conversation).catch(() => undefined);
@@ -678,6 +682,9 @@ function AttachDialog({
     }
   };
   const target = windows?.find((window) => window.handle === chosen);
+  // The macOS helper refuses with a System Settings step when a permission is missing; the
+  // prompt opens that pane instead of only naming it.
+  const missing = useMissingDesktopPermissions(error.includes('System Settings'));
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="window-glob-dialog">
@@ -759,7 +766,15 @@ function AttachDialog({
               How this works
             </LinkButton>
           </p>
-          {error && (canPick || dropped) && <InlineNotice tone="error">{error}</InlineNotice>}
+          {error &&
+            (canPick || dropped) &&
+            (missing ? (
+              <InlineNotice tone="warning">
+                <DesktopPermissionPrompt missing={missing} />
+              </InlineNotice>
+            ) : (
+              <InlineNotice tone="error">{error}</InlineNotice>
+            ))}
         </div>
         <DialogFooter>
           <Button variant="ghost" onClick={onClose} disabled={busy}>

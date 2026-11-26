@@ -165,21 +165,24 @@
   overscroll-behavior: contain;
   overflow-wrap: anywhere;
 }
-/* Toggle groups marked data-settings-tile sit two to a row on wide panes, so short cards use
-   the width instead of stacking into one long column; anything unmarked spans the row. The
-   grid gap replaces the stacked margins. */
+/* Groups marked data-settings-tile sit two to a row on wide panes, packed like masonry:
+   useSettingsMasonry gives each card a span of small rows from its height, so the next card
+   starts right under it instead of below the taller neighbour. Anything unmarked spans
+   both columns. Order still follows the page. */
 @container (min-width: 52rem) {
   .settings-section:has(> [data-settings-tile]) {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 16px;
+    grid-auto-rows: 4px;
+    column-gap: 16px;
     align-items: start;
+  }
+  .settings-section:has(> [data-settings-tile]) > * {
+    grid-row-end: span var(--settings-span, 1);
+    margin-top: 0;
   }
   .settings-section:has(> [data-settings-tile]) > :not([data-settings-tile]) {
     grid-column: 1 / -1;
-  }
-  .settings-section:has(> [data-settings-tile]) > * {
-    margin-top: 0;
   }
 }
 .settings-input {
@@ -467,6 +470,36 @@
 .project-setting-input {
   width: min(360px, 100%);
 }
+.project-command-lifecycle {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.project-command-lifecycle-legend {
+  margin-bottom: 4px;
+  padding: 0;
+  overflow: hidden;
+  color: var(--color-text-primary);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.worktree-retention-log {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+}
+.worktree-retention-log li {
+  overflow-wrap: anywhere;
+}
 .project-git-fields {
   min-width: 0;
   margin: 0;
@@ -507,14 +540,46 @@
   width: min(360px, 100%);
 }
 /* Shortcuts read as keycaps; recording swaps the caps for a focused capture target. */
+/* Each action wraps its row and any clash notice, so the wrapper carries the divider. */
+.shortcut-row {
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+.shortcut-row:last-child {
+  border-bottom: none;
+}
 .shortcut-edit {
   display: inline-flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
+  gap: 4px 8px;
 }
 .shortcut-keys {
   display: inline-flex;
+  flex-wrap: wrap;
   gap: 4px;
+}
+/* A chord's strokes sit apart; a stroke's keys sit together. */
+.shortcut-stroke {
+  display: inline-flex;
+  gap: 4px;
+}
+.shortcut-stroke {
+  align-items: center;
+}
+.shortcut-then {
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+}
+.shortcut-unset {
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+}
+.shortcut-import {
+  width: min(520px, calc(100vw - 32px));
+}
+.shortcut-import-body {
+  display: grid;
+  gap: 12px;
 }
 .shortcut-key {
   display: inline-grid;
@@ -530,7 +595,10 @@
   font: 500 var(--text-xs) / 1 var(--font-mono, ui-monospace, monospace);
 }
 .shortcut-recorder {
-  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 28px;
   padding: 0 10px;
   border: 1px dashed var(--color-border-focus);
   border-radius: var(--radius-xs);
@@ -578,6 +646,42 @@
 .privacy-summary-item[data-on] .privacy-summary-state {
   background: var(--color-accent-subtle);
   color: var(--color-accent-ink);
+}
+
+/* The session's usage reports, one row each, scrolling within a fixed height. */
+.privacy-events {
+  display: grid;
+  gap: 6px;
+  max-height: 280px;
+  margin: 8px 0 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+.privacy-event {
+  display: grid;
+  grid-template-columns: minmax(8rem, auto) 1fr auto;
+  align-items: baseline;
+  gap: 10px;
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-sunken);
+  font-size: var(--text-xs);
+}
+.privacy-event-name {
+  font-weight: 600;
+}
+.privacy-event code {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-text-secondary);
+}
+@media (max-width: 560px) {
+  .privacy-event {
+    grid-template-columns: 1fr;
+  }
 }
 
 /* Reset spells out what it erases and what survives, side by side on wide panes. */

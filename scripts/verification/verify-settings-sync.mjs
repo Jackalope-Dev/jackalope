@@ -39,7 +39,6 @@ window.__TAURI_INTERNALS__={metadata:{currentWindow:{label:'main'},currentWebvie
  if(command==='task_validate_project')return {path:args.path,name:'Fixture project',branch:'main'};
  if(command==='task_runners')return ['codex','claude','grok'].map(id=>({id,name:id==='codex'?'Codex':id==='claude'?'Claude Code':'Grok',available:true,signedIn:true,detail:''}));
  if(command==='list_worktrees')return [];
- if(command==='app_execution_access')return {required:true,allowed:f.account==='connected'};
  if(command==='app_account_status'||command==='app_account_poll')return status();
  if(command==='app_account_connect'){f.account='waiting';return status();}
  if(command==='app_account_referrals')return {limit:5,remaining:5,accepted:0,downloaded:0,connected:0,shareUrl:'',invites:[]};
@@ -91,7 +90,7 @@ useOnboardingStore.getState().begin();createRoot(document.getElementById('root')
             .setAppTheme({ ...window.themeStore.getState().appTheme, isDark: dark }),
         dark,
       );
-      await page.getByRole('button', { name: 'Connect account', exact: true }).click();
+      await page.getByRole('button', { name: 'Create free account or sign in' }).click();
       await page
         .getByText('Your email is verified. Early access is still waiting for approval.')
         .waitFor();

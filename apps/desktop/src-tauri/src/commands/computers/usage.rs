@@ -406,6 +406,11 @@ pub struct ComputerPreferences {
     /// Leave local sandboxes running when Jackalope quits.
     #[serde(default)]
     pub keep_running_on_quit: bool,
+    /// Agents on a computer reach Anthropic or OpenAI through this device,
+    /// which adds the saved API key, instead of receiving the key (see
+    /// [`super::provider_proxy`]).
+    #[serde(default)]
+    pub keep_api_keys_on_device: bool,
 }
 
 pub(crate) fn preferences(root: &Path) -> ComputerPreferences {

@@ -1,4 +1,11 @@
-import { CopyButton, Disclosure, DisclosureBody, DisclosureSummary } from '@jackalope/ui';
+import {
+  BorderBeamLayer,
+  CopyButton,
+  Disclosure,
+  DisclosureBody,
+  DisclosureSummary,
+  ThinkingOrb,
+} from '@jackalope/ui';
 import { useEffect, useState } from 'react';
 
 /** A pairing code as the host creates it, for this computer's Remote access or an invite. */
@@ -63,11 +70,14 @@ export function PairingView({
   expires,
   origin,
   scanHint = 'Scan this with the Jackalope app on your phone.',
+  waiting = false,
 }: {
   pair: PairingCode;
   expires: number;
   origin: string;
   scanHint?: string;
+  /** This computer is watching for the device to pair, so the view can say it is waiting. */
+  waiting?: boolean;
 }) {
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
@@ -76,20 +86,31 @@ export function PairingView({
   }, []);
   const left = Math.max(0, Math.ceil((expires - now) / 1000));
   const remaining = `${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}`;
+  const watching = waiting && left > 0;
+  const status = watching && (
+    <p className="remote-pair-waiting" role="status">
+      <ThinkingOrb state="connecting" size={20} aria-hidden="true" />
+      Waiting for {pair.qr ? 'your phone' : 'the other computer'} to pair
+    </p>
+  );
   if (!pair.qr)
     return (
       <div className="remote-pair px-5 py-4">
+        <BorderBeamLayer variant="pulse" active={watching} strength={0.6} />
         <TypedCode pair={pair} origin={origin} />
         <p className="task-muted">
           Enter it where you connect this computer. It works once and expires in {remaining}.
         </p>
+        {status}
       </div>
     );
   return (
     <div className="remote-pair remote-pair-hero px-5 py-4">
+      <BorderBeamLayer variant="pulse" active={watching} strength={0.6} />
       <PairingQr rows={pair.qr} />
       <p>{scanHint}</p>
       <p className="task-muted">Works once · expires in {remaining}</p>
+      {status}
       <Disclosure className="remote-pair-manual">
         <DisclosureSummary>Can't scan? Enter a code</DisclosureSummary>
         <DisclosureBody>

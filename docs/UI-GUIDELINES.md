@@ -183,8 +183,8 @@ and size inputs to what they hold, such as a short code.
 
 Controls use the shared `--control-height` (36px) and `--control-height-compact` (32px)
 for menu rows, segments and dense navigation; coarse pointers raise both to 44px. The sidebar
-leads with Inbox (work across projects that needs the person) and Library (files work
-created), then favorite projects and work as tiles, then projects with their pinned work,
+leads with Inbox (work across projects that needs the person), Overview (what is running
+and how each project stands) and Library (files work created), then favorite projects and work as tiles, then projects with their pinned work,
 folders, live work and an "N more" link to the rest, then Setup (Bots, Agents) and Settings. Prefer
 compact layouts that keep this in view over extra padding. Native
 window chrome can follow platform sizing. Dialogs retain viewport space and scroll on
@@ -223,9 +223,13 @@ that starts off, so a useful one starts on. What stays off until chosen: anythin
 writes into the person's repository, publishes, shares data beyond what sign-in
 disclosed, lets an agent decide in the person's place, or starts something at login.
 
-App appearance/privacy and account access precede the project setup steps.
-Preserve settings-sync disclosure, pre-connection opt-out and deletion choices.
-Waitlist membership does not imply approved desktop access.
+App appearance/privacy and the optional account precede the project setup steps;
+continuing without an account is always available. Preserve settings-sync
+disclosure, pre-connection opt-out and deletion choices. Waitlist membership does
+not unlock account features. Gate an account feature with `RequiresAccount` (a card
+in place of the feature) or `AccountRequiredNotice` (inline beside local controls),
+never with a blocking dialog. Suggest connecting at most once, after a real
+milestone, through `AccountSuggestion`; remember snooze and dismissal.
 
 Provider-reported account identity is separate from custom labels. Keep account
 names and credentials local. A different default applies to future tasks;
@@ -265,9 +269,23 @@ Use motion to explain changes, acknowledge input or express the mascot's
 personality. Avoid competing animation, ambient pulses and unnecessary delays.
 `@jackalope/ui` owns shared motion: dialogs, menus, popovers, selects and tooltips
 animate in and out, tab panels and opened pages settle into place, and segmented
-controls slide their selection. Reuse its `--motion-*` durations and `--ease-*` curves
+controls stretch their selection like a droplet. Reuse its `--motion-*` durations and `--ease-*` curves
 instead of adding feature keyframes, and keep reduced motion static.
 Maintain the existing setup acknowledgment and workspace-entry behavior.
+
+`@jackalope/ui` also owns the activity effects, and each one runs only while its state is
+real. `BorderBeam` rides the edge of the element doing the work: a travelling beam on a
+composer while its agent works, a bottom line on a field while it searches or sends, and a
+pulse that follows the voice level while dictating. Keep a handful per screen, never on
+list rows, and never two on one element. `ThinkingOrb` replaces spinners where an agent or
+other long AI wait is behind them, with the state that names the activity (searching,
+solving, composing, planning, connecting, working, breathing) beside a text label; it
+unmounts when the work ends. `playDistortionWave` carries a view into its result from the
+control that caused it, such as Send opening the new conversation, and never plays for a
+failed action or more than once at a time. `Liquid` and `LiquidActions` merge touching
+pieces into one surface for small groups such as a creation menu. Effects take their
+colours from the theme tokens, pause offscreen and in hidden windows, and fall back to a
+static cue under reduced motion.
 
 ## Components and verification
 
@@ -340,6 +358,12 @@ container. Release builds turn off the webview's own right-click menu outside te
 and selections; right-click actions use ContextMenu and repeat a visible options menu's items. Tabs use arrow-key panel navigation; SegmentedControl uses pressed
 buttons for filtering and SegmentedNav uses aria-current for view navigation. CopyButton accepts a custom clipboard function, shows
 failure beside the action and clears stale feedback when its text changes.
+
+Add app-level shortcuts as actions in lib/keybindings.ts rather than window key listeners, so
+Settings, the ? sheet and command search show the person's keys. Contexts keep a focused
+terminal's keys, typing keys in text fields and `data-own-find` views' own find. Composer
+forms carry `data-composer` and register their actions with `useComposerKeybindings`.
+Pickers opened from the keyboard start on the current choice and move with the arrow keys.
 
 Use the standalone gallery with `pnpm ui:dev` at http://127.0.0.1:5190 to inspect
 shared controls without a native bridge or account service. `pnpm ui:build` checks

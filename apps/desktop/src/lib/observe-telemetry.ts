@@ -1,6 +1,7 @@
 import { telemetry, useCommunityStore } from '../stores/communityStore';
 import { useExecutionStore } from '../stores/executionStore';
 import { useUpdateStore } from '../stores/updateStore';
+import { errorKind } from './error-kind';
 import { createTaskTelemetry } from './task-telemetry';
 
 const observeTasks = createTaskTelemetry(telemetry.track);
@@ -27,8 +28,10 @@ export function observeTelemetry() {
 }
 
 export function observeUiTelemetry() {
-  const uiError = () => telemetry.track({ name: 'app_error', code: 'ui_error' });
-  const rejection = () => telemetry.track({ name: 'app_error', code: 'ui_rejection' });
+  const uiError = (event: ErrorEvent) =>
+    telemetry.track({ name: 'app_error', code: 'ui_error', kind: errorKind(event.error) });
+  const rejection = (event: PromiseRejectionEvent) =>
+    telemetry.track({ name: 'app_error', code: 'ui_rejection', kind: errorKind(event.reason) });
   const hidden = () => {
     if (document.hidden) void telemetry.flush();
   };

@@ -20,8 +20,12 @@ fn poll_answering_cursor_requests(
         .matches("\u{1b}[6n")
         .count();
     while *answered < requests {
-        let _ =
-            work_terminal::task_terminal_write(id.into(), generation.into(), "\u{1b}[1;1R".into());
+        let _ = work_terminal::task_terminal_write(
+            id.into(),
+            generation.into(),
+            "\u{1b}[1;1R".into(),
+            None,
+        );
         *answered += 1;
     }
     view
@@ -38,10 +42,10 @@ fn task_terminal_reconnects_and_reserves_its_workspace_until_stopped() {
     run.workspace = workspace.to_string_lossy().into_owned();
     run.project_path = run.workspace.clone();
     run.status = RunStatus::Review;
-    let runtime = TaskRuntime::with_test_access(root.join("history")).unwrap();
+    let runtime = TaskRuntime::new(root.join("history")).unwrap();
     runtime.save(&run).unwrap();
     drop(runtime);
-    let runtime = TaskRuntime::with_test_access(root.join("history")).unwrap();
+    let runtime = TaskRuntime::new(root.join("history")).unwrap();
     work_terminal::start(&runtime, &run.id).unwrap();
     struct Stop(String, String);
     impl Drop for Stop {
@@ -89,11 +93,17 @@ fn task_terminal_reconnects_and_reserves_its_workspace_until_stopped() {
     assert!(work_terminal::task_terminal_write(
         split_id.clone(),
         generation.clone(),
-        "must not write".into()
+        "must not write".into(),
+        None
     )
     .is_err());
-    work_terminal::task_terminal_write(split_id.clone(), split_generation.clone(), "exit\r".into())
-        .unwrap();
+    work_terminal::task_terminal_write(
+        split_id.clone(),
+        split_generation.clone(),
+        "exit\r".into(),
+        None,
+    )
+    .unwrap();
     let saved_output = runtime.integration_directory().join("terminal-output");
     let started = std::time::Instant::now();
     let mut exit_sent = started;
@@ -109,10 +119,13 @@ fn task_terminal_reconnects_and_reserves_its_workspace_until_stopped() {
                 split_id.clone(),
                 split_generation.clone(),
                 "exit\r".into(),
+                None,
             );
             exit_sent = std::time::Instant::now();
         }
-        if started.elapsed().as_secs() >= 30 {
+        // A login shell that loads version managers can take well over 30 s to read input
+        // while other builds share the machine.
+        if started.elapsed().as_secs() >= 120 {
             let output = split["output"].as_str().unwrap();
             let tail = output
                 .char_indices()
@@ -140,6 +153,7 @@ fn task_terminal_reconnects_and_reserves_its_workspace_until_stopped() {
         run.task_id.clone(),
         generation.clone(),
         "echo JACKALOPE_TERMINAL_RECEIPT > terminal-receipt.txt\r".into(),
+        None,
     )
     .unwrap();
     let started = std::time::Instant::now();
@@ -161,7 +175,8 @@ fn task_terminal_reconnects_and_reserves_its_workspace_until_stopped() {
     assert!(work_terminal::task_terminal_write(
         run.task_id.clone(),
         generation.clone(),
-        "must not write".into()
+        "must not write".into(),
+        None
     )
     .is_err());
     work_terminal::start(&runtime, &run.id).unwrap();
@@ -171,7 +186,8 @@ fn task_terminal_reconnects_and_reserves_its_workspace_until_stopped() {
     assert!(work_terminal::task_terminal_write(
         run.task_id.clone(),
         generation.clone(),
-        "must not write".into()
+        "must not write".into(),
+        None
     )
     .unwrap_err()
     .contains("another window"));
@@ -192,4 +208,55 @@ fn task_terminal_reconnects_and_reserves_its_workspace_until_stopped() {
         .update_checked(&run.id, |run| run.status = RunStatus::Interrupted)
         .unwrap();
     assert!(work_terminal::start(&runtime, &run.id).is_err());
+}
+
+#[test]
+fn finishing_a_task_stops_only_a_terminal_that_ran_a_command_marked_for_it() {
+    let root = std::env::temp_dir().join(format!("jackalope-terminal-{}", uuid::Uuid::new_v4()));
+    let workspace = root.join("workspace");
+    std::fs::create_dir_all(&workspace).unwrap();
+    let mut run = sample("codex");
+    run.id = uuid::Uuid::new_v4().to_string();
+    run.task_id = uuid::Uuid::new_v4().to_string();
+    run.workspace = workspace.to_string_lossy().into_owned();
+    run.project_path = run.workspace.clone();
+    run.status = RunStatus::Review;
+    let runtime = TaskRuntime::new(root.join("history")).unwrap();
+    runtime.save(&run).unwrap();
+    drop(runtime);
+    let runtime = TaskRuntime::new(root.join("history")).unwrap();
+    work_terminal::start(&runtime, &run.id).unwrap();
+    let status = || {
+        serde_json::to_value(
+            work_terminal::task_terminal_status(run.task_id.clone(), 0, String::new())
+                .unwrap()
+                .unwrap(),
+        )
+        .unwrap()
+    };
+    let generation = status()["generation"].as_str().unwrap().to_string();
+    let other_task = uuid::Uuid::new_v4().to_string();
+    work_terminal::task_terminal_write(run.task_id.clone(), generation.clone(), " ".into(), None)
+        .unwrap();
+    assert_eq!(work_terminal::stop_when_finished([run.task_id.as_str()]), 0);
+    assert!(work_terminal::ensure_idle(&run.workspace).is_err());
+    assert_eq!(status()["stopsWhenFinished"], false);
+    work_terminal::task_terminal_write(
+        run.task_id.clone(),
+        generation.clone(),
+        " ".into(),
+        Some(true),
+    )
+    .unwrap();
+    assert_eq!(
+        status()["stopsWhenFinished"],
+        true,
+        "the terminal says the whole shell will stop"
+    );
+    assert_eq!(work_terminal::stop_when_finished([other_task.as_str()]), 0);
+    assert!(work_terminal::ensure_idle(&run.workspace).is_err());
+    assert_eq!(work_terminal::stop_when_finished([run.task_id.as_str()]), 1);
+    assert_eq!(status()["running"], false);
+    assert!(work_terminal::ensure_idle(&run.workspace).is_ok());
+    let _ = std::fs::remove_dir_all(root);
 }

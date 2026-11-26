@@ -35,7 +35,8 @@ export function BotCastCard({
       style={tint ? ({ '--bot-tint': tint } as CSSProperties) : undefined}
     >
       <span className="bots-cast-stage" data-hero={hero || undefined}>
-        <BotAvatar appearance={appearance} agent={agent} size="lg" />
+        {/* Only the editor's preview stands alone; template cards are buttons. */}
+        <BotAvatar appearance={appearance} agent={agent} size="lg" interactive={hero} />
         {children}
       </span>
       <span className="bots-cast-copy">

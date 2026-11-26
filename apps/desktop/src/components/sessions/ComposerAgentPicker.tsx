@@ -1,6 +1,6 @@
 import { Badge, Button, Choice, LoadingState, Popover, Tabs, Tooltip } from '@jackalope/ui';
 import { ChevronDown, GitCompareArrows, Sparkles } from 'lucide-react';
-import { type ReactNode, useState } from 'react';
+import { type KeyboardEvent, type ReactNode, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { agentAdapter } from '../../lib/agent-catalog';
 import { useAgentModels } from '../../lib/agent-models';
@@ -9,6 +9,7 @@ import { MAX_COMPARED_AGENTS } from '../../stores/compareStore';
 import { useExecutionStore } from '../../stores/executionStore';
 import { agentAccountFor, isAgentAllowedForProject, type Project } from '../../stores/projectStore';
 import { ProviderMark } from '../agents/ProviderMark';
+import { movePickerFocus, pickerStart } from '../composer/pickerKeys';
 
 /** A model chosen for one agent; the name keeps the label readable without a catalog read. */
 export interface ComposerModel {
@@ -59,6 +60,8 @@ export function ComposerAgentPicker({
   onModelChange,
   disabled,
   allowCompare = true,
+  open: requestedOpen,
+  onOpenChange,
 }: {
   project: Project;
   value: string[];
@@ -68,6 +71,9 @@ export function ComposerAgentPicker({
   onModelChange?: (model: ComposerModel | null) => void;
   disabled?: boolean;
   allowCompare?: boolean;
+  /** Opens the picker from outside, such as the /model command. */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }) {
   const roster = useRosterAgents(project);
   const agents = roster.filter((agent) => !agent.unavailable);
@@ -75,8 +81,20 @@ export function ComposerAgentPicker({
   const comparing = selected.length > 1;
   const single = selected.length === 1 ? agents.find((agent) => agent.id === selected[0]) : null;
   const current = comparing ? 'compare' : (single?.id ?? 'auto');
-  const [open, setOpen] = useState(false);
+  const [ownOpen, setOwnOpen] = useState(false);
+  const open = requestedOpen ?? ownOpen;
+  const setOpen = (next: boolean) => {
+    setOwnOpen(next);
+    onOpenChange?.(next);
+  };
   const [rail, setRail] = useState(current);
+  // Opened from outside, the rail starts at the current choice as a click would, before
+  // the picker renders so its first focus lands in the right pane.
+  const [requested, setRequested] = useState(requestedOpen);
+  if (requestedOpen !== requested) {
+    setRequested(requestedOpen);
+    if (requestedOpen) setRail(current);
+  }
   const modelLabel = single && model ? ` · ${model.name}` : '';
   const label = comparing
     ? `Compare ${selected.length} agents`
@@ -95,6 +113,26 @@ export function ComposerAgentPicker({
     onModelChange?.(null);
   };
   const railAgent = roster.find((agent) => agent.id === rail);
+  const body = useRef<HTMLDivElement>(null);
+  const pane = () => body.current?.querySelector('.agent-picker-pane[data-state="active"]');
+  /** ← and → move between the agent rail and the open agent's options. */
+  const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    const target = event.target as Element;
+    if (target.closest('.agent-picker-rail')) {
+      if (event.key !== 'ArrowRight') return;
+      const start = pickerStart(pane());
+      if (!start) return;
+      event.preventDefault();
+      start.focus();
+    } else if (target.closest('.agent-picker-pane')) {
+      if (event.key === 'ArrowLeft') {
+        event.preventDefault();
+        body.current
+          ?.querySelector<HTMLElement>('.agent-picker-rail [aria-selected="true"]')
+          ?.focus();
+      } else movePickerFocus(event, pane() ?? null);
+    }
+  };
   return (
     <Popover.Root
       open={open}
@@ -130,8 +168,21 @@ export function ComposerAgentPicker({
         </Button>
       </Popover.Trigger>
       <Popover.Portal>
-        <Popover.Content className="agent-picker" align="end" sideOffset={8}>
+        <Popover.Content
+          className="agent-picker"
+          align="end"
+          sideOffset={8}
+          onOpenAutoFocus={(event) => {
+            // Start on the current choice; ← reaches the agents.
+            const start = pickerStart(pane());
+            if (!start) return;
+            event.preventDefault();
+            start.focus();
+          }}
+        >
           <Tabs.Root
+            ref={body}
+            onKeyDown={onKeyDown}
             className="agent-picker-body"
             orientation="vertical"
             value={rail}

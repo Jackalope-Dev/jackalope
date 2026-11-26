@@ -1,4 +1,4 @@
-import { dimensionParts, operationCounts, taskCounts } from '@jackalope/contracts/telemetry';
+import { operationCounts } from '@jackalope/contracts/telemetry';
 import {
   Button,
   DefinitionList,
@@ -21,7 +21,23 @@ import {
   type Summary,
   useResource,
 } from './api';
+import { BarList, Delta, LineChart, SERIES, Sparkline, StackedBars, StepBars } from './charts';
 import { ErrorNotice, Heading, QuickLink, Refresh, SelectField, Table } from './components';
+import {
+  activityPath,
+  type Breakdown,
+  breakdown,
+  dayRange,
+  errorGroups,
+  improvements,
+  label,
+  type MetricRow,
+  outcomesByAgent,
+  series,
+  total,
+  trend,
+  versionAdoption,
+} from './insights';
 
 export function Dashboard() {
   const summary = useResource<Summary>('/admin/api/summary');
@@ -183,7 +199,7 @@ export function Dashboard() {
 }
 
 export function Usage() {
-  const [days, setDays] = useState('7');
+  const [days, setDays] = useState('14');
   const [channel, setChannel] = useState('all');
   const [version, setVersion] = useState('');
   const [os, setOs] = useState('all');
@@ -191,42 +207,59 @@ export function Usage() {
     `/admin/api/overview?${new URLSearchParams({ days, channel, version, os })}`,
   );
   const data = request.data;
-  const metrics = data?.metrics || [];
-  const releases = new Map<string, (string | number)[]>();
-  const events = new Map<string, number>();
-  const totals = new Map<string, number>();
-  for (const metric of metrics) {
-    const key = `${metric.version}/${metric.channel}/${metric.os}`;
-    const row = releases.get(key) || [
-      metric.version,
-      displayName(metric.channel),
-      audienceLabel(metric.os),
-      0,
-      0,
-      0,
-    ];
-    if (metric.name === 'app_opened') {
-      row[3] = Number(row[3]) + metric.count;
-      totals.set(metric.day, (totals.get(metric.day) || 0) + metric.count);
-    }
-    if (metric.name === 'task_state' && dimensionParts(metric.dimension)[0] === 'starting')
-      row[4] = Number(row[4]) + metric.count;
-    if (metric.name === 'app_error') row[5] = Number(row[5]) + metric.count;
-    releases.set(key, row);
-    if (metric.name === 'feature_used' || metric.name === 'app_error') {
-      const key = `${metric.name === 'app_error' ? 'Error' : 'View'} / ${dimensionParts(metric.dimension).map(displayName).join(' / ')}`;
-      events.set(key, (events.get(key) || 0) + metric.count);
-    }
-  }
-  const dates = Array.from({ length: Number(days) }, (_, index) =>
-    new Date((request.updated || Date.now()) - (Number(days) - index - 1) * 86400000)
-      .toISOString()
-      .slice(0, 10),
-  );
-  const peak = Math.max(0, ...totals.values());
+  const rows = data?.metrics || [];
+  const dates = dayRange(Number(days), request.updated || Date.now());
+  const state = (row: MetricRow) => row.dimension.split('|')[0];
+  const daily = {
+    opens: series(rows, dates, (row) => row.name === 'app_opened'),
+    work: series(rows, dates, (row) => row.name === 'work_sent'),
+    finished: series(
+      rows,
+      dates,
+      (row) => row.name === 'task_state' && ['review', 'reviewed'].includes(state(row)),
+    ),
+    errors: series(rows, dates, (row) => row.name === 'app_error'),
+  };
   const versions = [
     ...new Set([version, ...(data?.versions.map((row) => row.version) || [])]),
   ].filter(Boolean);
+  const named = (entries: Breakdown[], prefix = '') =>
+    entries.map((entry) => ({ ...entry, label: `${prefix}${label(entry.key)}` }));
+  const features = [
+    ...named(
+      breakdown(rows, dates, 'feature_used', ([feature]) => feature),
+      'Visited ',
+    ),
+    ...named(breakdown(rows, dates, 'action_used', ([action]) => action)),
+  ].sort((a, b) => b.total - a.total);
+  const shapes = named(breakdown(rows, dates, 'work_sent', ([shape]) => shape));
+  const agents = named(breakdown(rows, dates, 'work_sent', ([, agent]) => agent));
+  const withFiles = breakdown(rows, dates, 'work_sent', ([, , files]) =>
+    files && files !== '0' ? 'With attached files' : 'Without files',
+  );
+  const withWindow = breakdown(rows, dates, 'work_sent', ([, , , window]) =>
+    window === 'window' ? 'With an attached window' : 'Without a window',
+  );
+  const platforms = named(
+    breakdown(rows, dates, 'app_opened', (_, row) => `${row.os} · ${row.channel}`),
+  ).map((entry) => ({
+    ...entry,
+    label: entry.key
+      .split(' · ')
+      .map((part, index) => (index ? displayName(part) : audienceLabel(part)))
+      .join(' · '),
+  }));
+  const settings = named(breakdown(rows, dates, 'setting_changed', ([setting]) => setting));
+  const adoption = versionAdoption(rows, dates);
+  const errors = errorGroups(rows, dates);
+  const fixes = improvements(rows, dates);
+  const outcomes = outcomesByAgent(rows);
+  const tiles = [
+    ['App opens', daily.opens, false, 'Times Jackalope was opened'],
+    ['Work sent', daily.work, false, 'Conversations, plans and comparisons started'],
+    ['Runs finished', daily.finished, false, 'Agent runs that reached review'],
+    ['Errors reported', daily.errors, true, 'Known categories, with consent'],
+  ] as const;
   return (
     <>
       <Heading
@@ -238,7 +271,7 @@ export function Usage() {
           </Refresh>
         }
       >
-        See reported activity and errors across releases.
+        How Jackalope is used and where it struggles, from anonymous daily counts.
       </Heading>
       <Panel className="panel">
         <div className="filters">
@@ -248,6 +281,7 @@ export function Usage() {
             onChange={setDays}
             options={[
               ['7', 'Last 7 days'],
+              ['14', 'Last 14 days'],
               ['30', 'Last 30 days'],
             ]}
           />
@@ -280,10 +314,10 @@ export function Usage() {
         <ErrorNotice>{request.error}</ErrorNotice>
         <p role="status" className="notice">
           {request.loading
-            ? 'Loading aggregate counts…'
+            ? 'Loading usage…'
             : data
-              ? `Updated ${new Date(request.updated).toLocaleTimeString()}${data.truncated ? ' · Partial results — narrow the filters.' : ''}`
-              : 'Activity unavailable for this selection. Refresh to try again.'}
+              ? `Updated ${new Date(request.updated).toLocaleTimeString()} · Counts are events, not people. Changes compare the later half of the window with the earlier half.${data.truncated ? ' Partial results — narrow the filters.' : ''}`
+              : 'Usage unavailable for this selection. Refresh to try again.'}
         </p>
         {data && (
           <Disclosure>
@@ -296,78 +330,194 @@ export function Usage() {
           </Disclosure>
         )}
       </Panel>
-      {data && (
+      {data && !rows.length && (
+        <Panel className="panel">
+          <EmptyState
+            title="No usage reported in this selection"
+            description="Widen the window or clear a filter. Only installs that share usage counts report here."
+          />
+        </Panel>
+      )}
+      {data && rows.length > 0 && (
         <>
-          <div className="metric-grid">
-            {[
-              ['App opens', 'app_opened'],
-              ['View visits', 'feature_used'],
-              ['Operation results', 'operation_result'],
-              ['Reported errors', 'app_error'],
-            ].map(([label, name]) => (
-              <Stat
-                className="metric"
-                key={name}
-                label={label}
-                value={metrics
-                  .filter((row) => row.name === name)
-                  .reduce((total, row) => total + row.count, 0)
-                  .toLocaleString()}
-              />
+          <div className="usage-hero">
+            {tiles.map(([title, values, invert, hint]) => (
+              <div className="usage-tile" key={title} title={hint}>
+                <span>{title}</span>
+                <strong>{total(values).toLocaleString()}</strong>
+                <span className="usage-tile-foot">
+                  <Delta trend={trend(values)} invert={invert} />
+                  <Sparkline values={values} color={invert ? 'var(--color-danger)' : undefined} />
+                </span>
+              </div>
             ))}
           </div>
           <Panel className="panel">
-            <h2>Daily app opens</h2>
-            <p>Reported events by UTC receipt date. Includes today’s partial total.</p>
-            {!peak && <p className="notice">No app-open events reported in this selection.</p>}
-            <svg
-              className="admin-chart"
-              viewBox={`0 0 ${dates.length * 30} 100`}
-              preserveAspectRatio="none"
-              role="img"
-              aria-label={`Daily app opens, ${dates[0]} to ${dates.at(-1)}. Peak ${peak} per day.`}
-            >
-              {dates.map((day, index) => {
-                const count = totals.get(day) || 0;
-                const height = (count / Math.max(1, peak)) * 96;
-                return (
-                  <rect
-                    key={day}
-                    x={index * 30 + 2}
-                    y={100 - height}
-                    width={26}
-                    height={height}
-                    rx={2}
-                  >
-                    <title>
-                      {day}: {count} opens
-                    </title>
-                  </rect>
-                );
-              })}
-            </svg>
-            <div className="spark-labels">
-              <span>{dates[0]}</span>
-              <span>Peak {peak} opens / day</span>
-              <span>{dates.at(-1)}</span>
-            </div>
+            <h2>Activity over time</h2>
+            <p>Daily events by UTC date. Today is partial.</p>
+            <LineChart
+              dates={dates}
+              label={`Daily app opens, work sent and runs finished from ${dates[0]} to ${dates.at(-1)}`}
+              lines={[
+                { key: 'App opens', values: daily.opens, color: SERIES[0] },
+                { key: 'Work sent', values: daily.work, color: SERIES[1] },
+                { key: 'Runs finished', values: daily.finished, color: SERIES[2] },
+              ]}
+            />
             <Disclosure>
-              <DisclosureSummary>Daily counts</DisclosureSummary>
+              <DisclosureSummary>Show as a table</DisclosureSummary>
               <Table
-                label="Daily app opens"
-                headers={['UTC date', 'Opens']}
-                rows={dates.map((day) => [day, totals.get(day) || 0])}
+                label="Daily activity"
+                headers={['UTC date', 'App opens', 'Work sent', 'Runs finished', 'Errors']}
+                rows={dates.map((day, index) => [
+                  day,
+                  daily.opens[index],
+                  daily.work[index],
+                  daily.finished[index],
+                  daily.errors[index],
+                ])}
               />
             </Disclosure>
           </Panel>
+          <div className="usage-grid">
+            <Panel className="panel">
+              <h2>What to improve</h2>
+              <p>Operations, agents and pages whose failures stand out in this window.</p>
+              {fixes.length ? (
+                <ul className="improve-list">
+                  {fixes.slice(0, 6).map((fix) => (
+                    <li key={fix.title}>
+                      <span className="improve-tone" data-tone={fix.tone}>
+                        {fix.tone === 'danger' ? 'High' : 'Watch'}
+                      </span>
+                      <strong>{fix.title}</strong>
+                      <span>{fix.detail}</span>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="notice">Nothing stands out. Failure rates are low in this window.</p>
+              )}
+            </Panel>
+            <Panel className="panel">
+              <h2>From opening to finished work</h2>
+              <p>Event counts at each step, not people moving through them.</p>
+              <StepBars steps={activityPath(rows)} />
+            </Panel>
+          </div>
           <Panel className="panel">
-            <h2>Release activity</h2>
-            <p>App opens are events, not unique people.</p>
+            <h2>Version adoption</h2>
+            <p>App opens per day by version; smaller versions are grouped as Other.</p>
+            {adoption.length ? (
+              <>
+                <StackedBars
+                  dates={dates}
+                  layers={adoption}
+                  label={`Daily app opens by version from ${dates[0]} to ${dates.at(-1)}`}
+                  order={data.versions.map((row) => row.version)}
+                />
+                <Disclosure>
+                  <DisclosureSummary>Show as a table</DisclosureSummary>
+                  <Table
+                    label="App opens by version"
+                    headers={['Version', 'Opens', 'Share']}
+                    rows={adoption.map((layer) => [
+                      layer.key,
+                      total(layer.daily),
+                      `${Math.round((total(layer.daily) / Math.max(1, total(daily.opens))) * 100)}%`,
+                    ])}
+                  />
+                </Disclosure>
+              </>
+            ) : (
+              <p className="notice">No app opens in this selection.</p>
+            )}
+          </Panel>
+          <div className="usage-grid">
+            <Panel className="panel usage-span">
+              <h2>Features used</h2>
+              <p>Page visits and feature moments, most used first.</p>
+              <BarList items={features.slice(0, 16)} empty="No feature use reported." />
+            </Panel>
+            <Panel className="panel">
+              <h2>Work started</h2>
+              <p>What people start from the composer.</p>
+              <BarList items={shapes} empty="No work sent in this selection." />
+              <h3>By agent</h3>
+              <BarList items={agents} empty="No work sent in this selection." />
+              <h3>Context</h3>
+              <BarList
+                items={named([...withFiles, ...withWindow]).map((entry) => ({
+                  ...entry,
+                  label: entry.key,
+                }))}
+                empty="No work sent in this selection."
+              />
+            </Panel>
+            <Panel className="panel">
+              <h2>Platforms and channels</h2>
+              <p>App opens by operating system and release channel.</p>
+              <BarList items={platforms} empty="No app opens in this selection." />
+              <h3>Settings changed</h3>
+              <BarList items={settings} empty="No preference changes reported." />
+            </Panel>
+          </div>
+          <Panel className="panel">
+            <h2>Run outcomes by agent</h2>
+            <p>
+              Runs that ended in this window. Ready to review is an agent finishing, not an accepted
+              outcome or a merge.
+            </p>
             <Table
-              label="Release activity"
-              headers={['Version', 'Channel', 'OS', 'Opens', 'Tasks started', 'Errors']}
-              rows={[...releases.values()].sort((a, b) => Number(b[3]) - Number(a[3]))}
+              label="Run outcomes by agent"
+              headers={['Agent', 'Finished', 'Failed', 'Stopped', 'Failure rate']}
+              rows={outcomes.map((row) => [
+                displayName(row.agent),
+                row.finished,
+                row.failed,
+                row.stopped,
+                `${Math.round(row.failureRate * 100)}%`,
+              ])}
             />
+          </Panel>
+          <Panel className="panel error-table">
+            <h2>Errors</h2>
+            <p>
+              Grouped by category, kind and where they happened. Messages and stack traces are never
+              collected, so a group points at an area to investigate.
+            </p>
+            {errors.length ? (
+              <Table
+                label="Errors by category"
+                headers={[
+                  'Category',
+                  'Kind',
+                  'Where',
+                  'Count',
+                  'Change',
+                  'Versions',
+                  'First seen',
+                  'Last seen',
+                ]}
+                rows={errors.map((group) => [
+                  label(group.code),
+                  group.kind ? label(group.kind) : '—',
+                  [group.operation, group.feature].filter(Boolean).map(label).join(' · ') || '—',
+                  group.total,
+                  group.trend.change === null
+                    ? group.trend.current
+                      ? 'New'
+                      : '—'
+                    : `${group.trend.change > 0 ? '+' : ''}${Math.round(group.trend.change * 100)}%`,
+                  group.versions.slice(0, 3).join(', ') +
+                    (group.versions.length > 3 ? ` +${group.versions.length - 3}` : ''),
+                  group.first,
+                  group.last,
+                ])}
+              />
+            ) : (
+              <p className="notice">No errors reported in this selection.</p>
+            )}
           </Panel>
           <Panel className="panel">
             <h2>Operation results</h2>
@@ -380,7 +530,7 @@ export function Usage() {
             <Table
               label="Operation results"
               headers={['Operation', 'Accepted', 'Failed', 'Blocked', 'Partial', 'Canceled']}
-              rows={operationCounts(metrics).map((row) => [
+              rows={operationCounts(rows).map((row) => [
                 displayName(row.operation),
                 row.accepted,
                 row.failed,
@@ -388,32 +538,6 @@ export function Usage() {
                 row.partial,
                 row.canceled,
               ])}
-            />
-          </Panel>
-          <Panel className="panel">
-            <h2>Observed task states</h2>
-            <p>
-              Transitions observed while the main window is loaded. Ready to review is an agent
-              exit, not an accepted outcome or merge. Unknown marks reports from older clients.
-              Counts are not a completion funnel.
-            </p>
-            <Table
-              label="Observed task states"
-              headers={['State', 'Agent', 'Workflow', 'Count']}
-              rows={taskCounts(metrics).map((row) => [
-                row.state === 'review' ? 'Ready to review' : displayName(row.state),
-                displayName(row.agent),
-                displayName(row.workflow),
-                row.count,
-              ])}
-            />
-          </Panel>
-          <Panel className="panel">
-            <h2>View visits and error categories</h2>
-            <Table
-              label="View visits and error categories"
-              headers={['Event / category', 'Count']}
-              rows={[...events.entries()].sort((a, b) => b[1] - a[1])}
             />
           </Panel>
         </>

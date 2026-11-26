@@ -58,6 +58,7 @@ pub(super) fn drive_with_servers(
     let mut usage_text = String::new();
     let mut usage_baseline: Option<(u64, u64)> = None;
     let mut terminal_result = None;
+    let mut calls = std::collections::HashMap::new();
     loop {
         let mut bytes = Vec::new();
         let size = match (&mut output).take(1_000_001).read_until(b'\n', &mut bytes) {
@@ -129,7 +130,12 @@ pub(super) fn drive_with_servers(
                     && expected == 3
                     && event["params"]["sessionId"].as_str() == session.as_deref()
                 {
-                    let outcome = permission(&event["params"]);
+                    let mut params = event["params"].clone();
+                    params[KNOWN_CALL] = known_call(&calls, &params["toolCall"]);
+                    let mut outcome = permission(&params);
+                    let reason = outcome
+                        .as_object_mut()
+                        .and_then(|outcome| outcome.remove(REASON));
                     let denied = outcome["outcome"] != "selected"
                         || event["params"]["options"]
                             .as_array()
@@ -145,6 +151,9 @@ pub(super) fn drive_with_servers(
                         input,
                         &json!({"jsonrpc":"2.0","id":id,"result":{"outcome":outcome}}),
                     )?;
+                    if let Some(reason) = reason.as_ref().and_then(Value::as_str) {
+                        return Err(format!("{reason}\nThe agent ends its turn when a request is declined. Change the task or the rule before continuing."));
+                    }
                     if denied {
                         return Err("Kimi permission was declined or unanswered. Review the task before continuing.".into());
                     }
@@ -174,6 +183,7 @@ pub(super) fn drive_with_servers(
                 && event["params"]["sessionId"].as_str() == session.as_deref()
             {
                 let update = &event["params"]["update"];
+                remember_call(&mut calls, update);
                 if expected == 3
                     || ([4, 5].contains(&expected) && update["sessionUpdate"] == "usage_update")
                 {
@@ -413,6 +423,7 @@ pub(super) fn consume(run: &mut TaskRun, update: &Value) {
                 .zip(update["size"].as_u64())
                 .filter(|(_, size)| *size > 0)
             {
+                super::events::observe_context(run, used, Some(size));
                 activity(run, &format!("Context: {used} of {size} tokens. This is context occupancy, not billed usage."));
             }
         }
@@ -428,7 +439,7 @@ pub(super) fn consume(run: &mut TaskRun, update: &Value) {
         }
         "jackalope_error" => {
             if let Some(failure) = super::routing::quota_failure(update) {
-                run.quota_failure = Some(failure);
+                super::usage_limit::record(run, failure);
             }
         }
         "jackalope_session" => run.session_id = update["sessionId"].as_str().map(str::to_string),
@@ -462,6 +473,79 @@ pub(super) fn consume(run: &mut TaskRun, update: &Value) {
         },
         _ => {}
     }
+}
+
+/// Where [`permission`] puts a tool rule's denial reason in its outcome.
+const REASON: &str = "jackalopeRuleReason";
+
+/// Where `drive_with_servers` gives [`permission`] the requested tool call
+/// merged with what earlier updates reported about it. Never sent to the agent.
+const KNOWN_CALL: &str = "jackalopeKnownCall";
+
+/// Calls remembered at once; a turn's permission request follows its own call.
+const KNOWN_CALLS: usize = 16;
+
+/// Keeps what `tool_call` updates report about each call, because a permission
+/// request carries only some fields (Kimi sends only the title and a diff or
+/// description). Kimi reports no `rawInput`; it streams the call's JSON
+/// arguments as the text content, so those are kept instead.
+fn remember_call(calls: &mut std::collections::HashMap<String, Value>, update: &Value) {
+    if !matches!(
+        update["sessionUpdate"].as_str(),
+        Some("tool_call" | "tool_call_update")
+    ) {
+        return;
+    }
+    let Some(id) = update["toolCallId"].as_str() else {
+        return;
+    };
+    if calls.len() >= KNOWN_CALLS && !calls.contains_key(id) {
+        calls.clear();
+    }
+    // A `tool_call` starts a call; a reused ID must not keep an earlier call's arguments.
+    if update["sessionUpdate"] == "tool_call" {
+        calls.remove(id);
+    }
+    let known = calls.entry(id.to_string()).or_insert_with(|| json!({}));
+    for key in ["kind", "title", "rawInput", "locations"] {
+        if !update[key].is_null() {
+            known[key] = update[key].clone();
+        }
+    }
+    if let Some([item]) = update["content"].as_array().map(Vec::as_slice) {
+        if let Some(arguments) = item["content"]["text"]
+            .as_str()
+            .and_then(|text| serde_json::from_str::<Value>(text).ok())
+            .filter(Value::is_object)
+        {
+            known["arguments"] = arguments;
+        }
+    }
+}
+
+/// The requested call over what was known about it; reported arguments stand
+/// in for a missing `rawInput`.
+fn known_call(calls: &std::collections::HashMap<String, Value>, tool_call: &Value) -> Value {
+    let mut call = tool_call["toolCallId"]
+        .as_str()
+        .and_then(|id| calls.get(id))
+        .cloned()
+        .unwrap_or_else(|| json!({}));
+    for (key, value) in tool_call.as_object().into_iter().flatten() {
+        if !value.is_null() {
+            call[key] = value.clone();
+        }
+    }
+    if call["rawInput"].is_null() && call["arguments"].is_object() {
+        call["rawInput"] = call["arguments"].take();
+    }
+    call
+}
+
+/// The tool call a permission request asks about, merged with what earlier
+/// updates reported about it, for tool rules, the risk check and the question.
+fn requested_call(params: &Value) -> &Value {
+    params.get(KNOWN_CALL).unwrap_or(&params["toolCall"])
 }
 
 pub(super) fn permission(runtime: &TaskRuntime, run_id: &str, params: &Value) -> Value {
@@ -501,7 +585,36 @@ pub(super) fn permission(runtime: &TaskRuntime, run_id: &str, params: &Value) ->
     if options.is_empty() {
         return json!({"outcome":"cancelled"});
     }
-    let tool_call = &params["toolCall"];
+    let tool_call = requested_call(params);
+    let detail = crate::commands::permission_risk::label("", &tool_call["rawInput"]);
+    let label = match detail.trim_start_matches(": ") {
+        "" => tool_call["title"].as_str().unwrap_or("Tool").to_string(),
+        detail => match crate::commands::knowledge::tool_rules::acp_tool(tool_call) {
+            "" => format!("Tool: {detail}"),
+            tool => format!("{tool}: {detail}"),
+        },
+    };
+    // ACP has no field for a reason, so the agent sees a rejection; the reason
+    // rides along under `REASON` for the attempt's error and is removed before sending.
+    if let Some(reason) = crate::commands::knowledge::tool_rules::check_request(
+        runtime,
+        run_id,
+        &label,
+        |workspace| crate::commands::knowledge::tool_rules::ToolCall::acp(tool_call, workspace),
+    ) {
+        let mut outcome = params["options"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .find(|option| option["kind"] == "reject_once")
+            .and_then(|option| option["optionId"].as_str())
+            .map_or_else(
+                || json!({"outcome":"cancelled"}),
+                |reject| json!({"outcome":"selected","optionId":reject}),
+            );
+        outcome[REASON] = json!(reason);
+        return outcome;
+    }
     let allow_once = params["options"]
         .as_array()
         .into_iter()
@@ -510,12 +623,6 @@ pub(super) fn permission(runtime: &TaskRuntime, run_id: &str, params: &Value) ->
         .and_then(|option| option["optionId"].as_str());
     let mut escalation = None;
     if let Some(allow_once) = allow_once {
-        let label = format!(
-            "{}: {}",
-            tool_call["title"].as_str().unwrap_or("Tool"),
-            crate::commands::permission_risk::label("", &tool_call["rawInput"])
-                .trim_start_matches(": ")
-        );
         match crate::commands::permission_risk::decide(runtime, run_id, &label, |scope| {
             crate::commands::permission_risk::assess_acp(tool_call, scope)
         }) {
@@ -532,13 +639,13 @@ pub(super) fn permission(runtime: &TaskRuntime, run_id: &str, params: &Value) ->
         .collect();
     let question = format!(
         "Kimi requests permission: {}\n{}{}",
-        params["toolCall"]["title"]
+        tool_call["title"]
             .as_str()
             .unwrap_or("Tool action")
             .chars()
             .take(500)
             .collect::<String>(),
-        params["toolCall"]["rawInput"]
+        tool_call["rawInput"]
             .to_string()
             .chars()
             .take(3000)
@@ -947,6 +1054,295 @@ mod tests {
         }
     }
 
+    /// Kimi's shapes (kimi_cli/acp/session.py): `tool_call` updates carry the
+    /// title and the streamed JSON arguments as text; the permission request
+    /// carries only the id, the title and a diff or a description.
+    #[test]
+    fn kimi_permission_requests_are_checked_with_the_arguments_streamed_before_them() {
+        use crate::commands::knowledge::tool_rules::{ToolCall, ToolKind};
+        let update = |value: Value| json!({"method":"session/update","params":{"sessionId":"new","update":value}});
+        let text = |text: &str| json!([{"type":"content","content":{"type":"text","text":text}}]);
+        let ask = |id: &str, call: Value| json!({"id":id,"method":"session/request_permission","params":{"sessionId":"new","toolCall":call,"options":[{"optionId":"approve","name":"Approve once","kind":"allow_once"},{"optionId":"reject","name":"Reject","kind":"reject_once"}]}});
+        let mut seen = Vec::new();
+        drive(
+            transcript(&[
+                json!({"id":0,"result":{"protocolVersion":1}}),
+                json!({"id":1,"result":{"sessionId":"new"}}),
+                update(json!({"sessionUpdate":"tool_call","toolCallId":"turn/1","title":"Shell","status":"in_progress","content":text("{\"command\": \"npm")})),
+                update(json!({"sessionUpdate":"tool_call_update","toolCallId":"turn/1","title":"Shell: npm install left-pad","status":"in_progress","content":text("{\"command\": \"npm install left-pad\"}")})),
+                ask("p1", json!({"toolCallId":"turn/1","title":"Shell: npm install left-pad","content":text("Requesting approval to perform: Run command `npm install left-pad`")})),
+                update(json!({"sessionUpdate":"tool_call","toolCallId":"turn/2","title":"StrReplaceFile: src/a.ts","status":"in_progress","content":text("{\"path\": \"/work/src/a.ts\", \"edit\": [{\"old\": \"a\", \"new\": \"console.log(a)\"}, {\"old\": \"b\", \"new\": \"c\"}]}")})),
+                ask("p2", json!({"toolCallId":"turn/2","title":"StrReplaceFile: src/a.ts","content":[{"type":"diff","path":"/work/src/a.ts","oldText":"a\nb","newText":"console.log(a)\nc"}]})),
+                update(json!({"sessionUpdate":"tool_call","toolCallId":"turn/3","title":"WriteFile: notes/../src/b.ts","status":"in_progress","content":text("{\"path\": \"/work/notes/../src/b.ts\", \"content\": \"export {}\"}")})),
+                ask("p3", json!({"toolCallId":"turn/3","title":"WriteFile: src/b.ts","content":[{"type":"diff","path":"/work/src/b.ts","oldText":"","newText":"export {}"}]})),
+                // A request with no earlier update still reads its diff.
+                ask("p4", json!({"toolCallId":"turn/4","title":"StrReplaceFile: src/c.ts","content":[{"type":"diff","path":"/work/src/c.ts","oldText":"x","newText":"y"}]})),
+                json!({"id":3,"result":{"stopReason":"end_turn"}}),
+            ]),
+            &mut Vec::new(),
+            "/work",
+            None,
+            None,
+            "Task",
+            |_| {},
+            |params| {
+                seen.push(ToolCall::acp(&params[KNOWN_CALL], "/work").unwrap());
+                json!({"outcome":"selected","optionId":"approve"})
+            },
+        )
+        .unwrap();
+        let call = |kind, text: &str, paths: &[&str]| ToolCall {
+            kinds: vec![kind],
+            text: text.into(),
+            paths: paths.iter().map(|path| path.to_string()).collect(),
+        };
+        assert_eq!(
+            seen,
+            [
+                call(ToolKind::Shell, "npm install left-pad", &[]),
+                call(ToolKind::Edit, "console.log(a)\nc", &["src/a.ts"]),
+                call(ToolKind::Write, "export {}", &["src/b.ts"]),
+                call(ToolKind::Edit, "y", &["src/c.ts"]),
+            ]
+        );
+    }
+
+    /// Kimi's permission requests carry no `kind` or `rawInput`, so the
+    /// automatic risk check must read the arguments streamed before them.
+    #[test]
+    fn kimi_permission_requests_are_risk_checked_with_the_arguments_streamed_before_them() {
+        use crate::commands::permission_risk::{assess_acp, Scope, Verdict};
+        let update = |value: Value| json!({"method":"session/update","params":{"sessionId":"new","update":value}});
+        let text = |text: &str| json!([{"type":"content","content":{"type":"text","text":text}}]);
+        let ask = |id: &str, call: Value| json!({"id":id,"method":"session/request_permission","params":{"sessionId":"new","toolCall":call,"options":[{"optionId":"approve","name":"Approve once","kind":"allow_once"},{"optionId":"reject","name":"Reject","kind":"reject_once"}]}});
+        let streamed = |id: &str, title: &str, arguments: &str, request: Value| {
+            [
+                update(
+                    json!({"sessionUpdate":"tool_call","toolCallId":id,"title":title,"status":"in_progress","content":text(arguments)}),
+                ),
+                ask(id, request),
+            ]
+        };
+        let mut events = vec![
+            json!({"id":0,"result":{"protocolVersion":1}}),
+            json!({"id":1,"result":{"sessionId":"new"}}),
+        ];
+        events.extend(streamed(
+            "turn/1",
+            "Shell: rm -rf ~",
+            "{\"command\": \"rm -rf ~\"}",
+            json!({"toolCallId":"turn/1","title":"Shell: rm -rf ~","content":text("Requesting approval to perform: Run command `rm -rf ~`")}),
+        ));
+        events.extend(streamed(
+            "turn/2",
+            "WriteFile: /srv/other/app.ts",
+            "{\"path\": \"/srv/other/app.ts\", \"content\": \"export {}\"}",
+            json!({"toolCallId":"turn/2","title":"WriteFile: /srv/other/app.ts","content":[{"type":"diff","path":"/srv/other/app.ts","oldText":"","newText":"export {}"}]}),
+        ));
+        events.extend(streamed(
+            "turn/3",
+            "StrReplaceFile: /work/../other/a.ts",
+            "{\"path\": \"/work/../other/a.ts\", \"edit\": {\"old\": \"a\", \"new\": \"b\"}}",
+            json!({"toolCallId":"turn/3","title":"StrReplaceFile: /work/../other/a.ts"}),
+        ));
+        events.extend(streamed(
+            "turn/4",
+            "ReadFile: src/a.ts",
+            "{\"path\": \"/work/src/a.ts\"}",
+            json!({"toolCallId":"turn/4","title":"ReadFile: src/a.ts"}),
+        ));
+        events.extend(streamed(
+            "turn/5",
+            "StrReplaceFile: src/a.ts",
+            "{\"path\": \"/work/src/a.ts\", \"edit\": [{\"old\": \"a\", \"new\": \"b\"}]}",
+            json!({"toolCallId":"turn/5","title":"StrReplaceFile: src/a.ts","content":[{"type":"diff","path":"/work/src/a.ts","oldText":"a","newText":"b"}]}),
+        ));
+        events.extend(streamed(
+            "turn/6",
+            "Shell: pnpm test",
+            "{\"command\": \"pnpm test\"}",
+            json!({"toolCallId":"turn/6","title":"Shell: pnpm test","content":text("Requesting approval to perform: Run command `pnpm test`")}),
+        ));
+        // Requests whose arguments were never streamed.
+        events.push(ask(
+            "turn/7",
+            json!({"toolCallId":"turn/7","title":"Shell: pnpm test","content":text("Requesting approval to perform: Run command `pnpm test`")}),
+        ));
+        events.push(ask(
+            "turn/8",
+            json!({"toolCallId":"turn/8","title":"WriteFile: src/b.ts"}),
+        ));
+        events.push(ask(
+            "turn/9",
+            json!({"toolCallId":"turn/9","title":"deploy_site"}),
+        ));
+        events.push(json!({"id":3,"result":{"stopReason":"end_turn"}}));
+        let mut verdicts = Vec::new();
+        drive(
+            transcript(&events),
+            &mut Vec::new(),
+            "/work",
+            None,
+            None,
+            "Task",
+            |_| {},
+            |params| {
+                let scope = Scope::new(std::path::Path::new("/work"));
+                verdicts.push((
+                    params["toolCall"]["toolCallId"]
+                        .as_str()
+                        .unwrap()
+                        .to_string(),
+                    assess_acp(requested_call(params), &scope),
+                ));
+                json!({"outcome":"selected","optionId":"approve"})
+            },
+        )
+        .unwrap();
+        let routine: Vec<&str> = verdicts
+            .iter()
+            .filter(|(_, verdict)| *verdict == Verdict::Routine)
+            .map(|(id, _)| id.as_str())
+            .collect();
+        assert_eq!(routine, ["turn/4", "turn/5", "turn/6"], "{verdicts:?}");
+        assert_eq!(verdicts.len(), 9);
+    }
+
+    /// The whole path: the driver merges the streamed arguments and
+    /// [`permission`] gives that merged call to the risk check.
+    #[test]
+    fn kimi_auto_approval_asks_for_a_destructive_command_streamed_before_its_request() {
+        let folder =
+            std::env::temp_dir().join(format!("jackalope-kimi-risk-{}", uuid::Uuid::new_v4()));
+        let workspace = folder.join("work");
+        std::fs::create_dir_all(&workspace).unwrap();
+        let runtime = TaskRuntime::new(folder.join("history")).unwrap();
+        let mut run = super::super::tests::sample("kimi");
+        run.id = "kimi-risk".into();
+        run.project_id = "fixture".into();
+        run.workspace = workspace.to_string_lossy().into_owned();
+        runtime.insert_for_test(run);
+        let update = |value: Value| json!({"method":"session/update","params":{"sessionId":"new","update":value}});
+        let text = |text: &str| json!([{"type":"content","content":{"type":"text","text":text}}]);
+        let ask = |id: &str, title: &str| json!({"id":id,"method":"session/request_permission","params":{"sessionId":"new","toolCall":{"toolCallId":id,"title":title,"content":text("Requesting approval")},"options":[{"optionId":"approve","name":"Approve once","kind":"allow_once"},{"optionId":"reject","name":"Reject","kind":"reject_once"}]}});
+        let mut outcomes = Vec::new();
+        let error = drive(
+            transcript(&[
+                json!({"id":0,"result":{"protocolVersion":1}}),
+                json!({"id":1,"result":{"sessionId":"new"}}),
+                update(json!({"sessionUpdate":"tool_call","toolCallId":"turn/1","title":"Shell: pnpm test","content":text("{\"command\": \"pnpm test\"}")})),
+                ask("turn/1", "Shell: pnpm test"),
+                update(json!({"sessionUpdate":"tool_call","toolCallId":"turn/2","title":"Shell: rm -rf ~","content":text("{\"command\": \"rm -rf ~\"}")})),
+                ask("turn/2", "Shell: rm -rf ~"),
+                json!({"id":3,"result":{"stopReason":"end_turn"}}),
+            ]),
+            &mut Vec::new(),
+            &workspace.to_string_lossy(),
+            None,
+            None,
+            "Task",
+            |_| {},
+            |params| {
+                let outcome = permission(&runtime, "kimi-risk", params);
+                outcomes.push(outcome.clone());
+                outcome
+            },
+        )
+        .unwrap_err();
+        assert!(error.contains("declined or unanswered"), "{error}");
+        // With no process to ask through, the question goes unanswered.
+        assert_eq!(
+            outcomes,
+            [
+                json!({"outcome":"selected","optionId":"approve"}),
+                json!({"outcome":"cancelled"})
+            ]
+        );
+        let run = runtime.run_snapshot("kimi-risk").unwrap();
+        assert!(
+            run.activity
+                .iter()
+                .any(|line| line == "Auto-approved Shell: pnpm test"),
+            "{:?}",
+            run.activity
+        );
+        assert!(
+            run.activity
+                .iter()
+                .any(|line| line.starts_with("Asking: ") && line.ends_with("(Shell: rm -rf ~)")),
+            "{:?}",
+            run.activity
+        );
+        assert!(run.prompts[0].question.contains("rm -rf ~"));
+        drop(runtime);
+        std::fs::remove_dir_all(folder).unwrap();
+    }
+
+    #[test]
+    fn a_reused_call_id_never_keeps_the_earlier_call_s_arguments() {
+        let mut calls = std::collections::HashMap::new();
+        let text = |text: &str| json!([{"type":"content","content":{"type":"text","text":text}}]);
+        remember_call(
+            &mut calls,
+            &json!({"sessionUpdate":"tool_call","toolCallId":"Shell:0","title":"Shell","content":text("{\"command\": \"pnpm test\"}")}),
+        );
+        remember_call(
+            &mut calls,
+            &json!({"sessionUpdate":"tool_call_update","toolCallId":"Shell:0","content":text("not json")}),
+        );
+        let request = json!({"toolCallId":"Shell:0","title":"Shell: pnpm test"});
+        assert_eq!(
+            known_call(&calls, &request)["rawInput"],
+            json!({"command": "pnpm test"})
+        );
+        // A new call with the same ID whose arguments never parse.
+        remember_call(
+            &mut calls,
+            &json!({"sessionUpdate":"tool_call","toolCallId":"Shell:0","title":"Shell","content":text("{\"command\": \"rm -rf")}),
+        );
+        let request = json!({"toolCallId":"Shell:0","title":"Shell: rm -rf ~"});
+        let call = known_call(&calls, &request);
+        assert!(call["rawInput"].is_null(), "{call}");
+        assert_ne!(
+            crate::commands::permission_risk::assess_acp(
+                &call,
+                &crate::commands::permission_risk::Scope::new(std::path::Path::new("/work"))
+            ),
+            crate::commands::permission_risk::Verdict::Routine
+        );
+    }
+
+    #[test]
+    fn a_tool_rule_denial_is_sent_as_a_rejection_and_stops_with_its_reason() {
+        let mut sent = Vec::new();
+        let error = drive(
+            transcript(&[
+                json!({"id":0,"result":{"protocolVersion":1}}),
+                json!({"id":1,"result":{"sessionId":"new"}}),
+                json!({"id":"permission-8","method":"session/request_permission","params":{"sessionId":"new","options":[{"optionId":"yes","kind":"allow_once"},{"optionId":"no","kind":"reject_once"}]}}),
+                json!({"id":3,"result":{"stopReason":"end_turn"}}),
+            ]),
+            &mut sent,
+            "C:/workspace",
+            None,
+            None,
+            "Task",
+            |_| {},
+            |_| json!({"outcome":"selected","optionId":"no",REASON:"Project rule \"Use pnpm\": No npm."}),
+        )
+        .unwrap_err();
+        assert!(
+            error.starts_with("Project rule \"Use pnpm\": No npm."),
+            "{error}"
+        );
+        let sent = String::from_utf8(sent).unwrap();
+        let reply: Value = serde_json::from_str(sent.lines().last().unwrap()).unwrap();
+        assert_eq!(
+            reply["result"]["outcome"],
+            json!({"outcome":"selected","optionId":"no"})
+        );
+    }
+
     #[test]
     fn kimi_rejects_oversized_and_invalid_events() {
         for data in [vec![b'x'; 1_000_002], b"not json\n".to_vec(), vec![]] {
@@ -1022,7 +1418,7 @@ setInterval(()=>{},1000);
             std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o700)).unwrap();
             path
         };
-        let runtime = TaskRuntime::with_test_access(folder.join("history")).unwrap();
+        let runtime = TaskRuntime::new(folder.join("history")).unwrap();
         let mut policy = AgentPolicy::default();
         policy.custom_agents.push(CustomAgent {
             id: "kimi-fixture".into(),
@@ -1151,7 +1547,7 @@ require('readline').createInterface({input:process.stdin}).on('line', line => {
 });
 setInterval(()=>{},1000);
 "#).unwrap();
-        let runtime = TaskRuntime::with_test_access(folder.join("history")).unwrap();
+        let runtime = TaskRuntime::new(folder.join("history")).unwrap();
         let mut policy = AgentPolicy::default();
         policy.custom_agents.push(CustomAgent {
             id: "kimi-fixture".into(),
@@ -1165,6 +1561,7 @@ setInterval(()=>{},1000);
         let mut request = RunRequest {
             retry_of: None,
             handoff_focus: None,
+            reasoning_effort: None,
             continues: None,
             live_session_id: None,
             effort: None,

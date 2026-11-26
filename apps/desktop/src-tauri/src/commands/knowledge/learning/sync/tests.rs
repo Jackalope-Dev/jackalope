@@ -61,6 +61,14 @@ fn body(statement: &str) -> SyncedBody {
 }
 
 #[test]
+fn remembered_secret_values_are_not_shareable() {
+    let value = format!("orchid-{}", "q7".repeat(6));
+    assert!(shareable(&format!("Deploy with {value} first")));
+    crate::commands::redaction::injected([("JACKALOPE_FIXTURE_TOKEN", value.as_str())], &[]);
+    assert!(!shareable(&format!("Deploy with {value} first")));
+}
+
+#[test]
 fn uploads_carry_only_allowlisted_fields() {
     let (store, project) = fixture();
     let entry = learn(
@@ -334,4 +342,33 @@ fn the_project_key_comes_from_root_commits_not_the_path() {
     let (projects, unavailable) = sync_projects(&[("p".into(), project.path.clone())]);
     assert!(projects.is_empty());
     assert_eq!(unavailable, 1);
+}
+
+#[test]
+fn a_synced_copy_never_hands_a_ruled_lesson_back_to_jackalope() {
+    let (store, project) = fixture();
+    let mut entry = learn(&store, &project, "Always use pnpm instead of npm here.");
+    entry.tool_rule = Some(
+        serde_json::from_value(serde_json::json!({
+            "tools":["shell"],"pattern":"npm","message":"Use pnpm."
+        }))
+        .unwrap(),
+    );
+    let entry = store.save(entry).unwrap();
+    let mut remote = outgoing_lesson(&entry, &project.key).unwrap();
+    remote.revision = entry.revision + 1;
+    remote.updated_at = millis(&entry.updated_at) + 10;
+    remote.lesson.as_mut().unwrap().managed = true;
+    remote.lesson.as_mut().unwrap().title = "Newer title".into();
+    store
+        .sync_apply(
+            std::slice::from_ref(&project),
+            std::slice::from_ref(&remote),
+            &[],
+        )
+        .unwrap();
+    let local = store.list("p", &project.path).unwrap().remove(0);
+    assert_eq!(local.title, "Newer title");
+    assert!(!local.automatic.as_ref().unwrap().managed);
+    assert!(local.tool_rule.is_some());
 }

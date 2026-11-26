@@ -30,6 +30,16 @@ pub struct UsageObservation {
     pub cache_write: u64,
 }
 
+/// How full the agent's context was after its latest top-level model call, as the
+/// provider reported it. `window` is set only when the provider states its limit.
+#[derive(Clone, Serialize, Deserialize, Default, Debug, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct ContextUsage {
+    pub used: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub window: Option<u64>,
+}
+
 /// Where an attempt's agent ran when a project computer ran it.
 #[derive(Clone, Serialize, Deserialize, Debug, Default, PartialEq)]
 #[serde(rename_all = "camelCase")]
@@ -88,6 +98,9 @@ pub struct TaskRun {
     pub checkpoint: Option<crate::commands::checkpoint::Checkpoint>,
     #[serde(default)]
     pub checkpoint_error: Option<String>,
+    /// Turn checkpoint, conversation mark and rewinds, for "Edit from here".
+    #[serde(default, skip_serializing_if = "super::rewind::RewindState::is_empty")]
+    pub rewind: super::rewind::RewindState,
     #[serde(default)]
     pub routing: Option<super::routing::RoutingHistory>,
     #[serde(default)]
@@ -98,6 +111,14 @@ pub struct TaskRun {
     /// A provider error the agent printed as assistant text, used if the turn ends unanswered.
     #[serde(skip)]
     pub provider_error: Option<String>,
+    /// The reset of the account's used-up window in the agent's latest rate-limit
+    /// snapshot, for a quota error that does not state its own.
+    #[serde(skip)]
+    pub limit_snapshot_reset: Option<i64>,
+    /// When this attempt, stopped by a usage limit, is to be retried, in Unix seconds.
+    /// Set and cancelled by the person; see `coordination::limit_resume`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub resume_at_reset: Option<super::usage_limit::ResumeAtReset>,
     /// The CLI's own refusal to resume a session it no longer has. The attempt then starts
     /// once more as a new conversation, unless it continues a session from outside Jackalope.
     #[serde(skip)]
@@ -145,6 +166,10 @@ pub struct TaskRun {
     pub verify_command: Option<String>,
     #[serde(default)]
     pub prepare_command: Option<String>,
+    /// The project's setup and check time limits when the attempt started. Absent means
+    /// the defaults.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub time_limits: Option<crate::commands::verification::TimeLimits>,
     #[serde(default)]
     pub setup_files: Vec<String>,
     #[serde(default)]
@@ -182,12 +207,26 @@ pub struct TaskRun {
     /// cleared when the message completes into activity or `result`.
     #[serde(skip)]
     pub streaming: String,
+    /// The agent's running turn takes new messages (Codex's turn/steer). Live state only:
+    /// never read back from a saved record.
+    #[serde(
+        default,
+        skip_deserializing,
+        skip_serializing_if = "std::ops::Not::not"
+    )]
+    pub steerable: bool,
     /// Labels of tool calls still waiting for their result, by call id, so a failed
     /// result can name the step. Kept in memory only.
     #[serde(skip)]
     pub pending_tools: std::collections::HashMap<String, String>,
     #[serde(default)]
     pub details_omitted: bool,
+    /// A conversation snapshot left `result` out to bound its size; the full reply has
+    /// `result_chars` characters and is read with `live_session_results`. Never saved.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub result_omitted: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub result_chars: Option<usize>,
     pub activity: Vec<String>,
     #[serde(default)]
     pub diagnostics: Vec<String>,
@@ -199,6 +238,8 @@ pub struct TaskRun {
     pub mcp_usage: Option<crate::commands::mcp_broker::BrokerUsage>,
     #[serde(default)]
     pub usage_observations: Vec<UsageObservation>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub context: Option<ContextUsage>,
     #[serde(default)]
     pub prompts: Vec<crate::commands::harness::PendingUserPrompt>,
     /// Questions whose ask returned to the agent unanswered and whose answer has
@@ -231,6 +272,9 @@ pub struct TaskRun {
     /// The result this attempt challenges, when it is a Challenge reviewer.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub challenge_of: Option<crate::commands::challenge_review::ChallengeSource>,
+    /// The turn advisor's review of this attempt, when the project has one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub advisor: Option<crate::commands::turn_advisor::AdvisorReview>,
     /// Secret values the agent was given, which the record never shows. Kept
     /// in memory only, for as long as the attempt can still produce output.
     #[serde(skip)]
@@ -358,6 +402,10 @@ pub struct RunRequest {
     /// (a quota handoff, a lost session or a retry of preserved work). Ignored otherwise.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub handoff_focus: Option<String>,
+    /// A provider effort level the person chose for this send (one of
+    /// `effort::CHOOSABLE`); it wins over the task approach's level.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reasoning_effort: Option<String>,
     /// A first attempt that resumes a session from outside Jackalope where it ran.
     #[serde(skip)]
     pub continues: Option<ContinuedSession>,
@@ -405,6 +453,7 @@ impl RunRequest {
             previous_run_id: None,
             retry_of: None,
             handoff_focus: None,
+            reasoning_effort: None,
             continues: None,
             connection_ids: None,
             coordination: None,
@@ -418,6 +467,15 @@ pub struct CoordinationContext {
     pub endpoint: String,
     pub token: String,
     pub instructions: String,
+}
+
+/// Where one attempt of a task stands, without its record.
+#[derive(Clone, Debug)]
+pub struct AttemptState {
+    pub id: String,
+    pub started_at: String,
+    pub status: RunStatus,
+    pub archived: bool,
 }
 
 /// Lightweight summary of a run that retention moved out of the loaded history
@@ -486,10 +544,13 @@ impl TaskRun {
             dependency_snapshot: self.dependency_snapshot.clone(),
             checkpoint: self.checkpoint.clone(),
             checkpoint_error: self.checkpoint_error.clone(),
+            rewind: self.rewind.clone(),
             routing: self.routing.clone(),
             quota_failure: self.quota_failure.clone(),
             failure_kind: self.failure_kind,
             provider_error: None,
+            limit_snapshot_reset: None,
+            resume_at_reset: self.resume_at_reset.clone(),
             session_refused: None,
             handoff_context: None,
             contract: self.contract.clone(),
@@ -514,6 +575,7 @@ impl TaskRun {
             host: self.host.clone(),
             verify_command: self.verify_command.clone(),
             prepare_command: self.prepare_command.clone(),
+            time_limits: self.time_limits,
             setup_files: self.setup_files.clone(),
             auto_verify: self.auto_verify.clone(),
             non_code: self.non_code,
@@ -532,8 +594,11 @@ impl TaskRun {
             session_id: self.session_id.clone(),
             result: Default::default(),
             streaming: String::new(),
+            steerable: self.steerable,
             pending_tools: Default::default(),
             details_omitted: true,
+            result_omitted: false,
+            result_chars: None,
             activity: if self.status.is_active() {
                 self.activity
                     .iter()
@@ -552,6 +617,7 @@ impl TaskRun {
             usage: self.usage.clone(),
             mcp_usage: self.mcp_usage.clone(),
             usage_observations: self.usage_observations.clone(),
+            context: self.context.clone(),
             prompts: self.prompts.clone(),
             awaiting_answers: self.awaiting_answers.clone(),
             validation_steps: self.validation_steps.clone(),
@@ -564,6 +630,7 @@ impl TaskRun {
             review_captures: self.review_captures.clone(),
             review_capturing: self.review_capturing,
             challenge_of: self.challenge_of.clone(),
+            advisor: self.advisor.clone(),
             secrets: None,
         }
     }

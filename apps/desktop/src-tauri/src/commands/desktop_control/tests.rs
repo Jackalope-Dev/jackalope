@@ -711,7 +711,7 @@ fn desktop_release_cancels_inflight_work_before_releasing_its_lease() {
 async fn desktop_bridge_rejects_unauthorized_and_missing_attempts_before_access() {
     let directory =
         std::env::temp_dir().join(format!("jackalope-desktop-auth-{}", uuid::Uuid::new_v4()));
-    let runtime = TaskRuntime::with_test_access(directory.join("runs")).unwrap();
+    let runtime = TaskRuntime::new(directory.join("runs")).unwrap();
     assert!(session(&runtime, "missing", true).is_err());
     let service =
         super::super::coordination::Coordinator::new(directory.join("queue"), runtime.clone())
@@ -731,6 +731,67 @@ async fn desktop_bridge_rejects_unauthorized_and_missing_attempts_before_access(
     std::fs::remove_dir_all(directory).unwrap();
 }
 
+/// Starts the resident Windows helper, which compiles its C# source, so a change that
+/// breaks the helper fails here, with the compiler's message, rather than on someone's
+/// computer.
+#[cfg(windows)]
+#[test]
+fn the_windows_helper_compiles_and_lists_windows() {
+    use std::io::Write;
+    use std::process::Stdio;
+    let launch = (platform::launcher().unwrap())().unwrap();
+    let mut command = launch.command;
+    let mut child = command
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap();
+    {
+        let mut stdin = child.stdin.take().unwrap();
+        for line in &launch.preamble {
+            writeln!(stdin, "{line}").unwrap();
+        }
+        let request = json!({"id":1,"action":"list","deny":[std::process::id()]});
+        writeln!(stdin, "{request}").unwrap();
+    }
+    let output = child.wait_with_output().unwrap();
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        stdout.contains("\"windows\""),
+        "helper output: {stdout}\nerrors: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
+/// Compiles the Windows indicator the way a grant does, without showing it.
+#[cfg(windows)]
+#[test]
+fn the_windows_indicator_compiles() {
+    let directory =
+        std::env::temp_dir().join(format!("jackalope-indicator-{}", uuid::Uuid::new_v4()));
+    std::fs::create_dir_all(&directory).unwrap();
+    let source = directory.join("indicator.cs");
+    std::fs::write(&source, include_str!("indicator.cs")).unwrap();
+    let powershell = std::path::PathBuf::from(std::env::var_os("SystemRoot").unwrap())
+        .join("System32/WindowsPowerShell/v1.0/powershell.exe");
+    let output = crate::commands::process_control::hidden(&mut std::process::Command::new(powershell))
+        .args(["-NoProfile", "-NonInteractive", "-Command"])
+        .arg(format!(
+            "$ErrorActionPreference='Stop'; Add-Type -ReferencedAssemblies System.Drawing,System.Windows.Forms -TypeDefinition ([IO.File]::ReadAllText('{}'))",
+            source.display()
+        ))
+        .output()
+        .unwrap();
+    let _ = std::fs::remove_dir_all(&directory);
+    assert!(
+        output.status.success(),
+        "{}{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
 /// Opens a disposable form, starts a real indicator and drives the resident
 /// helper through every Windows action, printing per-action latency.
 #[cfg(windows)]
@@ -747,15 +808,18 @@ fn native_desktop_window_trial() {
     let report = directory.join("result.txt");
     let powershell = std::path::PathBuf::from(std::env::var_os("SystemRoot").unwrap())
         .join("System32/WindowsPowerShell/v1.0/powershell.exe");
-    let mut child = crate::commands::process_control::hidden(&mut Command::new(powershell))
-        .args(["-NoProfile", "-File"])
-        .arg(fixture)
-        .env("JACKALOPE_DESKTOP_FIXTURE_TITLE", &title)
-        .env("JACKALOPE_DESKTOP_FIXTURE_RESULT", &report)
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .spawn()
-        .unwrap();
+    let open_fixture = |title: &str, report: &std::path::Path| {
+        crate::commands::process_control::hidden(&mut Command::new(&powershell))
+            .args(["-NoProfile", "-File"])
+            .arg(&fixture)
+            .env("JACKALOPE_DESKTOP_FIXTURE_TITLE", title)
+            .env("JACKALOPE_DESKTOP_FIXTURE_RESULT", report)
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn()
+            .unwrap()
+    };
+    let mut child = open_fixture(&title, &report);
     // The job object closes the fixture even if an assertion unwinds past cleanup.
     let tree = super::super::process_control::ProcessTree::attach(&child).unwrap();
     let canceled = AtomicBool::new(false);
@@ -843,6 +907,61 @@ fn native_desktop_window_trial() {
         typed["text"] = json!(literal);
         call(typed).unwrap();
         wait_for_fixture_text(&report, literal);
+
+        // Another window takes the foreground; the fixture still takes a click and typing
+        // where it is, sent to its controls without moving the pointer or focus.
+        let cover_title = format!("Jackalope desktop cover {}", uuid::Uuid::new_v4());
+        let mut cover = open_fixture(&cover_title, &directory.join("cover.txt"));
+        let cover_tree = super::super::process_control::ProcessTree::attach(&cover).unwrap();
+        for _ in 0..20 {
+            let listed = call(json!({"action":"list"})).unwrap();
+            if listed["windows"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|w| w["title"] == cover_title)
+            {
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(200));
+        }
+        std::thread::sleep(Duration::from_secs(1));
+        let center = |reference: &str| {
+            let bounds: Vec<i64> = items.iter().find(|e| e["ref"] == reference).unwrap()["bounds"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|v| v.as_i64().unwrap())
+                .collect();
+            (bounds[0] + bounds[2] / 2, bounds[1] + bounds[3] / 2)
+        };
+        let behind = |action: &str| {
+            let mut payload = base(action);
+            payload["background"] = json!(true);
+            payload
+        };
+        let mut click = behind("click");
+        let (x, y) = center(&button);
+        click["x"] = json!(x);
+        click["y"] = json!(y);
+        assert_eq!(call(click).unwrap()["focusChanged"], false);
+        wait_for_fixture_text(&report, "button invoked");
+        let mut field = behind("click");
+        let (x, y) = center(&editor);
+        field["x"] = json!(x);
+        field["y"] = json!(y);
+        call(field).unwrap();
+        let mut end = behind("press");
+        end["chord"] = json!({"modifiers":[],"key":"End"});
+        call(end).unwrap();
+        let mut typed = behind("type");
+        typed["text"] = json!(" posted");
+        call(typed).unwrap();
+        wait_for_fixture_text(&report, &format!("{literal} posted"));
+        cover_tree.terminate();
+        let _ = cover.kill();
+        let _ = cover.wait();
+
         let mut protected = base("set_value");
         protected["element"] = json!(password);
         protected["text"] = json!("must not enter");
@@ -888,7 +1007,127 @@ fn native_desktop_window_trial() {
     }
 }
 
-#[cfg(windows)]
+/// Opens a disposable AppKit window that never activates, starts a real indicator, and
+/// drives the bundled helper's background input: a click and typing reach the window while
+/// another app stays in front, and the pointer never moves.
+#[cfg(target_os = "macos")]
+#[test]
+#[ignore = "Opens and controls a disposable macOS window; requires desktop-control permissions"]
+fn native_desktop_background_trial() {
+    use std::process::{Command, Stdio};
+    let directory =
+        std::env::temp_dir().join(format!("jackalope-desktop-trial-{}", uuid::Uuid::new_v4()));
+    std::fs::create_dir_all(&directory).unwrap();
+    let source = directory.join("fixture.swift");
+    std::fs::write(&source, include_str!("fixture.swift")).unwrap();
+    // A minimal app bundle: only windows of apps with a bundle ID are attachable.
+    let contents = directory.join("Fixture.app/Contents");
+    std::fs::create_dir_all(contents.join("MacOS")).unwrap();
+    std::fs::write(
+        contents.join("Info.plist"),
+        r#"<?xml version="1.0" encoding="UTF-8"?>
+<plist version="1.0"><dict><key>CFBundleIdentifier</key><string>dev.jackalope.desktop-fixture</string><key>CFBundleExecutable</key><string>fixture</string><key>CFBundleName</key><string>Jackalope fixture</string></dict></plist>
+"#,
+    )
+    .unwrap();
+    let program = contents.join("MacOS/fixture");
+    assert!(Command::new("xcrun")
+        .args(["swiftc", "-O"])
+        .arg(&source)
+        .arg("-o")
+        .arg(&program)
+        .status()
+        .unwrap()
+        .success());
+    let title = format!("Jackalope desktop fixture {}", uuid::Uuid::new_v4());
+    let report = directory.join("result.txt");
+    let mut child = Command::new(&program)
+        .env("JACKALOPE_DESKTOP_FIXTURE_TITLE", &title)
+        .env("JACKALOPE_DESKTOP_FIXTURE_RESULT", &report)
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn()
+        .unwrap();
+    let canceled = AtomicBool::new(false);
+    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        let mut helper = helper::Helper::new(platform::launcher().unwrap());
+        let mut call = |payload: Value| {
+            helper
+                .call(&payload, Duration::from_secs(20), &canceled)
+                .map_err(String::from)
+        };
+        let mut target = None;
+        for _ in 0..40 {
+            let listed = call(json!({"action":"list","deny":[std::process::id()]})).unwrap();
+            target = listed["windows"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .find(|w| w["title"] == title)
+                .cloned();
+            if target.is_some() {
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(250));
+        }
+        let target = target.expect("Fixture window appeared");
+        let window: Window = serde_json::from_value(target.clone()).unwrap();
+        assert!(grant::background_input(&window));
+        // Resumes at once, as a remembered grant does, and leaves the window where it is.
+        let mut granted = Grant::from_choice(Choice::Window(window));
+        granted.resume = true;
+        let mut indicator = indicator::Indicator::start(&granted).unwrap();
+        let mut state = indicator.state().unwrap();
+        for _ in 0..40 {
+            if state.status == "active" {
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(250));
+            state = indicator.state().unwrap();
+        }
+        assert_eq!(state.status, "active");
+        let base = |action: &str| json!({"action":action,"window":target,"scope":"window","surface":"window","background":true,"guard":indicator.guard(state.epoch),"deny":[std::process::id()]});
+        let snap = call(base("snapshot")).unwrap();
+        let items = snap["elements"].as_array().unwrap().clone();
+        let center = |role: &str| {
+            let element = items.iter().find(|e| e["role"] == role).unwrap();
+            let bounds: Vec<f64> = element["bounds"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|v| v.as_f64().unwrap())
+                .collect();
+            (bounds[0] + bounds[2] / 2.0, bounds[1] + bounds[3] / 2.0)
+        };
+        let click = |role: &str| {
+            let (x, y) = center(role);
+            let mut payload = base("click");
+            payload["x"] = json!(x);
+            payload["y"] = json!(y);
+            payload
+        };
+        let pressed = call(click("AXButton")).unwrap();
+        assert_eq!(pressed["focusChanged"], false);
+        wait_for_fixture_text(&report, "button invoked");
+        call(click("AXTextField")).unwrap();
+        let mut typed = base("type");
+        typed["text"] = json!("typed behind");
+        assert_eq!(call(typed).unwrap()["focusChanged"], false);
+        wait_for_fixture_text(&report, "typed behind");
+        let mut enter = base("press");
+        enter["chord"] = json!({"modifiers":[],"key":"Enter"});
+        call(enter).unwrap();
+        drop(indicator);
+    }));
+    let _ = child.kill();
+    let _ = child.wait();
+    let _ = std::fs::remove_dir_all(&directory);
+    if let Err(panic) = result {
+        std::panic::resume_unwind(panic);
+    }
+}
+
+#[cfg(any(windows, target_os = "macos"))]
 fn wait_for_fixture_text(path: &std::path::Path, expected: &str) {
     for _ in 0..100 {
         if std::fs::read_to_string(path).ok().as_deref() == Some(expected) {
@@ -927,6 +1166,11 @@ fn only_system_settings_links_open_natively() {
     }
 }
 
+/// Whether an action waits for a window that does not take background input.
+fn needs_focus_in_front(request: &DesktopRequest) -> bool {
+    needs_focus(request, false)
+}
+
 fn desktop(action: &str, element: Option<&str>) -> DesktopRequest {
     DesktopRequest {
         action: action.into(),
@@ -937,14 +1181,14 @@ fn desktop(action: &str, element: Option<&str>) -> DesktopRequest {
 
 #[test]
 fn only_raw_pointer_and_keyboard_input_needs_the_window_in_front() {
-    assert!(needs_focus(&desktop("click", None)));
+    assert!(needs_focus_in_front(&desktop("click", None)));
     assert!(
-        !needs_focus(&desktop("click", Some("e3"))),
+        !needs_focus_in_front(&desktop("click", Some("e3"))),
         "a ref click can press through Accessibility"
     );
-    assert!(needs_focus(&desktop("double_click", Some("e3"))));
-    assert!(needs_focus(&desktop("type", None)));
-    assert!(!needs_focus(&desktop("type", Some("e3"))));
+    assert!(needs_focus_in_front(&desktop("double_click", Some("e3"))));
+    assert!(needs_focus_in_front(&desktop("type", None)));
+    assert!(!needs_focus_in_front(&desktop("type", Some("e3"))));
     for action in [
         "press",
         "drag",
@@ -953,7 +1197,7 @@ fn only_raw_pointer_and_keyboard_input_needs_the_window_in_front() {
         "switch_window",
         "open_app",
     ] {
-        assert!(needs_focus(&desktop(action, None)), "{action}");
+        assert!(needs_focus_in_front(&desktop(action, None)), "{action}");
     }
     for action in [
         "snapshot",
@@ -964,7 +1208,73 @@ fn only_raw_pointer_and_keyboard_input_needs_the_window_in_front() {
         "set_value",
         "list_windows",
     ] {
-        assert!(!needs_focus(&desktop(action, Some("e1"))), "{action}");
+        assert!(
+            !needs_focus_in_front(&desktop(action, Some("e1"))),
+            "{action}"
+        );
+    }
+}
+
+#[test]
+fn a_window_that_takes_background_input_waits_only_to_be_raised() {
+    for action in [
+        "click",
+        "double_click",
+        "right_click",
+        "drag",
+        "scroll",
+        "type",
+        "switch_window",
+    ] {
+        assert!(!needs_focus(&desktop(action, None), true), "{action}");
+    }
+    let mut key = desktop("press", None);
+    key.key = Some("Enter".into());
+    assert!(!needs_focus(&key, true));
+    key.key = Some("Primary+a".into());
+    assert_eq!(
+        needs_focus(&key, true),
+        cfg!(windows),
+        "chords wait on Windows only"
+    );
+    assert_eq!(needs_focus(&desktop("open_app", None), true), cfg!(windows));
+    assert!(
+        needs_focus(&desktop("focus", None), true),
+        "focusing always raises"
+    );
+    assert!(!needs_focus(&desktop("focus", Some("e1")), true));
+}
+
+#[test]
+fn safari_firefox_and_store_app_windows_never_take_background_input() {
+    let window = |app: &str, class: &str| {
+        let mut window = window_of("7", 7, "Page");
+        window.app = app.into();
+        window.class = class.into();
+        window
+    };
+    let supported = cfg!(any(windows, target_os = "macos"));
+    for (app, class) in [
+        ("com.google.Chrome", "com.google.Chrome"),
+        ("com.tinyspeck.slackmacgap", "com.tinyspeck.slackmacgap"),
+        ("chrome", "Chrome_WidgetWin_1"),
+        ("notepad", "Notepad"),
+    ] {
+        assert_eq!(
+            grant::background_input(&window(app, class)),
+            supported,
+            "{app}"
+        );
+    }
+    for (app, class) in [
+        ("com.apple.Safari", "com.apple.Safari"),
+        ("org.mozilla.firefox", "org.mozilla.firefox"),
+        ("app.zen-browser.zen", "app.zen-browser.zen"),
+        ("firefox", "MozillaWindowClass"),
+        ("calculator", "ApplicationFrameWindow"),
+        ("myapp", "WinUIDesktopWin32WindowClass"),
+    ] {
+        assert!(!grant::background_input(&window(app, class)), "{app}");
     }
 }
 
@@ -1040,11 +1350,14 @@ fn element_actions_try_their_accessibility_path_in_the_background() {
     // Scroll, type and focus with an element reach the helper, which scrolls the scroll area,
     // appends to the value or focuses without raising, and refuses otherwise.
     for action in ["scroll", "type", "focus", "click"] {
-        assert!(!needs_focus(&desktop(action, Some("e2"))), "{action}");
+        assert!(
+            !needs_focus_in_front(&desktop(action, Some("e2"))),
+            "{action}"
+        );
     }
     // Raising or opening a window never happens while the person works elsewhere.
-    assert!(needs_focus(&desktop("switch_window", Some("e2"))));
-    assert!(needs_focus(&desktop("open_app", None)));
+    assert!(needs_focus_in_front(&desktop("switch_window", Some("e2"))));
+    assert!(needs_focus_in_front(&desktop("open_app", None)));
 }
 
 #[test]

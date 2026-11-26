@@ -1,14 +1,27 @@
-import { Button, InlineNotice, Textarea } from '@jackalope/ui';
+import { isRunning } from '@jackalope/contracts/runs';
+import { BorderBeamLayer, Button, InlineNotice, Textarea } from '@jackalope/ui';
 import { ArrowRight } from 'lucide-react';
-import { useRef } from 'react';
+import { useMemo, useRef, useState } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import { usePromptAttachments } from '../../hooks/usePromptAttachments';
-import { getAgentMetadata } from '../../lib/agent-catalog';
+import { useProviderSkills } from '../../hooks/useProviderSkills';
+import { agentAdapter, getAgentMetadata } from '../../lib/agent-catalog';
+import { emitAppEvent } from '../../lib/app-events';
+import type { ComposerCommand } from '../../lib/composer-commands';
 import { insertDictation, placeCaret } from '../../lib/dictation';
 import { appendAttachments } from '../../lib/prompt-attachments';
+import { isReasoningEffort, type ReasoningEffort } from '../../lib/reasoning-effort';
 import type { TaskRun } from '../../lib/run-types';
 import { PROMPT_MAX_CHARS } from '../../lib/run-types';
 import type { TaskFollowUp } from '../../lib/task-followups';
+import { useAgentConfigStore } from '../../stores/agentConfigStore';
 import { useExecutionStore } from '../../stores/executionStore';
+import { ComposerEffortPicker, useEffortLevels } from '../composer/ComposerEffortPicker';
+import { ContextMeter } from '../composer/ContextMeter';
+import { PastedTextChips } from '../composer/PastedTextChips';
+import { SideQuestion } from '../composer/SideQuestion';
+import { useComposerAssist } from '../composer/useComposerAssist';
+import { useComposerKeybindings } from '../composer/useComposerKeybindings';
 import { ActionError } from '../ui/ActionError';
 import { DismissButton } from '../ui/DismissButton';
 import { VoiceButton } from '../voice/VoiceButton';
@@ -28,6 +41,8 @@ export function TaskFollowUpPanel({
   acting,
   submitting,
   onReply,
+  effort: savedEffort,
+  onEffort,
   onSend,
   onStopAndSend,
   onUpdate,
@@ -45,6 +60,9 @@ export function TaskFollowUpPanel({
   acting: boolean;
   submitting: boolean;
   onReply: (text: string) => void;
+  /** The effort level chosen for the next follow-up, kept with the reply draft. */
+  effort: string | null;
+  onEffort: (value: ReasoningEffort | null) => void;
   onSend: () => void;
   onStopAndSend: () => void;
   onUpdate: (id: string, action: 'resume' | 'cancel') => void;
@@ -52,17 +70,76 @@ export function TaskFollowUpPanel({
 }) {
   const form = useRef<HTMLFormElement>(null);
   const replyField = useRef<HTMLTextAreaElement>(null);
+  const [recording, setRecording] = useState(false);
   const agentName = useExecutionStore(
     (state) =>
       state.runners.find((runner) => runner.id === run.agent)?.name ??
       getAgentMetadata(run.agent)?.name ??
       run.agent,
   );
+  const latestReply = useRef(reply);
+  latestReply.current = reply;
+  const edit = (change: (current: string) => string) => {
+    onReply(change(latestReply.current));
+    replyField.current?.focus();
+  };
   const attachments = usePromptAttachments({
     projectPath: run.projectPath,
     target: form,
     disabled: !canContinue,
-    onAttach: (references) => onReply(appendAttachments(reply, references)),
+    onAttach: (references) => edit((current) => appendAttachments(current, references)),
+    edit,
+    room: () => PROMPT_MAX_CHARS - [...latestReply.current].length,
+  });
+  const effort = isReasoningEffort(savedEffort) ? savedEffort : null;
+  const efforts = useEffortLevels(run.projectId, run.agent, run.model ?? undefined);
+  const [effortOpen, setEffortOpen] = useState(false);
+  const [side, setSide] = useState<{ id: string; text: string } | null>(null);
+  const prompts = useExecutionStore(
+    useShallow((state) =>
+      state.runs
+        .filter((item) => item.taskId === run.taskId)
+        .sort((a, b) => a.startedAt.localeCompare(b.startedAt))
+        .map((item) => item.prompt),
+    ),
+  );
+  const history = useMemo(
+    () => [...prompts, ...followups.map((item) => item.prompt)],
+    [prompts, followups],
+  );
+  const customAgents = useAgentConfigStore((state) => state.customAgents);
+  const skills = useProviderSkills(agentAdapter(run.agent, customAgents), run.projectId);
+  const commands = useMemo(
+    () => ({ effort: efforts.levels.length > 0, clear: true, btw: true, provider: skills }),
+    [efforts.levels.length, skills],
+  );
+  const assist = useComposerAssist({
+    input: replyField,
+    text: reply,
+    setText: onReply,
+    projectPath: run.projectPath,
+    history,
+    commands,
+    disabled: !canContinue,
+    run: (command: ComposerCommand, argument: string) => {
+      if (command.id === 'effort') setEffortOpen(true);
+      else if (command.id === 'clear') emitAppEvent('new-work', run.projectId);
+      else if (command.id === 'btw') setSide({ id: crypto.randomUUID(), text: argument });
+    },
+  });
+  const send = () => {
+    if (assist.intercept(reply.trim())) return;
+    assist.sent();
+    onSend();
+  };
+  useComposerKeybindings(form, {
+    focus: () => replyField.current?.focus(),
+    send,
+    effortPicker: () => {
+      if (submitting || acting || !efforts.levels.length) return false;
+      setEffortOpen(!effortOpen);
+      if (effortOpen) replyField.current?.focus();
+    },
   });
   return (
     <div className="task-next">
@@ -107,6 +184,7 @@ export function TaskFollowUpPanel({
         // biome-ignore lint/a11y/useKeyWithClickEvents: a pointer convenience; the field and buttons stay reachable by keyboard
         <form
           ref={form}
+          data-composer
           className="task-followup-form"
           data-dragging={attachments.dragging || undefined}
           onClick={(event) => {
@@ -115,11 +193,33 @@ export function TaskFollowUpPanel({
           }}
           onSubmit={(event) => {
             event.preventDefault();
-            onSend();
+            send();
           }}
         >
+          <BorderBeamLayer
+            variant={recording ? 'pulse' : 'travel'}
+            active={recording || (active && isRunning(run))}
+            level={recording ? 'var(--voice-level, 0)' : undefined}
+            strength={recording ? 1 : 0.85}
+          />
+          {assist.menu}
+          {side && (
+            <SideQuestion
+              run={run}
+              question={side}
+              onClose={() => {
+                setSide(null);
+                replyField.current?.focus();
+              }}
+              onInsert={(answer) => {
+                edit((current) => (current.trim() ? `${current.trimEnd()}\n\n${answer}` : answer));
+                setSide(null);
+              }}
+            />
+          )}
           <Textarea
             ref={replyField}
+            {...assist.fieldProps}
             id="task-reply"
             aria-label="Follow-up instructions"
             className="task-reply"
@@ -127,17 +227,10 @@ export function TaskFollowUpPanel({
             value={reply}
             onChange={(event) => onReply(event.target.value)}
             onPaste={attachments.onPaste}
-            placeholder="Tell Jackalope what to do next…"
+            placeholder="Tell Jackalope what to do next, / for commands, @ for files…"
             maxLength={PROMPT_MAX_CHARS}
             onKeyDown={(event) => {
-              if (
-                (event.ctrlKey || event.metaKey) &&
-                event.key === 'Enter' &&
-                !event.nativeEvent.isComposing
-              ) {
-                event.preventDefault();
-                onSend();
-              }
+              assist.onKeyDown(event);
             }}
           />
           {attachments.error && (
@@ -158,11 +251,25 @@ export function TaskFollowUpPanel({
             )}
             <VoiceButton
               disabled={submitting || acting}
+              onRecordingChange={setRecording}
               onText={(value) => {
                 const next = insertDictation(reply, value, replyField.current);
                 onReply(next.text);
                 placeCaret(replyField.current, next.caret);
               }}
+            />
+            <ContextMeter run={run} />
+            <ComposerEffortPicker
+              levels={efforts.levels}
+              loaded={efforts.loaded}
+              value={effort}
+              onChange={onEffort}
+              open={effortOpen}
+              onOpenChange={(open) => {
+                setEffortOpen(open);
+                if (!open) replyField.current?.focus();
+              }}
+              disabled={submitting || acting}
             />
             <p className="task-muted">
               {followups.length && previewRunning
@@ -201,6 +308,11 @@ export function TaskFollowUpPanel({
               <ArrowRight size={15} />
             </Button>
           </div>
+          <PastedTextChips
+            pasted={attachments.pasted}
+            onUndo={attachments.undoPaste}
+            onDismiss={attachments.dismissPaste}
+          />
         </form>
       ) : (
         <>

@@ -13,12 +13,92 @@ publishing a channel, with signing, source-check and installed-acceptance gates.
 Native signed builds and installed upgrades still need platform acceptance.
 The [Store path](STORE-RELEASE.md) provides
 MSIX packaging, branch-based submission and Store-backed in-app update controls
-as the primary Windows channel. Cloud targets are macOS and Linux; direct EXE
-distribution is optional and requires separate publisher signing.
+as the primary Windows channel. Cloud also publishes the
+[direct Windows installer](#direct-windows-installer), which is Azure-signed or,
+under an explicit opt-in, ships without Authenticode.
 
 Accept the exact candidate's clean installation, real execution, account lifecycle,
 saved-data recovery and older-to-newer update before distribution. An MSIX build
 does not prove certification; an ephemeral updater signature does not prove publisher trust.
+
+## GitHub Releases mirror
+
+Each stable Cloud publication is mirrored to a public GitHub Release tagged
+`vVERSION` at the published source commit. The `github-release` job runs after
+the publication job succeeds in **Cloud release** (stable, `publish` mode,
+including automatic runs) and in **Publish Cloud candidate** (from stable). Beta,
+rehearsal, candidate and draft runs never create a GitHub Release.
+
+The release attaches every installer the Cloud publication contains (the macOS
+Apple silicon and Intel DMGs, the Linux x64 AppImage and, once enabled, the Windows
+x64 NSIS installer) plus a `SHA256SUMS` file. Its notes are the version's
+`releases/VERSION.md` notes, the same text Cloud and the in-app update notes show,
+followed by a download list that also links the Microsoft Store build. An unsigned
+Windows installer is labeled "not code-signed", and the notes add that SmartScreen
+may warn ("More info", then "Run anyway") and point to `SHA256SUMS`.
+
+The job reuses the run's candidate artifacts and never builds or signs. It reads
+`cloud-release.json` from the publication job and requires the candidates' digest
+to match the confirmed Cloud publication, so the attached bytes are the bytes Cloud
+serves. A Windows installer is attached only with a valid, timestamped Jackalope
+Digital LLC Authenticode signature (`azure-sign.ps1 -VerifyOnly`), or as an unsigned
+installer while `WINDOWS_AUTHENTICODE=unsigned` is in effect; otherwise the job
+fails. The job has no environment secrets, and its token can only write
+repository contents (plus read Actions artifacts when promoting a candidate run).
+
+Retries are safe. A new release stays a draft until every file is uploaded and its
+size and SHA-256 digest match, and a retry resumes that draft. A published release
+that already matches is left unchanged. A `vVERSION` tag at another commit, a
+release without this publication's marker, or changed, missing or extra files stop
+the job for an operator; it never overwrites or deletes a published release. Rerun
+only the failed `github-release` job. `pnpm release:setup --apply` protects `v*`
+tags from being moved or deleted.
+
+## Direct Windows installer
+
+Windows ships through Microsoft Store and, alongside it, as the NSIS installer
+published through Cloud like macOS and Linux. The Tauri updater in the
+EXE receives updates from the Cloud feed, and the GitHub Release mirror attaches
+the installer. The release configuration lists all four Cloud targets:
+
+```json
+["darwin-aarch64","darwin-x86_64","linux-x86_64","windows-x86_64"]
+```
+
+Set that array in `CLOUD_RELEASE_TARGETS` and `CLOUD_ACCEPTED_TARGETS` together:
+a normal publication needs the accepted set to match the release targets exactly,
+so changing only one blocks every platform. Then choose how the EXE is signed:
+
+| Variables | Windows installer |
+| --- | --- |
+| `CLOUD_SIGNING_READY=true` after [Azure signing setup](CRABNEBULA-RELEASE.md#optional-direct-windows-signing) | Azure Authenticode-signed; the build, Cloud publication and GitHub mirror each reject an installer without a valid Jackalope Digital LLC signature |
+| `WINDOWS_AUTHENTICODE=unsigned`, `CLOUD_SIGNING_READY` not `true` | [Published without Authenticode](CRABNEBULA-RELEASE.md#unsigned-direct-windows-installer); SmartScreen may warn on download and first launch |
+| Neither | Planning fails before any build when Windows is selected |
+
+`CLOUD_SIGNING_READY=true` wins when both are set. In both modes the installer
+carries the Tauri updater signature, and the installed app only accepts updates
+signed with the release updater key. Switching from unsigned to signed takes
+effect with the next candidate build; see
+[switching to signing](CRABNEBULA-RELEASE.md#unsigned-direct-windows-installer).
+The website download page stays Store-first.
+
+The EXE runs the same app code as the Store MSIX, so Store acceptance covers
+accounts, secure storage and agent behavior. After each stable release that
+changes Windows packaging, and after the first one with the installer, check
+only what differs:
+
+1. Clean install on a fresh Windows 11 VM. For a signed installer,
+   `Get-AuthenticodeSignature` reports `Valid` with signer Jackalope Digital LLC
+   and a timestamp for the installer and the installed `jackalope-desktop.exe`;
+   for an unsigned one it reports `NotSigned` and the SHA-256 matches `SHA256SUMS`.
+   Record the SmartScreen result for the download and first launch.
+2. Run a real task with one installed agent.
+3. Update in place from the previous version: choose **Check for updates**, then
+   **Restart to update**, and confirm the new version and saved work. The update
+   must come from the Cloud stable feed through the Tauri updater.
+4. Uninstall, and confirm the app, shortcuts and processes are gone.
+5. Install alongside the Store build. Confirm both launch, each updates only
+   through its own channel, and neither removes or overwrites the other.
 
 ## Platform acceptance
 
@@ -50,7 +130,7 @@ Use this map to locate platform-specific behavior and the checks needed when cha
 | Browser automation | Chrome, Edge and Chromium detection includes native installation paths, PATH, and macOS system/user Applications folders. `JACKALOPE_BROWSER_EXECUTABLE` accepts an absolute executable override. Unix sockets use short, private directories. Jackalope launches Unix Chromium in its own guarded process group and connects the bundled helper to that disposable browser over loopback CDP. Cancellation tests inspect browser process groups after Stop. Test all actions and cleanup. Safari/Firefox are unsupported engines; Snap/Flatpak Chromium confinement needs separate validation. Do not disable Chromium's sandbox as a workaround. |
 | Desktop control | Windows retains its guarded backend. macOS, Linux X11 and GNOME 46 Wayland have native integrations, visible Pause/Resume/Cancel controls, identity checks, accessibility, selected-window capture and guarded input. Devices reports readiness and explicitly installs the bundled GNOME extension or requests macOS permissions. Isolated Xvfb and GNOME fixtures exercise input and interruption. macOS compilation and installed acceptance remain open. Other Wayland compositors and GNOME versions are unavailable; XWayland alone is insufficient. See [native control details](DESKTOP-CONTROL.md). |
 | Notifications, window and tray | Task clicks use native callbacks on all three platforms. Unix response listeners expire after 24 hours, retain at most 64 notices and close on shutdown. macOS uses UserNotifications from a signed app bundle and asks for notification permission. Linux uses desktop notification actions; compositor focus policy still applies. Linux close-to-tray requires a registered StatusNotifier host and a hidden window reappears if that host disappears. macOS Dock reopening restores hidden windows. Test permission denial, DND, clicks, tray loss, window controls, focus and dialogs. |
-| Jackalope account and settings sync | All platforms use the same approved-account, bounded offline lease and explicit sync-choice contracts, backed by their native credential store. Device names come from the Unix hostname API when no shell environment is present. Verify connection, restart, revocation, offline expiry and conflicts against an isolated service. |
+| Jackalope account and settings sync | The account is optional on every platform. All platforms use the same approved-account, bounded offline lease (for account features only) and explicit sync-choice contracts, backed by their native credential store. Device names come from the Unix hostname API when no shell environment is present. Verify connection, restart, revocation, offline expiry and conflicts against an isolated service. |
 | Files, Git and recovery | Worktree/checkpoint/integration safeguards, locks, atomic replacement, recovery, codebase watching and schedules are shared. Test case-sensitive volumes, symlinks, executable bits, Unicode paths, timezone/DST, restart, sleep/wake and interrupted writes. Scope comparisons remain conservative across case variants. |
 | UI and optional services | WebView UI, MCP HTTP, account service, sync, feedback, lessons and helper actions need installed checks. Check WKWebView/WebKitGTK, clipboard, keyboard, dialogs, links, themes, reduced motion and narrow layouts. Command shortcuts accept Meta and their labels use Command on Mac and Control on other desktops. |
 | Packages and updates | CI defines Linux x64 and macOS arm64/x64 verification, browser smoke tests and trial packages (Intel macOS and trial packages on release branches and manual runs). macOS 11 is the declared minimum; trial app/helper bundles are ad-hoc signed and archived with executable modes preserved. Developer ID signing/notarization, updater trust, AppImage/RPM, Linux arm64 and clean-machine acceptance remain open. Windows ARM uses the x64 browser helper and needs emulation validation. |

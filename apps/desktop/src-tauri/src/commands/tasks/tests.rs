@@ -1,6 +1,7 @@
 use super::*;
 mod agent_matrix;
 mod decision_trail;
+mod without_account;
 mod workbench;
 mod workspace_modes;
 
@@ -22,10 +23,13 @@ pub(super) fn sample(agent: &str) -> TaskRun {
         stages: vec![],
         checkpoint: None,
         checkpoint_error: None,
+        rewind: Default::default(),
         routing: None,
         quota_failure: None,
         failure_kind: None,
         provider_error: None,
+        limit_snapshot_reset: None,
+        resume_at_reset: None,
         session_refused: None,
         handoff_context: None,
         contract: Default::default(),
@@ -48,6 +52,7 @@ pub(super) fn sample(agent: &str) -> TaskRun {
         host: None,
         verify_command: None,
         prepare_command: None,
+        time_limits: None,
         setup_files: Vec::new(),
         auto_verify: false,
         non_code: false,
@@ -68,8 +73,11 @@ pub(super) fn sample(agent: &str) -> TaskRun {
         session_id: None,
         result: String::new(),
         streaming: String::new(),
+        steerable: false,
         pending_tools: Default::default(),
         details_omitted: false,
+        result_omitted: false,
+        result_chars: None,
         activity: vec![],
         diagnostics: vec![],
         error: None,
@@ -78,6 +86,7 @@ pub(super) fn sample(agent: &str) -> TaskRun {
         usage: Usage::default(),
         mcp_usage: None,
         usage_observations: vec![],
+        context: None,
         prompts: vec![],
         awaiting_answers: Vec::new(),
         validation_steps: vec![],
@@ -89,6 +98,7 @@ pub(super) fn sample(agent: &str) -> TaskRun {
         review_captures: None,
         review_capturing: false,
         challenge_of: None,
+        advisor: None,
         secrets: None,
     }
 }
@@ -425,6 +435,7 @@ pub(super) fn trial_request(
     RunRequest {
         retry_of: None,
         handoff_focus: None,
+        reasoning_effort: None,
         continues: None,
         live_session_id: None,
         effort: None,
@@ -477,7 +488,7 @@ pub(super) fn agent_lifecycle_trial(agent: &str, executable: Option<&Path>) -> P
     let root = std::env::temp_dir().join(format!("jackalope-agent-trial-{}", uuid::Uuid::new_v4()));
     let repo = trial_repository(&root);
     let history = root.join("history");
-    let runtime = TaskRuntime::with_test_access(history.clone()).unwrap();
+    let runtime = TaskRuntime::new(history.clone()).unwrap();
     let selected_agent = if let Some(executable) = executable {
         let mut policy = super::super::agent_policy::AgentPolicy::default();
         policy
@@ -527,6 +538,7 @@ pub(super) fn agent_lifecycle_trial(agent: &str, executable: Option<&Path>) -> P
                 enabled: true,
                 stale: None,
                 enforced: None,
+                tool_rule: None,
                 source_run_id: None,
                 source_head: None,
                 revision: 0,
@@ -673,7 +685,7 @@ pub(super) fn agent_lifecycle_trial(agent: &str, executable: Option<&Path>) -> P
     assert_eq!(settled(&runtime, &stop.id).status, RunStatus::Stopped);
     std::thread::sleep(Duration::from_millis(300));
     drop(runtime);
-    let restored = TaskRuntime::with_test_access(history).unwrap();
+    let restored = TaskRuntime::new(history).unwrap();
     assert_eq!(
         restored.inner.lock().unwrap().runs[&second.id].result,
         second.result
@@ -711,7 +723,7 @@ fn a_retry_repeats_the_task_and_reuses_a_clean_or_quota_stopped_worktree() {
     )
     .unwrap();
 
-    let runtime = TaskRuntime::with_test_access(root.join("history")).unwrap();
+    let runtime = TaskRuntime::new(root.join("history")).unwrap();
     let mut failed = sample("codex");
     failed.status = RunStatus::Failed;
     failed.project_path = repo_path.clone();
@@ -767,6 +779,7 @@ fn a_retry_repeats_the_task_and_reuses_a_clean_or_quota_stopped_worktree() {
         run.quota_failure = Some(super::routing::QuotaFailure {
             model_only: false,
             message: "usage limit reached".into(),
+            ..Default::default()
         })
     });
     assert!(runtime.reusable_workspace(&failed_id).unwrap().3);
@@ -826,7 +839,7 @@ fn a_retry_repeats_the_task_and_reuses_a_clean_or_quota_stopped_worktree() {
 #[test]
 fn saved_user_answers_are_scoped_idempotent_and_not_overwritten_by_a_timeout() {
     let folder = std::env::temp_dir().join(format!("jackalope-answer-{}", uuid::Uuid::new_v4()));
-    let runtime = TaskRuntime::with_test_access(folder.clone()).unwrap();
+    let runtime = TaskRuntime::new(folder.clone()).unwrap();
     let run = sample("codex");
     runtime
         .inner
@@ -955,16 +968,94 @@ fn a_reported_result_wins_over_observed_calls() {
 }
 
 #[test]
+fn context_follows_the_latest_top_level_call_and_the_window_claude_reports() {
+    let mut run = sample("claude");
+    for event in CLAUDE_CALLS {
+        consume_event(&mut run, event);
+    }
+    // The subagent's call (m3) does not fill the parent's context.
+    assert_eq!(
+        run.context,
+        Some(ContextUsage {
+            used: 135,
+            window: None
+        })
+    );
+    run.model = Some("claude-opus-5-5".into());
+    consume_event(
+        &mut run,
+        r#"{"type":"result","result":"Done","usage":{"input_tokens":1,"output_tokens":1},"modelUsage":{"claude-haiku-5-5":{"contextWindow":100000},"claude-opus-5-5":{"contextWindow":200000}}}"#,
+    );
+    assert_eq!(run.context.as_ref().unwrap().window, Some(200_000));
+    consume_event(&mut run, CLAUDE_CALLS[0]);
+    assert_eq!(
+        run.context,
+        Some(ContextUsage {
+            used: 130,
+            window: Some(200_000)
+        })
+    );
+
+    // Codex's exec stream reports totals only, so it reports no context.
+    let mut codex = sample("codex");
+    consume_event(
+        &mut codex,
+        r#"{"type":"turn.completed","usage":{"input_tokens":120,"cached_input_tokens":80,"output_tokens":15}}"#,
+    );
+    assert_eq!(codex.context, None);
+    assert!(!serde_json::to_string(&codex)
+        .unwrap()
+        .contains("\"context\""));
+}
+
+/// Claude Code 2.1.282's result names models by their dated IDs and, on a resumed
+/// session, also lists the models earlier turns used.
+#[test]
+fn the_context_window_comes_from_the_served_model_in_a_real_claude_result() {
+    let mut run = sample("claude");
+    for event in [
+        r#"{"type":"system","subtype":"init","session_id":"s-1","model":"claude-haiku-4-5-20251001","permissionMode":"default"}"#,
+        r#"{"type":"assistant","message":{"id":"m1","model":"claude-haiku-4-5-20251001","usage":{"input_tokens":8,"cache_read_input_tokens":26007,"cache_creation_input_tokens":4276,"output_tokens":37}}}"#,
+        r#"{"type":"result","subtype":"success","is_error":false,"result":"OK","session_id":"s-1","usage":{"input_tokens":18,"cache_creation_input_tokens":16223,"cache_read_input_tokens":40067,"output_tokens":295},"modelUsage":{"claude-haiku-4-5-20251001":{"inputTokens":18,"outputTokens":295,"cacheReadInputTokens":40067,"cacheCreationInputTokens":16223,"costUSD":0.0379457,"contextWindow":200000,"maxOutputTokens":32000},"claude-sonnet-5":{"inputTokens":8,"outputTokens":1119,"contextWindow":1000000,"maxOutputTokens":64000}}}"#,
+    ] {
+        consume_event(&mut run, event);
+    }
+    assert_eq!(
+        run.context,
+        Some(ContextUsage {
+            used: 30_291,
+            window: Some(200_000)
+        })
+    );
+}
+
+#[test]
+fn an_unattributed_context_window_is_kept_only_when_every_model_agrees() {
+    let mut run = sample("claude");
+    consume_event(&mut run, CLAUDE_CALLS[2]);
+    consume_event(
+        &mut run,
+        r#"{"type":"result","result":"Done","modelUsage":{"a":{"contextWindow":100000},"b":{"contextWindow":200000}}}"#,
+    );
+    assert_eq!(run.context.as_ref().unwrap().window, None);
+    consume_event(
+        &mut run,
+        r#"{"type":"result","result":"Done","modelUsage":{"a":{"contextWindow":100000}}}"#,
+    );
+    assert_eq!(run.context.as_ref().unwrap().window, Some(100_000));
+}
+
+#[test]
 fn an_attempt_interrupted_by_closing_keeps_its_observed_usage_after_reload() {
     let folder = std::env::temp_dir().join(format!("jackalope-usage-{}", uuid::Uuid::new_v4()));
-    let runtime = TaskRuntime::with_test_access(folder.clone()).unwrap();
+    let runtime = TaskRuntime::new(folder.clone()).unwrap();
     let mut run = sample("claude");
     for event in CLAUDE_CALLS {
         consume_event(&mut run, event);
     }
     runtime.save(&run).unwrap();
     drop(runtime);
-    let loaded = TaskRuntime::with_test_access(folder.clone()).unwrap();
+    let loaded = TaskRuntime::new(folder.clone()).unwrap();
     let restored = loaded.inner.lock().unwrap().runs[&run.id].clone();
     drop(loaded);
     std::fs::remove_dir_all(folder).unwrap();
@@ -1059,7 +1150,7 @@ process.stdin.on('end', () => {
     )
     .unwrap();
     std::fs::write(&executable, "@echo off\r\nnode \"%~dp0capture.cjs\" %*\r\n").unwrap();
-    let runtime = TaskRuntime::with_test_access(folder.join("history")).unwrap();
+    let runtime = TaskRuntime::new(folder.join("history")).unwrap();
     let mut policy = AgentPolicy::default();
     policy.default_meta_agent = "custom-fixture".into();
     policy.custom_agents.push(CustomAgent {
@@ -1082,6 +1173,7 @@ process.stdin.on('end', () => {
     let request = RunRequest {
         retry_of: None,
         handoff_focus: None,
+        reasoning_effort: None,
         continues: None,
         live_session_id: None,
         effort: None,
@@ -1194,7 +1286,7 @@ process.stdin.on('end', () => {
     // npm installs Claude Code behind a .cmd shim, which re-parses arguments through cmd.exe.
     let executable = folder.join("claude-fixture.cmd");
     std::fs::write(&executable, "@echo off\r\nnode \"%~dp0capture.cjs\" %*\r\n").unwrap();
-    let runtime = TaskRuntime::with_test_access(folder.join("history")).unwrap();
+    let runtime = TaskRuntime::new(folder.join("history")).unwrap();
     let mut policy = AgentPolicy::default();
     policy.default_meta_agent = "claude-fixture".into();
     policy.custom_agents.push(CustomAgent {
@@ -1212,6 +1304,7 @@ process.stdin.on('end', () => {
         .start(RunRequest {
             retry_of: None,
             handoff_focus: None,
+            reasoning_effort: None,
             continues: None,
             live_session_id: None,
             effort: None,
@@ -1289,7 +1382,7 @@ fn session_and_unicode_output_survive_journal_reload_without_rerunning() {
         std::process::id(),
         Utc::now().timestamp_nanos_opt().unwrap()
     ));
-    let runtime = TaskRuntime::with_test_access(folder.clone()).unwrap();
+    let runtime = TaskRuntime::new(folder.clone()).unwrap();
     let mut run = sample("codex");
     consume_event(
         &mut run,
@@ -1301,7 +1394,7 @@ fn session_and_unicode_output_survive_journal_reload_without_rerunning() {
     );
     runtime.save(&run).unwrap();
     drop(runtime);
-    let loaded = TaskRuntime::with_test_access(folder.clone()).unwrap();
+    let loaded = TaskRuntime::new(folder.clone()).unwrap();
     let inner = loaded.inner.lock().unwrap();
     let restored = &inner.runs[&run.id];
     assert_eq!(restored.status, RunStatus::Interrupted);
@@ -1316,7 +1409,7 @@ fn session_and_unicode_output_survive_journal_reload_without_rerunning() {
 #[test]
 fn a_released_interrupted_attempt_stays_stopped_with_its_session_after_reload() {
     let folder = std::env::temp_dir().join(format!("jackalope-release-{}", uuid::Uuid::new_v4()));
-    let runtime = TaskRuntime::with_test_access(folder.clone()).unwrap();
+    let runtime = TaskRuntime::new(folder.clone()).unwrap();
     let mut run = sample("codex");
     consume_event(
         &mut run,
@@ -1324,7 +1417,7 @@ fn a_released_interrupted_attempt_stays_stopped_with_its_session_after_reload() 
     );
     runtime.save(&run).unwrap();
     drop(runtime);
-    let loaded = TaskRuntime::with_test_access(folder.clone()).unwrap();
+    let loaded = TaskRuntime::new(folder.clone()).unwrap();
     let mut newer = sample("codex");
     newer.id = "newer-attempt".into();
     newer.task_id = run.task_id.clone();
@@ -1349,7 +1442,7 @@ fn a_released_interrupted_attempt_stays_stopped_with_its_session_after_reload() 
         .unwrap_err()
         .contains("Only an interrupted attempt"));
     drop(loaded);
-    let reloaded = TaskRuntime::with_test_access(folder.clone()).unwrap();
+    let reloaded = TaskRuntime::new(folder.clone()).unwrap();
     let restored = reloaded.inner.lock().unwrap().runs[&run.id].clone();
     assert_eq!(restored.status, RunStatus::Stopped);
     assert_eq!(restored.session_id.as_deref(), Some("session-1"));
@@ -1370,7 +1463,7 @@ fn journal_identifiers_cannot_escape_the_storage_directory() {
 fn failed_save_can_be_exported_and_retried_without_losing_the_latest_state() {
     let folder = std::env::temp_dir().join(format!("jackalope-retry-{}", uuid::Uuid::new_v4()));
     let directory = folder.join("history");
-    let runtime = TaskRuntime::with_test_access(directory.clone()).unwrap();
+    let runtime = TaskRuntime::new(directory.clone()).unwrap();
     let mut run = sample("codex");
     run.status = RunStatus::Review;
     run.result = "last saved output".into();
@@ -1408,7 +1501,7 @@ fn failed_save_can_be_exported_and_retried_without_losing_the_latest_state() {
     runtime.update_checked(&run.id, |_| {}).unwrap();
     runtime.ensure_history_saved().unwrap();
     drop(runtime);
-    let restarted = TaskRuntime::with_test_access(directory).unwrap();
+    let restarted = TaskRuntime::new(directory).unwrap();
     let saved = restarted.integration_runs().unwrap().pop().unwrap();
     assert_eq!(saved.result, "latest unsaved output");
     assert!(saved.persistence_error.is_none());
@@ -1422,7 +1515,7 @@ fn failed_save_can_be_exported_and_retried_without_losing_the_latest_state() {
 fn startup_keeps_readable_tasks_available_when_the_recovered_state_cannot_be_written() {
     let folder =
         std::env::temp_dir().join(format!("jackalope-startup-save-{}", uuid::Uuid::new_v4()));
-    let runtime = TaskRuntime::with_test_access(folder.clone()).unwrap();
+    let runtime = TaskRuntime::new(folder.clone()).unwrap();
     let mut run = sample("codex");
     run.process_contained = true;
     runtime.save(&run).unwrap();
@@ -1432,7 +1525,7 @@ fn startup_keeps_readable_tasks_available_when_the_recovered_state_cannot_be_wri
     let mut readonly = original.clone();
     readonly.set_readonly(true);
     std::fs::set_permissions(&path, readonly).unwrap();
-    let runtime = TaskRuntime::with_test_access(folder.clone())
+    let runtime = TaskRuntime::new(folder.clone())
         .expect("a failed checkpoint must not prevent reading other history");
     let recovered = runtime.integration_runs().unwrap().pop().unwrap();
     assert_eq!(recovered.status, RunStatus::Stopped);
@@ -1457,7 +1550,7 @@ fn startup_keeps_readable_tasks_available_when_the_recovered_state_cannot_be_wri
 fn mismatched_identifiers_and_unfinished_saves_cannot_replace_another_task() {
     let folder =
         std::env::temp_dir().join(format!("jackalope-history-id-{}", uuid::Uuid::new_v4()));
-    let runtime = TaskRuntime::with_test_access(folder.clone()).unwrap();
+    let runtime = TaskRuntime::new(folder.clone()).unwrap();
     let mut good = sample("codex");
     good.status = RunStatus::Review;
     good.result = "keep this result".into();
@@ -1469,7 +1562,7 @@ fn mismatched_identifiers_and_unfinished_saves_cannot_replace_another_task() {
     let unfinished = folder.join(format!("{}.tmp", good.id));
     std::fs::write(&unfinished, b"partial JSON").unwrap();
     drop(runtime);
-    let loaded = TaskRuntime::with_test_access(folder.clone()).unwrap();
+    let loaded = TaskRuntime::new(folder.clone()).unwrap();
     assert_eq!(loaded.integration_runs().unwrap().len(), 1);
     assert_eq!(
         loaded.integration_runs().unwrap()[0].result,
@@ -1486,7 +1579,7 @@ fn mismatched_identifiers_and_unfinished_saves_cannot_replace_another_task() {
 fn oversized_or_summary_records_do_not_overwrite_complete_history() {
     let folder =
         std::env::temp_dir().join(format!("jackalope-history-limit-{}", uuid::Uuid::new_v4()));
-    let runtime = TaskRuntime::with_test_access(folder.clone()).unwrap();
+    let runtime = TaskRuntime::new(folder.clone()).unwrap();
     let mut run = sample("codex");
     runtime.save(&run).unwrap();
     let path = folder.join(format!("{}.json", run.id));
@@ -1525,7 +1618,7 @@ fn corrupt_or_invalid_history_entries_are_quarantined_not_fatal() {
     )
     .unwrap();
 
-    let runtime = TaskRuntime::with_test_access(folder.clone())
+    let runtime = TaskRuntime::new(folder.clone())
         .expect("a corrupted or invalid history entry must not prevent app startup");
     let inner = runtime.inner.lock().unwrap();
     assert_eq!(inner.runs.len(), 1, "only the valid entry should load");
@@ -1544,7 +1637,7 @@ fn corrupt_or_invalid_history_entries_are_quarantined_not_fatal() {
     assert!(folder.join("bad-id-file.json.corrupt").exists());
     assert!(!folder.join("bad-id-file.json").exists());
 
-    let restarted = TaskRuntime::with_test_access(folder.clone()).unwrap();
+    let restarted = TaskRuntime::new(folder.clone()).unwrap();
     let inner = restarted.inner.lock().unwrap();
     assert_eq!(inner.runs.len(), 1);
     assert_eq!(
@@ -1584,7 +1677,7 @@ fn agent_and_automatic_verification_reuse_only_an_unchanged_checked_snapshot_and
         ],
     )
     .unwrap();
-    let runtime = TaskRuntime::with_test_access(root.join("profile")).unwrap();
+    let runtime = TaskRuntime::new(root.join("profile")).unwrap();
     let mut run = sample("codex");
     run.project_path = path.into();
     run.workspace = path.into();
@@ -1707,7 +1800,7 @@ fn agent_launch_retries_transient_failures_but_not_a_missing_executable() {
 fn manual_archive_preserves_history_and_restores_after_restart() {
     let folder =
         std::env::temp_dir().join(format!("jackalope-manual-archive-{}", uuid::Uuid::new_v4()));
-    let runtime = TaskRuntime::with_test_access(folder.clone()).unwrap();
+    let runtime = TaskRuntime::new(folder.clone()).unwrap();
     let mut run = sample("codex");
     run.status = RunStatus::Reviewed;
     run.result = "Keep this result".into();
@@ -1721,14 +1814,14 @@ fn manual_archive_preserves_history_and_restores_after_restart() {
     runtime.set_archived(&run.id, true).unwrap();
     assert!(runtime.snapshot(None)[0].archived_at.is_some());
     drop(runtime);
-    let runtime = TaskRuntime::with_test_access(folder.clone()).unwrap();
+    let runtime = TaskRuntime::new(folder.clone()).unwrap();
     let saved = runtime.snapshot(Some(&run.id));
     assert!(saved[0].archived_at.is_some());
     assert_eq!(saved[0].result, run.result);
     assert_eq!(saved[0].status, RunStatus::Reviewed);
     runtime.set_archived(&run.id, false).unwrap();
     drop(runtime);
-    let runtime = TaskRuntime::with_test_access(folder.clone()).unwrap();
+    let runtime = TaskRuntime::new(folder.clone()).unwrap();
     assert!(runtime.snapshot(None)[0].archived_at.is_none());
     drop(runtime);
     std::fs::remove_dir_all(folder).unwrap();
@@ -1738,7 +1831,7 @@ fn manual_archive_preserves_history_and_restores_after_restart() {
 fn manual_archive_rejects_unfinished_unsaved_session_and_stale_attempts() {
     let folder =
         std::env::temp_dir().join(format!("jackalope-archive-guards-{}", uuid::Uuid::new_v4()));
-    let runtime = TaskRuntime::with_test_access(folder.clone()).unwrap();
+    let runtime = TaskRuntime::new(folder.clone()).unwrap();
     let mut run = sample("codex");
     for status in ["starting", "running", "stopping", "interrupted"] {
         run.status = status.into();
@@ -1797,7 +1890,7 @@ fn manual_archive_failed_save_keeps_task_visible() {
         "jackalope-archive-failure-{}",
         uuid::Uuid::new_v4()
     ));
-    let runtime = TaskRuntime::with_test_access(folder.clone()).unwrap();
+    let runtime = TaskRuntime::new(folder.clone()).unwrap();
     let mut run = sample("codex");
     run.status = RunStatus::Failed;
     runtime
@@ -1822,7 +1915,7 @@ fn manual_archive_failed_save_keeps_task_visible() {
 #[test]
 fn retention_archives_old_reviewed_runs_and_keeps_everything_else_loaded() {
     let folder = std::env::temp_dir().join(format!("jackalope-retention-{}", uuid::Uuid::new_v4()));
-    let runtime = TaskRuntime::with_test_access(folder.clone()).unwrap();
+    let runtime = TaskRuntime::new(folder.clone()).unwrap();
     let mut session_run = sample("codex");
     session_run.id = "keep-live-session".into();
     session_run.live_session_id = Some("live-session".into());
@@ -1845,7 +1938,7 @@ fn retention_archives_old_reviewed_runs_and_keeps_everything_else_loaded() {
     }
     drop(runtime);
 
-    let restarted = TaskRuntime::with_test_access(folder.clone()).unwrap();
+    let restarted = TaskRuntime::new(folder.clone()).unwrap();
     let loaded = restarted.integration_runs().unwrap();
     assert_eq!(
         loaded
@@ -1891,7 +1984,7 @@ fn retention_archives_old_reviewed_runs_and_keeps_everything_else_loaded() {
 #[test]
 fn recovery_exports_import_once_and_never_shadow_a_present_task() {
     let folder = std::env::temp_dir().join(format!("jackalope-import-{}", uuid::Uuid::new_v4()));
-    let runtime = TaskRuntime::with_test_access(folder.clone()).unwrap();
+    let runtime = TaskRuntime::new(folder.clone()).unwrap();
     let mut run = sample("codex");
     run.id = "imported-attempt-01".into();
     run.status = RunStatus::Review;
@@ -2151,4 +2244,235 @@ fn reported_input_includes_cache_once_for_every_adapter() {
         (30, 20)
     );
     assert_eq!(fresh(&antigravity.usage), 10);
+}
+
+/// A saved check that names the task Simulator runs against a booted device
+/// of its own, kept for the workspace's next check and deleted with it. Run on
+/// a Mac with Xcode:
+/// `cargo test --lib check_commands_reach_the_task_simulator -- --ignored --nocapture`
+#[test]
+#[ignore = "boots a real iOS Simulator"]
+fn check_commands_reach_the_task_simulator() {
+    let root = std::env::temp_dir().join(format!("jackalope-sim-check-{}", uuid::Uuid::new_v4()));
+    let workspace = root.join("repo");
+    std::fs::create_dir_all(&workspace).unwrap();
+    let path = workspace.to_str().unwrap();
+    git(path, &["init", "-b", "master"]).unwrap();
+    git(
+        path,
+        &[
+            "-c",
+            "user.name=Trial",
+            "-c",
+            "user.email=trial@example.test",
+            "commit",
+            "--allow-empty",
+            "-m",
+            "fixture",
+        ],
+    )
+    .unwrap();
+    let runtime = TaskRuntime::new(root.join("profile")).unwrap();
+    crate::commands::simulators::initialize(root.join("simulators"), runtime.clone());
+    let mut run = sample("codex");
+    run.id = format!("test{}", uuid::Uuid::new_v4().simple());
+    run.project_path = path.into();
+    run.workspace = path.into();
+    run.base_head = git(path, &["rev-parse", "HEAD"]).unwrap();
+    run.verify_command =
+        Some("xcrun simctl getenv \"$JACKALOPE_SIMULATOR_UDID\" HOME && echo \"$JACKALOPE_SIMULATOR_NAME\"".into());
+    run.auto_verify = true;
+    runtime.save(&run).unwrap();
+    runtime
+        .inner
+        .lock()
+        .unwrap()
+        .runs
+        .insert(run.id.clone(), run.clone());
+    let _cleanup = crate::commands::simulators::ReleaseOnDrop(
+        crate::commands::simulators::workspace_identity(path),
+    );
+    crate::commands::verification::finish(&runtime, &run.id).unwrap();
+    let checked = runtime.run_snapshot(&run.id).unwrap().verification.unwrap();
+    println!(
+        "check output:\n{}{}",
+        checked.result.stdout, checked.result.stderr
+    );
+    assert!(checked.result.success);
+    let device = crate::commands::simulators::assigned(path).unwrap();
+    assert_eq!(device.state, "Booted");
+    assert!(checked.result.stdout.contains(&device.udid));
+    assert!(checked.result.stdout.contains("Jackalope test"));
+
+    std::fs::write(workspace.join("changed.txt"), "again").unwrap();
+    crate::commands::verification::finish(&runtime, &run.id).unwrap();
+    let again = runtime.run_snapshot(&run.id).unwrap().verification.unwrap();
+    assert!(again.result.stdout.contains(&device.udid));
+
+    crate::commands::simulators::release(crate::commands::simulators::workspace_identity(path));
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(120);
+    while crate::commands::simulators::simctl::devices()
+        .unwrap()
+        .iter()
+        .any(|listed| listed.udid == device.udid)
+    {
+        assert!(
+            std::time::Instant::now() < deadline,
+            "device was not deleted"
+        );
+        std::thread::sleep(std::time::Duration::from_millis(250));
+    }
+    std::fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
+fn a_usage_limit_keeps_the_reset_its_first_event_reported() {
+    let resets = Utc::now().timestamp() + 3_600;
+    let mut run = sample("claude");
+    consume_event(
+        &mut run,
+        &format!(
+            r#"{{"type":"rate_limit_event","rate_limit_info":{{"status":"rejected","rateLimitType":"five_hour","resetsAt":{resets}}}}}"#
+        ),
+    );
+    consume_event(
+        &mut run,
+        r#"{"type":"result","subtype":"success","is_error":true,"result":"You've hit your limit"}"#,
+    );
+    let failure = run.quota_failure.as_ref().unwrap();
+    assert!(failure.message.ends_with("You've hit your limit"));
+    assert_eq!(failure.resets_at, Some(resets));
+
+    // Codex reports the used-up window in a snapshot, before or after the error.
+    let mut run = sample("codex");
+    consume_event(
+        &mut run,
+        r#"{"type":"turn.failed","error":{"message":"You've hit your usage limit."}}"#,
+    );
+    assert_eq!(run.quota_failure.as_ref().unwrap().resets_at, None);
+    consume_event(
+        &mut run,
+        &format!(
+            r#"{{"id":"0","msg":{{"type":"token_count","rate_limits":{{"primary":{{"used_percent":100.0,"resets_at":{resets}}}}}}}}}"#
+        ),
+    );
+    assert_eq!(run.quota_failure.as_ref().unwrap().resets_at, Some(resets));
+}
+
+#[test]
+fn resume_at_reset_is_saved_with_the_attempt_and_taken_once() {
+    let history =
+        std::env::temp_dir().join(format!("jackalope-limit-resume-{}", uuid::Uuid::new_v4()));
+    std::fs::create_dir_all(&history).unwrap();
+    let resets = Utc::now().timestamp() + 600;
+    let mut run = sample("claude");
+    run.status = RunStatus::Failed;
+    run.error = Some("You've hit your limit".into());
+    run.failure_kind = Some(super::failure::FailureKind::QuotaExhausted);
+    run.quota_failure = Some(super::routing::QuotaFailure {
+        message: "You've hit your limit".into(),
+        resets_at: Some(resets),
+        ..Default::default()
+    });
+    let mut unreported = sample("codex");
+    unreported.id = "unreported-attempt".into();
+    unreported.task_id = "unreported-task".into();
+    unreported.status = RunStatus::Failed;
+    unreported.failure_kind = Some(super::failure::FailureKind::QuotaExhausted);
+    for run in [&run, &unreported] {
+        std::fs::write(
+            history.join(format!("{}.json", run.id)),
+            serde_json::to_vec(run).unwrap(),
+        )
+        .unwrap();
+    }
+    let runtime = TaskRuntime::new(history.clone()).unwrap();
+    assert!(runtime
+        .schedule_limit_resume(&unreported.id, true)
+        .unwrap_err()
+        .contains("did not report"));
+    runtime.schedule_limit_resume(&run.id, true).unwrap();
+    assert!(runtime.take_due_limit_resumes(resets).is_empty());
+    drop(runtime);
+
+    // The schedule survives a restart and is handed out once, after the grace period.
+    let runtime = TaskRuntime::new(history.clone()).unwrap();
+    let saved = runtime
+        .run_snapshot(&run.id)
+        .unwrap()
+        .resume_at_reset
+        .unwrap();
+    assert_eq!(saved.at, resets);
+    let due = runtime.take_due_limit_resumes(resets + super::usage_limit::RESUME_GRACE_SECONDS);
+    assert_eq!(due, vec![(run.id.clone(), resets)]);
+    assert!(runtime.take_due_limit_resumes(resets + 3_600).is_empty());
+
+    // Cancelling clears it; a failed start keeps the reason and is not retried.
+    runtime.schedule_limit_resume(&run.id, true).unwrap();
+    runtime.schedule_limit_resume(&run.id, false).unwrap();
+    assert!(runtime
+        .run_snapshot(&run.id)
+        .unwrap()
+        .resume_at_reset
+        .is_none());
+    runtime.limit_resume_failed(&run.id, resets, "No account".into());
+    assert!(runtime.take_due_limit_resumes(resets + 3_600).is_empty());
+
+    // A later attempt, such as a manual retry or a switch, drops the schedule.
+    runtime.schedule_limit_resume(&run.id, true).unwrap();
+    drop(runtime);
+    let mut newer = sample("codex");
+    newer.id = "newer-attempt".into();
+    newer.status = RunStatus::Failed;
+    newer.started_at = (Utc::now() + chrono::Duration::minutes(5)).to_rfc3339();
+    std::fs::write(
+        history.join(format!("{}.json", newer.id)),
+        serde_json::to_vec(&newer).unwrap(),
+    )
+    .unwrap();
+    let runtime = TaskRuntime::new(history.clone()).unwrap();
+    assert!(runtime.take_due_limit_resumes(resets + 3_600).is_empty());
+    assert!(runtime
+        .run_snapshot(&run.id)
+        .unwrap()
+        .resume_at_reset
+        .is_none());
+}
+
+#[test]
+fn switching_after_a_usage_limit_needs_a_different_agent_or_account() {
+    let mut old = sample("claude");
+    old.model = Some("claude-opus".into());
+    old.account_binding = Some(crate::commands::agent_profiles::AccountBinding {
+        adapter: "claude".into(),
+        profile_id: Some("work".into()),
+        directory: std::env::temp_dir(),
+        label: "Work".into(),
+    });
+    let mut request: RunRequest = serde_json::from_value(serde_json::json!({"id":"retry","projectId":"p","projectName":"P","projectPath":"/tmp/p","agent":"claude","model":"claude-opus","prompt":"Do it","isolated":true,"previousRunId":null,"agentProfileId":"work"})).unwrap();
+    let to = |agent: &str, profile: Option<&str>| super::AgentSwitch {
+        agent: agent.into(),
+        profile_id: profile.map(str::to_string),
+    };
+    assert!(to("claude", Some("personal"))
+        .apply(&old, &mut request.clone())
+        .unwrap_err()
+        .contains("after a usage limit"));
+    old.quota_failure = Some(super::routing::QuotaFailure {
+        message: "You've hit your limit".into(),
+        ..Default::default()
+    });
+    assert!(to("claude", Some("work"))
+        .apply(&old, &mut request.clone())
+        .is_err());
+    let mut account = request.clone();
+    to("claude", Some("personal"))
+        .apply(&old, &mut account)
+        .unwrap();
+    assert_eq!(account.agent_profile_id.as_deref(), Some("personal"));
+    assert_eq!(account.model.as_deref(), Some("claude-opus"));
+    to("codex", None).apply(&old, &mut request).unwrap();
+    assert_eq!(request.agent, "codex");
+    assert_eq!(request.model, None);
+    assert_eq!(request.agent_profile_id, None);
 }

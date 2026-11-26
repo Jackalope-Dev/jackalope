@@ -1,0 +1,15 @@
+{
+  "info": {
+    "arguments": ["devicectl", "list", "devices", "--json-output", "/tmp/out.json"],
+    "commandType": "devicectl.list.devices",
+    "environment": {
+      "TERM": "xterm-256color"
+    },
+    "jsonVersion": 5,
+    "outcome": "success",
+    "version": "651.32"
+  },
+  "result": {
+    "devices": []
+  }
+}

@@ -104,7 +104,7 @@ fn a_fixture_planner_drafts_a_plan_that_is_revised_approved_only_exactly_and_exp
         std::env::temp_dir().join(format!("jackalope-plan-session-{}", uuid::Uuid::new_v4()));
     std::fs::create_dir_all(&folder).unwrap();
     let root = repository(&folder);
-    let runtime = TaskRuntime::with_test_access(folder.join("history")).unwrap();
+    let runtime = TaskRuntime::new(folder.join("history")).unwrap();
     let mut policy = AgentPolicy::default();
     policy.custom_agents.push(CustomAgent {
         id: "planner-fixture".into(),

@@ -435,6 +435,26 @@ fn plan_gaps(task: &managed::ManagedTask, run: &TaskRun) -> Option<String> {
     crate::commands::planning::handoff::open_gaps(&run.validation_steps)
 }
 
+/// Whether `run` belongs to a managed task's automatic work: the planner, an
+/// attempt the task recorded (assignments and delivery repairs), or a later
+/// attempt of an assignment's task. `task_of` gives an attempt's task ID.
+pub(super) fn managed_attempt(
+    ledger: &Ledger,
+    run: &TaskRun,
+    task_of: impl Fn(&str) -> Option<String>,
+) -> bool {
+    ledger
+        .managed_tasks
+        .iter()
+        .any(|task| task.planner_run_id == run.id || task.run_ids.contains(&run.id))
+        || ledger
+            .items
+            .iter()
+            .filter(|item| item.feature_id.is_some())
+            .filter_map(|item| item.run_id.as_deref())
+            .any(|root| root == run.id || task_of(root).as_deref() == Some(run.task_id.as_str()))
+}
+
 fn repair_candidate<'a>(
     ledger: &Ledger,
     task: &managed::ManagedTask,
@@ -1046,6 +1066,40 @@ mod tests {
     }
 
     #[test]
+    fn managed_attempts_cover_planners_assignments_their_follow_ups_and_repairs() {
+        let (mut ledger, runs) = fixture();
+        let task_of = |id: &str| {
+            runs.iter()
+                .find(|run| run.id == id)
+                .map(|run| run.task_id.clone())
+        };
+        let attempt = |id: &str, task: &str| TaskRun {
+            id: id.into(),
+            task_id: task.into(),
+            ..Default::default()
+        };
+        for (id, task) in [("planner", "planner"), ("a", "a"), ("a-follow-up", "a")] {
+            assert!(
+                managed_attempt(&ledger, &attempt(id, task), task_of),
+                "{id}"
+            );
+        }
+        ledger.managed_tasks[0].run_ids.push("repair".into());
+        assert!(managed_attempt(
+            &ledger,
+            &attempt("repair", "repair"),
+            task_of
+        ));
+        assert!(!managed_attempt(&ledger, &attempt("own", "own"), task_of));
+        ledger.items[0].feature_id = None;
+        ledger.managed_tasks[0].run_ids.clear();
+        assert!(
+            !managed_attempt(&ledger, &attempt("a-follow-up", "a"), task_of),
+            "a plain queued task is not managed"
+        );
+    }
+
+    #[test]
     fn repair_only_continues_finished_checks_without_consumers_or_lost_process_ownership() {
         let (mut ledger, mut runs) = fixture();
         runs[0].verification.as_mut().unwrap().result.success = false;
@@ -1140,7 +1194,7 @@ mod tests {
         let repo = super::super::agreement_tests::Repo::new();
         let history = repo.root.join("history");
         std::fs::create_dir(&history).unwrap();
-        let runtime = TaskRuntime::with_test_access(history).unwrap();
+        let runtime = TaskRuntime::new(history).unwrap();
         let service = Coordinator::new(repo.root.join("queue"), runtime).unwrap();
         let (mut ledger, mut runs) = fixture();
         let mut final_run = runs[0].clone();
@@ -1264,7 +1318,7 @@ mod tests {
         }
         ledger.managed_tasks[0].run_ids = runs.iter().map(|run| run.id.clone()).collect();
         ledger.managed_tasks[0].delivery.as_mut().unwrap().ready_at = Some("now".into());
-        let runtime = TaskRuntime::with_test_access(history).unwrap();
+        let runtime = TaskRuntime::new(history).unwrap();
         let service = Coordinator::new(repo.root.join("queue"), runtime).unwrap();
         {
             let mut inner = service.state();
@@ -1350,7 +1404,7 @@ mod tests {
         let repo = super::super::agreement_tests::Repo::new();
         let history = repo.root.join("history");
         std::fs::create_dir(&history).unwrap();
-        let runtime = TaskRuntime::with_test_access(history.clone()).unwrap();
+        let runtime = TaskRuntime::new(history.clone()).unwrap();
         let directory = repo.root.join("queue");
         let service = Coordinator::new(directory.clone(), runtime).unwrap();
         let (mut ledger, mut runs) = fixture();
@@ -1376,8 +1430,7 @@ mod tests {
         drop(guard);
         drop(inner);
         drop(service);
-        let restarted =
-            Coordinator::new(directory, TaskRuntime::with_test_access(history).unwrap()).unwrap();
+        let restarted = Coordinator::new(directory, TaskRuntime::new(history).unwrap()).unwrap();
         let inner = restarted.state();
         assert!(inner.enabled.is_empty());
         assert!(inner.ledger.managed_tasks[0].error.is_some());

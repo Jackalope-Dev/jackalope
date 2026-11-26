@@ -2,9 +2,11 @@ import type { PendingUserPrompt, RunStatus } from '@jackalope/contracts/runs';
 import type { DecisionReceipt } from './decisions.ts';
 import type { ContextReceipt, ContextSelection } from './knowledge-types.ts';
 import type { ReviewCaptures } from './review-captures.ts';
+import type { RewindState } from './rewind.ts';
 import type { DesktopPermission } from './system-info.ts';
 import type { TaskEffort } from './task-effort.ts';
 import type { EvidenceLevel, GoalRestatement, SafetyFact, TaskContract } from './task-outcomes.ts';
+import type { AdvisorReview } from './turn-advisor.ts';
 
 /** The longest instruction the composer accepts for a task, follow-up or schedule. */
 export const PROMPT_MAX_CHARS = 24_000;
@@ -26,6 +28,7 @@ export type FailureKind =
   | 'authentication'
   | 'quota_exhausted'
   | 'rate_limited'
+  | 'billing'
   | 'provider_refused'
   | 'model_unavailable'
   | 'context_too_long'
@@ -39,11 +42,37 @@ export interface RunUsage {
   reported: boolean;
   estimatedCostUsd: number | null;
 }
+/** What a tool call spent the agent's time on; `think` is time with no tool running. */
+export type ActivityKind =
+  | 'think'
+  | 'plan'
+  | 'read'
+  | 'search'
+  | 'edit'
+  | 'command'
+  | 'check'
+  | 'app'
+  | 'ask'
+  | 'helper'
+  | 'web'
+  | 'tool';
+/** One kind's calls and its share of working time, in which overlapping calls count once. */
+export interface ActivityTime {
+  calls: number;
+  wallMs: number;
+  longestMs: number;
+}
 export interface TaskRun {
   archivedAt?: string | null;
   liveSessionId?: string | null;
+  /** Work that changes no code, run in the project folder as it is. */
+  nonCode?: boolean;
+  /** The session from outside Jackalope this work continues. */
+  continues?: { adapter: string; sessionId: string } | null;
   effort?: TaskEffort | null;
   codexSpeed?: 'standard' | 'fast' | null;
+  /** The running turn takes new messages without stopping (a Codex app-server turn). */
+  steerable?: boolean;
   requestedServiceTier?: string | null;
   reasoningEffort?: string | null;
   efficiency?: {
@@ -54,6 +83,10 @@ export interface TaskRun {
     repositoryMapCacheHits?: number;
     toolCalls?: Record<string, number>;
     toolObservationsTruncated?: boolean;
+    /** Working time by kind of activity; absent before it was measured. */
+    activity?: Partial<Record<ActivityKind, ActivityTime>>;
+    /** Measured durations by tool name; overlapping calls each count in full. */
+    toolTime?: Record<string, { kind: ActivityKind; totalMs: number; longestMs: number }>;
     launchPromptBytes: number;
     launches: number;
     jevQuestionCalls?: number | null;
@@ -84,7 +117,12 @@ export interface TaskRun {
   };
   checkpoint?: { head: string; message: string } | null;
   checkpointError?: string | null;
-  quotaFailure?: { modelOnly: boolean; message: string } | null;
+  /** Turn checkpoint, conversation mark and rewinds; absent on attempts saved before them. */
+  rewind?: RewindState;
+  /** The provider limit that stopped the attempt; `resetsAt` is Unix seconds when reported. */
+  quotaFailure?: { modelOnly: boolean; message: string; resetsAt?: number | null } | null;
+  /** A retry the person scheduled for when that limit resets. */
+  resumeAtReset?: { at: number; error?: string | null } | null;
   routing?: {
     attempts?: {
       agent: string;
@@ -116,7 +154,7 @@ export interface TaskRun {
       sessionId: string | null;
       result: string;
       usage: RunUsage;
-      failure: { modelOnly: boolean; message: string };
+      failure: { modelOnly: boolean; message: string; resetsAt?: number | null };
       recordedAt: string;
     }[];
   } | null;
@@ -199,6 +237,17 @@ export interface TaskRun {
   sessionId: string | null;
   result: string;
   detailsOmitted?: boolean;
+  /**
+   * A conversation snapshot left this reply out to stay small; `result` is empty and
+   * `resultChars` is the reply's length. Load it with `loadReplies`.
+   */
+  resultOmitted?: boolean;
+  resultChars?: number;
+  /**
+   * A conversation snapshot trimmed this run to the fields its transcript row and status
+   * read; the task list's own snapshot holds the full summary.
+   */
+  summaryOmitted?: boolean;
   activity: string[];
   diagnostics: string[];
   error: string | null;
@@ -226,6 +275,8 @@ export interface TaskRun {
     cacheRead?: number;
     cacheWrite?: number;
   }[];
+  /** Context after the latest top-level model call; `window` only when the provider states it. */
+  context?: { used: number; window?: number | null } | null;
   prompts?: PendingUserPrompt[];
   validationSteps?: ValidationStep[];
   /** Append-only decision trail the agent reported for this attempt. */
@@ -249,6 +300,8 @@ export interface TaskRun {
     /** Absent on reviewers saved before agent reviews existed, which are Challenges. */
     kind?: 'challenge' | 'review';
   } | null;
+  /** The turn advisor's review of this attempt, when the project has the advisor on. */
+  advisor?: AdvisorReview | null;
 }
 /** @public Named in the return types of usage-entries.ts and usage-insights.ts exports. */
 export interface DesktopActionRecord {
@@ -346,6 +399,8 @@ export interface ScreenshotArtifact {
 }
 export interface RunRequest {
   effort?: TaskEffort;
+  /** A provider effort level chosen for this send; wins over the task approach's level. */
+  reasoningEffort?: string;
   codexSpeed?: 'standard' | 'fast';
   contextSelection?: ContextSelection;
   connectionIds?: string[];

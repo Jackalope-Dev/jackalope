@@ -4,6 +4,7 @@ import { resolve } from 'node:path';
 import { isReleaseChannel } from '../../packages/contracts/src/platform.ts';
 import { assertVersions, readNotes, root } from './catalog.mjs';
 import { releaseTargets } from './cloud-publish.mjs';
+import { windowsSigning } from './crabnebula-config.mjs';
 
 const event = JSON.parse(await readFile(process.env.GITHUB_EVENT_PATH, 'utf8'));
 const automatic = process.env.GITHUB_EVENT_NAME === 'push';
@@ -30,26 +31,37 @@ if (automatic && enabled) {
   if (refs.some((ref) => ref.ref === `refs/tags/${tag}`)) enabled = false;
 }
 if (enabled) await readNotes(v, mode !== 'rehearsal');
-let selected =
-  !automatic && event.inputs?.targets === 'windows'
-    ? ['windows-x86_64']
-    : releaseTargets(process.env.CLOUD_RELEASE_TARGETS);
-if (process.env.RELEASE_DISTRIBUTION === 'store') {
-  if (event.inputs?.targets === 'windows')
-    throw new Error('Windows releases use Microsoft Store; run Store release');
-  selected = selected.filter((target) => target !== 'windows-x86_64');
-  if (!selected.length) throw new Error('Configure Mac/Linux Cloud targets for Store distribution');
-}
+const configured = () => releaseTargets(process.env.CLOUD_RELEASE_TARGETS);
+const windowsOnly = !automatic && event.inputs?.targets === 'windows';
+const selected = windowsOnly ? ['windows-x86_64'] : configured();
+// With Store distribution the direct Windows installer ships through Cloud only
+// when CLOUD_RELEASE_TARGETS lists it; the default targets leave it out.
+if (
+  process.env.RELEASE_DISTRIBUTION === 'store' &&
+  windowsOnly &&
+  !configured().includes('windows-x86_64')
+)
+  throw new Error(
+    'Windows releases use Microsoft Store; add windows-x86_64 to CLOUD_RELEASE_TARGETS for the direct installer',
+  );
 const runners = {
   'windows-x86_64': 'windows-2022',
   'darwin-aarch64': 'macos-15',
   'darwin-x86_64': 'macos-15-intel',
   'linux-x86_64': 'ubuntu-22.04',
 };
+const windows = selected.includes('windows-x86_64');
+if (windows && ![undefined, '', 'unsigned'].includes(process.env.WINDOWS_AUTHENTICODE))
+  throw new Error('WINDOWS_AUTHENTICODE must be unset or "unsigned"');
+const signing = windows ? windowsSigning(process.env) : null;
 if (enabled && mode !== 'rehearsal') {
-  if (selected.includes('windows-x86_64') && process.env.CLOUD_SIGNING_READY !== 'true')
+  if (windows && !signing)
     throw new Error(
-      'Complete Azure setup and set CLOUD_SIGNING_READY before requesting Windows candidates',
+      'Complete Azure setup and set CLOUD_SIGNING_READY, or set WINDOWS_AUTHENTICODE=unsigned to ship the installer without Authenticode, before requesting Windows candidates',
+    );
+  if (windows && signing === 'unsigned')
+    console.log(
+      '::warning::The Windows installer is built without Authenticode (WINDOWS_AUTHENTICODE=unsigned); SmartScreen may warn users',
     );
   if (
     selected.some((target) => target.startsWith('darwin-')) &&
@@ -71,6 +83,7 @@ await appendFile(
     mode,
     version: v,
     targets: JSON.stringify(selected),
+    windows_signing: signing ?? '',
     matrix: JSON.stringify({
       include: selected.map((target) => ({ target, os: runners[target] })),
     }),

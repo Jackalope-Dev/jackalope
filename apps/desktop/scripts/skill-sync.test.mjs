@@ -10,6 +10,7 @@ import {
   parseSkillsPage,
   reach,
   skillSlug,
+  syncingDevices,
   syncSummary,
   visibleSkills,
 } from '../src/lib/skill-sync.ts';
@@ -165,16 +166,25 @@ test('names, reasons and the summary line read plainly', () => {
     assert.ok(blockedReason(reason).length > 10, reason);
   assert.equal(
     syncSummary({ ...EMPTY_SKILLS_PAGE }, false),
-    'Sign in to sync skills between your computers.',
+    'Connect your Jackalope account to sync skills between your computers.',
   );
   const twoDevices = page({
-    skills: [card({ syncedId: 's1' }), card({ id: 'b', syncedId: null })],
+    skills: [
+      card({ syncedId: 's1', holders: [{ device: 'b', current: true }] }),
+      card({ id: 'b', syncedId: null }),
+    ],
     devices: [
       { id: 'a', name: null, platform: null, here: true },
       { id: 'b', name: null, platform: null, here: false },
+      // An old profile or reconnect that never synced anything.
+      { id: 'c', name: 'ROAMING', platform: 'windows', here: false },
     ],
   });
   assert.equal(syncSummary(twoDevices, false), '1 skill synced across 2 computers.');
+  assert.deepEqual(
+    syncingDevices(twoDevices.skills, twoDevices.devices).map((device) => device.id),
+    ['a', 'b'],
+  );
   assert.equal(syncSummary(twoDevices, true), 'Syncing skills…');
   assert.match(
     syncSummary(page({ sync: { ...page().sync, reset: true } }), false),

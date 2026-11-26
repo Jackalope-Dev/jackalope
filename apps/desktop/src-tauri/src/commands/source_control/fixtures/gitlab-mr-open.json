@@ -1,0 +1,41 @@
+{
+  "id": 471200042,
+  "iid": 42,
+  "project_id": 34675721,
+  "title": "Add saved carts",
+  "description": "Keeps a cart between visits.",
+  "state": "opened",
+  "created_at": "2026-11-24T14:05:20.000Z",
+  "updated_at": "2026-11-24T14:11:14.856Z",
+  "target_branch": "main",
+  "source_branch": "jackalope/saved-carts",
+  "draft": false,
+  "work_in_progress": false,
+  "merge_when_pipeline_succeeds": false,
+  "merge_status": "can_be_merged",
+  "detailed_merge_status": "not_approved",
+  "sha": "1cb8a0961c4d3e2b5a7f8e9d0c1b2a3f4e5d6c7b",
+  "squash": false,
+  "squash_on_merge": false,
+  "has_conflicts": false,
+  "blocking_discussions_resolved": true,
+  "user_notes_count": 3,
+  "references": { "short": "!42", "full": "acme/platform/web!42" },
+  "web_url": "https://gitlab.com/acme/platform/web/-/merge_requests/42",
+  "head_pipeline": {
+    "id": 3109717199,
+    "iid": 18599,
+    "project_id": 34675721,
+    "sha": "7e6dca61301884fbba4e673898affb7d69e2474c",
+    "ref": "refs/merge-requests/42/merge",
+    "status": "failed",
+    "source": "merge_request_event",
+    "web_url": "https://gitlab.com/acme/platform/web/-/pipelines/3109717199",
+    "detailed_status": {
+      "icon": "status_failed",
+      "text": "Failed",
+      "label": "failed",
+      "group": "failed"
+    }
+  }
+}

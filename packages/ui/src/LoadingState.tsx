@@ -1,14 +1,28 @@
 import { LoaderCircle } from 'lucide-react';
+import { ThinkingOrb, type ThinkingOrbState } from './ThinkingOrb';
 import './loading-state.css';
 
-export function LoadingState({ label, compact = false }: { label: string; compact?: boolean }) {
+export function LoadingState({
+  label,
+  compact = false,
+  orb,
+}: {
+  label: string;
+  compact?: boolean;
+  /** An agent is behind the wait: show what it is doing instead of a generic spinner. */
+  orb?: ThinkingOrbState;
+}) {
   return (
     <div
       className={`workspace-loading${compact ? ' workspace-loading--compact' : ''}`}
       role="status"
     >
       <div className="workspace-loading-label">
-        <LoaderCircle className="workspace-loading-spinner" size={18} aria-hidden="true" />
+        {orb ? (
+          <ThinkingOrb state={orb} size={20} aria-hidden="true" />
+        ) : (
+          <LoaderCircle className="workspace-loading-spinner" size={18} aria-hidden="true" />
+        )}
         <span>{label}</span>
       </div>
       {!compact && (

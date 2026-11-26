@@ -409,7 +409,6 @@ pub async fn local_ai_verify(
     runtime: State<'_, tasks::TaskRuntime>,
 ) -> Result<Verification, String> {
     model(&model_id)?;
-    runtime.access.ensure()?;
     let _operation = service.begin()?;
     *service.verified.lock().map_err(|e| e.to_string())? = None;
     let helper = if let Some(id) = helper_model_id.as_deref() {
@@ -523,7 +522,6 @@ pub async fn local_ai_connect(
     runtime: State<'_, tasks::TaskRuntime>,
 ) -> Result<agent_profiles::AgentProfile, String> {
     model(&model_id)?;
-    runtime.access.ensure()?;
     let _operation = service.begin()?;
     let verified = service
         .verified

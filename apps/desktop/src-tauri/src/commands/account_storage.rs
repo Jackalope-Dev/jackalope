@@ -14,6 +14,7 @@ const RECORD_NAMES: &[&str] = &[
     "account.bin",
     "agent-credentials.bin",
     "api-key.bin",
+    "bitbucket.bin",
     "cloudflare-artifacts.bin",
     "cloudflare-postgres.bin",
     "composio.bin",
@@ -26,8 +27,9 @@ const RECORD_NAMES: &[&str] = &[
 ];
 
 /// Folders whose every `.bin` file is a protected record named at runtime: a
-/// project's secrets, and each computer's and computer provider's.
-const RECORD_FOLDERS: &[&str] = &["project-secrets", "secrets"];
+/// project's secrets and App Store Connect connection, and each computer's and
+/// computer provider's.
+const RECORD_FOLDERS: &[&str] = &["project-secrets", "app-store-connect", "secrets"];
 
 /// Whether `path` is a protected record: a registered name, or a `.bin` file
 /// in one of [`RECORD_FOLDERS`].
@@ -216,6 +218,7 @@ mod registry_tests {
             &root.join("agent-profiles/opencode/a/api-key.bin")
         ));
         assert!(is_record(&root.join("project-secrets/project.bin")));
+        assert!(is_record(&root.join("app-store-connect/project.bin")));
         assert!(is_record(&root.join("computers/secrets/agent37-a.bin")));
         assert!(is_record(&root.join("secrets/agent37.bin")));
         assert!(!is_record(&root.join("history/run.bin")));

@@ -72,8 +72,9 @@ changed since the displayed snapshot cannot be marked seen without refreshing.
 If Git has removed the earlier snapshot, the view falls back to all current changes.
 
 Before sending a new chat, optional workflow starters prepare editable issue, PR-review,
-CI-repair or dependency-update requests. GitHub CLI reads use the selected repository;
-imported evidence is bounded and labeled when incomplete. No remote write is performed.
+CI-repair or dependency-update requests. Reads use the selected repository's code host
+(see Code hosts below); imported evidence is bounded and labeled when incomplete. No
+remote write is performed.
 Optional session limits cap the number of batches or pause at a reported cost estimate.
 They only block the next batch; a running batch can exceed the threshold. Missing cost
 for any batch or routing work pauses further dispatch when a cost threshold is set.
@@ -346,9 +347,34 @@ through a separate temporary Git index. Forced additions already in the source i
 preserved. The source index and files are not staged, reset or committed in place.
 
 Git `commit-tree` and `merge-tree` prepare the combined result against the captured target branch.
+Xcode project files (`.pbxproj`) that conflict only as text are merged object by object
+first; see [Xcode project merges](IOS-DEVELOPMENT.md#xcode-project-merges). The same
+applies to feature-dependency bases, reconciliation input, peer conflict prediction, the
+cleanup content check and **Merge locally**.
 The app retains a reference and durable review receipt. A conflict produces a blocked
 review with the conflicting paths; it does not touch the target branch. Reiterate an affected task,
 or resolve with ordinary Git tools and prepare a new review. There is no conflict editor yet.
+
+A ready review can be split into ordered commits before it is applied. **Split into commits**
+asks the default agent, without tools, to group the change: each hunk of a modified text file is
+one unit, while new, deleted, binary, mode-changing, single-hunk and Xcode project files and a
+file replaced by a link (or the reverse) move whole. The diff format is fixed regardless of the person's Git diff
+settings. The agent returns at most 12 commits with messages and the earlier commits each one
+needs; any `Signed-off-by:` line it writes is dropped, since only the person can sign off. Jackalope
+rejects a grouping that omits, repeats or invents a hunk, or whose dependencies form a cycle;
+orders commits by dependency, then source before tests, docs and configuration; and places
+each lock file with the commit that changes its manifest. A single change, more than 400 hunks
+or an unusable answer keeps one commit and says why. The proposal lists each commit's files,
+its share of each file's hunks and the commits it needs, and its messages stay editable.
+Merging waits until the person approves or dismisses it. Approval rebuilds the commits on
+the captured target through a private index, with project attribution on each, and moves the
+review's reference only when the last commit's tree equals the reviewed tree exactly; a
+mismatch, a review that changed since the proposal or changed commit settings leave it
+untouched. The review offers to propose again when the proposal is stale and to prepare a fresh
+review when the review itself is, including after an interruption between moving the reference
+and saving the review. Apply then fast-forwards the target through the commits as usual. With the
+desktop development server running, `node scripts/verification/verify-commit-split.mjs`
+exercises this review against native-service fixtures.
 
 Apply rechecks the selected sources' HEAD, content tree and index/worktree state, the current
 target branch, checked-out target, ignored-file collisions and dirty/untracked files. It then
@@ -385,7 +411,8 @@ settings can disable automatic checkpoints. Agents receive consistent handoff
 instructions and Git identity environment values; the native writer owns checkpoint
 and final-merge metadata. This is not a sandbox against a CLI deliberately issuing
 its own Git commands. Review squashes the selected snapshots to one target commit,
-so intermediate commits do not clutter main/master history. Users may edit the
+so intermediate commits do not clutter main/master history, unless the reviewer approves
+a split into ordered commits. Users may edit the
 suggested message before preparing the final review.
 
 Cleanup uses ancestry for clean merged branches and exact no-op Git three-way
@@ -398,6 +425,29 @@ candidates. A Windows folder lock reports the affected path and a retry action.
 If Git removed its registration but left residue, the remaining directory needs
 manual inspection rather than an unverified recursive deletion. No remote branches
 are deleted. Old applied receipts and saved task data remain readable.
+
+**Remove finished worktrees** (Project settings → Basics, off by default) removes a
+project's task worktrees after a chosen 1, 3, 7, 14 or 30 days. The app runs it ten minutes
+after opening and then hourly, never during startup. A worktree qualifies only when it is
+in the project's `.worktrees/` folder, an attempt in loaded history used it, and its task
+was merged by Jackalope, archived, or has commits of its own that are merged into `main` or
+`master`, counted from the latest of its attempts' end, archive and merge times. It is kept
+while any attempt using it is active, interrupted, finishing or unsaved, while it belongs
+to a conversation, while a review of its result runs, while a prepared merge of it is not
+applied, while a Keep and combine follow-up reads it, or while any process runs inside it
+(on macOS and Linux, also while the processes cannot be listed).
+It then goes through the same inspection and removal as Clean up, so uncommitted changes,
+unmerged commits, local data, locks, submodules, terminals, previews and checks keep it.
+Because no one sees what it deletes, it also keeps a worktree holding any ignored file that
+is not dependency or build output (`node_modules`, `target`, `dist`, `build`, `.next`,
+`.cache`, `__pycache__`, `.venv` and similar), a file tools recreate (`.DS_Store`,
+`*.tsbuildinfo`), a byte-identical copy of the checkout's file (as `.worktreeinclude` and
+setup files place them) or Jackalope's `.jackalope/prepared.json`. Notes, local output and
+`.jackalope/artifacts` therefore keep it, with the reason "Kept: has local files (notes.md,
+out/…)"; Clean up in Project worktrees lists those files and removes it on confirmation.
+Branches are never deleted. Removals, failures and worktrees kept for local files are logged
+in `integrations/worktree-cleanup.jsonl` in the native profile with the reason (a repeated
+keep only once), and the newest show under the setting.
 
 ## Usage and capacity
 
@@ -475,9 +525,37 @@ and page details** uses a fresh isolated browser and saves a screenshot with bou
 page elements and errors. It does not copy login or interactions from the embedded page.
 Users can attach that evidence to a follow-up, cancel a capture, and explicitly stop
 the preview before continuing. Preview ownership still blocks integration and cleanup.
+An iOS app runs in the task's Simulator instead, under the same ownership; see
+[iOS development](IOS-DEVELOPMENT.md#run-in-simulator).
 
 Delivery can inspect local Git state or read PR/CI through an installed, authenticated
 GitHub CLI. Ahead/behind counts use local upstream references, without fetching. PR
 checks apply to their recorded head; a different local head is shown explicitly.
 Delivery preparation creates an editable handoff and does not publish, merge or deploy.
 Deployment remains unverified until checked in the target environment.
+
+### Code hosts
+
+Delivery, pull request following, issue browsing and workflow starters serve the code
+host of the remote the checkout publishes to (its branch's remote, then `origin`, then
+its only remote). `commands/source_control.rs` recognizes github.com, gitlab.com and
+bitbucket.org, plus self-managed GitLab and GitHub Enterprise hosts named in Settings →
+Connected work; a project's Integrations settings can say its remote is GitHub or GitLab
+instead. Any other host keeps the GitHub CLI path, which is unchanged.
+
+| Host | Access | Change request | Checks and follow-ups |
+| --- | --- | --- | --- |
+| GitHub | `gh` sign-in | Pull request; merge, squash or rebase | Check runs and statuses; review threads; failed runs in starters |
+| GitLab | `glab` sign-in, `glab api --hostname` | Merge request (`Draft:` title); merge or squash as the project allows | Head pipeline jobs; unresolved discussions; the end of failed job logs |
+| Bitbucket Cloud | API token with scopes and the Atlassian email, in protected storage | Pull request (draft); merge commit, squash or fast-forward as the branch allows | Commit build statuses; open comments; the end of failed Pipelines step logs |
+
+GitLab and Bitbucket answers are reported in the GitHub CLI's pull request shape with
+`provider` set, so following, phases and notifications are shared; the UI uses "merge
+request" on GitLab. Merging is refused before the request when the host says the change
+request cannot merge yet, and the host still enforces its pipelines, approvals and merge
+checks; nothing bypasses them. A merge request address is read through glab only on the
+task's own remote host or a configured GitLab host. A missing or signed-out glab, or a
+missing or refused Bitbucket token, is shown with the host's own message and the install
+or `glab auth login --hostname` step. Pushing always uses plain Git with the remote's own
+credentials; Bitbucket Data Center and GitLab or Bitbucket remote publication other than
+opening and merging a change request are not supported.

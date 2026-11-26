@@ -382,7 +382,6 @@ impl Coordinator {
         title: String,
         auto_start: bool,
     ) -> Result<String, String> {
-        self.runtime.access.ensure()?;
         self.ensure_storage_loaded()?;
         let assessment =
             task_strategy::validated_assessment(&self.runtime, &assessment_id, &request)?;
@@ -495,7 +494,6 @@ impl Coordinator {
     }
 
     pub(super) fn start_managed(&self, id: &str, planner_run_id: &str) -> Result<(), String> {
-        self.runtime.access.ensure()?;
         let task = self
             .inner
             .lock()
@@ -591,7 +589,7 @@ impl Coordinator {
             }
             auto_start_ready(&inner.ledger, &runs)
         };
-        if ready.is_empty() || self.runtime.access.ensure().is_err() {
+        if ready.is_empty() {
             return Ok(());
         }
         for (id, planner_run_id) in ready {
@@ -630,7 +628,6 @@ impl Coordinator {
             .ok_or("Task not found.")?;
         match action {
             "retry-repair" => {
-                self.runtime.access.ensure()?;
                 task_strategy::validate_source(&task.request, &task.assessment.source_head)?;
                 self.commit(&mut inner, |ledger| {
                     let saved = ledger
@@ -678,7 +675,6 @@ impl Coordinator {
                 return self.launch_planner(&next);
             }
             "resume" => {
-                self.runtime.access.ensure()?;
                 if !task.started {
                     return Err("Review and start the proposed plan first.".into());
                 }
@@ -1017,7 +1013,7 @@ mod tests {
         inner.enabled = [dispatch_key("parent")].into();
         assert!(ready_items(&inner, &[], &[]).is_empty());
         let folder = std::env::temp_dir().join(format!("managed-restart-{}", Uuid::new_v4()));
-        let runtime = TaskRuntime::with_test_access(folder.join("history")).unwrap();
+        let runtime = TaskRuntime::new(folder.join("history")).unwrap();
         let service = Coordinator::new(folder.join("queue"), runtime.clone()).unwrap();
         service.commit(&mut inner, |_| Ok::<_, String>(())).unwrap();
         drop(service);

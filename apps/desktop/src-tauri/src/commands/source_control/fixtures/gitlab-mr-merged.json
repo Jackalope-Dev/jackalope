@@ -1,0 +1,23 @@
+{
+  "id": 471200040,
+  "iid": 40,
+  "project_id": 34675721,
+  "title": "Fix totals rounding",
+  "description": "",
+  "state": "merged",
+  "target_branch": "main",
+  "source_branch": "fix/rounding",
+  "draft": false,
+  "work_in_progress": false,
+  "merge_status": "can_be_merged",
+  "detailed_merge_status": "not_open",
+  "sha": "3ec1ddde0a1b2c3d4e5f60718293a4b5c6d7e8f9",
+  "has_conflicts": false,
+  "blocking_discussions_resolved": true,
+  "web_url": "https://gitlab.com/acme/platform/web/-/merge_requests/40",
+  "head_pipeline": {
+    "id": 3108923281,
+    "status": "success",
+    "web_url": "https://gitlab.com/acme/platform/web/-/pipelines/3108923281"
+  }
+}

@@ -22,8 +22,9 @@ pub struct LedgerRecord {
     /// `restored`, `edited`, `deleted`, `curated` (folded by the curator),
     /// `missed` (restated after it was supplied), `contradicted`, `stale`
     /// (names something the project no longer has), `enforced` (a repository
-    /// check now enforces it), `unenforced` (that check is gone) or
-    /// `unreported` (an accepted check task named no enforcer).
+    /// check now enforces it), `unenforced` (that check is gone),
+    /// `unreported` (an accepted check task named no enforcer), `ruled` (the
+    /// person made or changed its tool rule) or `unruled` (removed it).
     pub action: String,
     pub reason: String,
     /// The entry revision after the change.

@@ -30,8 +30,14 @@ pub fn workspace_processes(workspace: &Path) -> Option<Vec<WorkspaceProcess>> {
 fn inside(workspace: &Path) -> Option<Vec<WorkspaceProcess>> {
     let root = std::fs::canonicalize(workspace).unwrap_or_else(|_| workspace.to_path_buf());
     let own = std::process::id();
+    let listed = running()?;
+    // Every listing includes this process; one that does not could not read the others either,
+    // such as lsof producing no output.
+    if !listed.iter().any(|(pid, _, _)| *pid == own) {
+        return None;
+    }
     Some(
-        running()?
+        listed
             .into_iter()
             .filter(|(pid, _, directory)| *pid != own && directory.starts_with(&root))
             .map(|(pid, name, directory)| WorkspaceProcess {

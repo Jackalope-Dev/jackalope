@@ -3,14 +3,14 @@
 The `jackalope` command opens a conversation with Jackalope from a terminal. You
 describe the work, Jackalope routes it to an agent, and the terminal shows the
 exchange, the assigned agent and the step the work is on. It uses the same live
-sessions, routing, account access and Git safeguards as the desktop app.
+sessions, routing and Git safeguards as the desktop app, and needs no Jackalope account.
 
 ## Host and clients
 
 A profile has one owner: `TaskRuntime` and `Coordinator` take exclusive locks on
 `task-runs-v1/runtime.lock` and `coordination/owner.lock`. The command therefore
 never opens a profile. It connects to the process that owns it, called the host,
-and inherits that host's approved-account lease.
+which runs work with or without a connected Jackalope account.
 
 - The desktop binary is the host. `jackalope-desktop --headless` runs the same
   services without a window; on macOS it has no Dock icon until a window opens.
@@ -90,7 +90,7 @@ terminal and the app together. Leaving a terminal does not stop work.
 | `jackalope answer <id> [reply]` | Shows the question a conversation is waiting on, or answers it by text or option number |
 | `jackalope diff <id>` | Prints a conversation's changes since its worktree left the project's commit, uncommitted edits included; `--stat` summarizes them. New untracked files are listed on stderr |
 | `jackalope merge <id>` | Pauses the conversation, prepares a merge of its latest reviewed attempt into the project's target branch through the app's merge review, lists the files and asks before applying. `-m` sets the commit message; conflicts are reported for the app's merge review. Work that ran on a new branch or the current branch in the checkout has nothing to merge, and the command says what to do instead; when nothing is prepared, the pause it added is undone |
-| `jackalope pr <id>` | Commits remaining changes with the project's commit settings, pushes the branch and opens a draft pull request through the GitHub CLI after you confirm. `--title` replaces the conversation title; `--ready` opens it ready for review |
+| `jackalope pr <id>` | Commits remaining changes with the project's commit settings, pushes the branch and opens a draft pull request after you confirm, through the project's code host (GitHub CLI, GitLab CLI as a merge request, or the Bitbucket API). `--title` replaces the conversation title; `--ready` opens it ready for review |
 | `jackalope plan "<goal>"` | Plans before any code changes: a read-only interview whose questions are asked on the terminal (exit status 2 when there is none), then prints the plan. See [plan mode](#plan-mode) |
 | `jackalope plans` | Lists this project's plans; `--json` |
 | `jackalope plan show <id>` | Prints a plan and its progress; `--json` |
@@ -354,7 +354,7 @@ Agent questions open a picker of their options once; choosing one, or typing a
 reply and pressing Enter, answers the oldest open question. The
 transcript shows the conversation's messages with each reply; when work was
 retried, every attempt's output appears in order under an attempt label. Errors
-raised before an agent starts, such as missing account access, update the view
+raised before an agent starts, such as a missing agent, update the view
 without further input.
 
 The terminal re-reads the conversation in the background when the host reports a

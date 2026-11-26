@@ -86,6 +86,77 @@ const CONSENT =
  * current epoch. A write names the revision it replaces, so a device that
  * missed another device's change receives `conflict` and never overwrites it.
  */
+/** A computer that stopped checking in this long ago, and holds nothing, isn't shown. */
+const RECENT_DEVICE = 30 * 86400000;
+const SHOWN_DEVICES = 10;
+interface SkillDeviceRow {
+  id: string;
+  name: string | null;
+  platform: string | null;
+  machineKey: string | null;
+  seen: number;
+  settingsSync: number;
+}
+interface Holding {
+  skill: string;
+  device: string;
+  revision: number;
+}
+
+/**
+ * The computers skill sync involves, one entry per computer: connections sharing a machine
+ * key are one computer, shown by the caller's connection or else its most recently seen one,
+ * and their holdings move to that entry. A computer is shown when it is this one, holds a
+ * synced skill, or has settings sync on and checked in recently. Old profiles, resets and
+ * reconnects that never synced drop out. Each entry keeps the `{id,name,platform,here}` shape
+ * shipped desktops parse strictly, and the machine key is never returned.
+ */
+export function skillDevices(
+  rows: SkillDeviceRow[],
+  holdings: Holding[],
+  deviceId: string,
+  now: number,
+) {
+  const held = new Set(holdings.map((holding) => holding.device));
+  const computers = new Map<string, SkillDeviceRow[]>();
+  for (const row of rows) {
+    const key = row.machineKey ?? `device:${row.id}`;
+    computers.set(key, [...(computers.get(key) ?? []), row]);
+  }
+  const shownAs = new Map<string, string>();
+  const devices: { id: string; name: string | null; platform: string | null; here: boolean }[] = [];
+  for (const connections of computers.values()) {
+    const here = connections.some((row) => row.id === deviceId);
+    const shown =
+      here ||
+      connections.some(
+        (row) => held.has(row.id) || (row.settingsSync === 1 && row.seen > now - RECENT_DEVICE),
+      );
+    if (!shown) continue;
+    // Rows arrive newest first, so the first is the most recently seen connection.
+    const lead = connections.find((row) => row.id === deviceId) ?? connections[0];
+    for (const row of connections) shownAs.set(row.id, lead.id);
+    devices.push({
+      id: lead.id,
+      name: lead.name ?? connections.find((row) => row.name)?.name ?? null,
+      platform: lead.platform ?? connections.find((row) => row.platform)?.platform ?? null,
+      here,
+    });
+  }
+  devices.sort((a, b) => Number(b.here) - Number(a.here));
+  const kept = new Set(devices.slice(0, SHOWN_DEVICES).map((device) => device.id));
+  const newest = new Map<string, Holding>();
+  for (const holding of holdings) {
+    const device = shownAs.get(holding.device);
+    if (!device || !kept.has(device)) continue;
+    const key = `${holding.skill}\n${device}`;
+    const previous = newest.get(key);
+    if (!previous || previous.revision < holding.revision)
+      newest.set(key, { skill: holding.skill, device, revision: holding.revision });
+  }
+  return { devices: devices.slice(0, SHOWN_DEVICES), holdings: [...newest.values()] };
+}
+
 export async function skillsRoute(
   env: Env,
   memberId: string,
@@ -144,25 +215,17 @@ export async function skillsRoute(
     ]);
     const [devices, holdings] = await Promise.all([
       env.DB.prepare(
-        'SELECT id,name,platform FROM access_devices WHERE member_id=? AND expires_at>? ORDER BY coalesce(last_seen_at,created_at) DESC,id LIMIT 10',
+        'SELECT id,name,platform,machine_key AS machineKey,coalesce(last_seen_at,created_at) AS seen,settings_sync AS settingsSync FROM access_devices WHERE member_id=? AND expires_at>? ORDER BY seen DESC,id LIMIT 50',
       )
         .bind(memberId, now)
-        .all<{ id: string; name: string | null; platform: string | null }>(),
+        .all<SkillDeviceRow>(),
       env.DB.prepare(
         'SELECT skill_id AS skill,device_id AS device,revision FROM access_skill_devices WHERE member_id=? LIMIT ?',
       )
         .bind(memberId, HOLDINGS)
-        .all<{ skill: string; device: string; revision: number }>(),
+        .all<Holding>(),
     ]);
-    return {
-      devices: devices.results.map((device) => ({
-        id: device.id,
-        name: device.name,
-        platform: device.platform,
-        here: device.id === deviceId,
-      })),
-      holdings: holdings.results,
-    };
+    return skillDevices(devices.results, holdings.results, deviceId, now);
   }
   const push = pushSchema.parse(body);
   if (push.epoch !== consent.epoch) throw new ServiceError(409, 'skills_reset');

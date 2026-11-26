@@ -8,9 +8,26 @@ supported). Jackalope uses the account already on this computer unless you choos
 isolated account in Agents. Each provider's own subscription and permissions
 still apply.
 
-Running tasks also needs a free Jackalope account. The welcome screen opens the
-website in your browser to sign up or sign in, then you confirm the code shown in
-the app to connect this desktop. See [desktop account connection](DESKTOP-ACCOUNT.md).
+A Jackalope account is optional. Choose **Continue without an account** on the
+welcome screen to start right away, or **Create free account or sign in** to add
+settings, lesson and skill sync across computers, invitations and the Microsoft Store beta. That
+opens the website in your browser; confirm the code shown in the app to connect this
+desktop. You can connect later from Settings → Jackalope account. See
+[desktop account connection](DESKTOP-ACCOUNT.md).
+
+First-run setup starts by looking for repositories on this computer: the folders your
+Claude Code and Codex conversations ran in, Git repositories one or two levels inside common
+code folders in your home (such as `~/Code`, `~/Developer`, `~/Projects`, `~/src` and
+`~/source/repos`), and folders VS Code, Cursor and Windsurf list as open or recently open
+in their `storage.json`. Worktrees count as their main checkout, and repositories that are
+already projects are left out. It reads only directory entries and Git metadata (current
+commit time and the default remote's host), never file contents. On macOS it never opens
+Desktop, Documents, Downloads, the media folders, `~/Library` (including iCloud Drive) or
+mounted volumes, so macOS does not ask for permission. The scan stops after a few seconds
+with what it found. The few with recent agent conversations or commits start chosen; **Add
+another folder…** adds one you pick, and **Skip** goes to choosing a folder instead. Each
+chosen repository is added with its commands detected, and the first continues through
+setup. Command search's **Find projects on this computer** runs the same scan later.
 
 1. Open a Git repository with at least one commit (Project settings → Integrations →
    Cloudflare Artifacts can make the first one). Choose the agent you want.

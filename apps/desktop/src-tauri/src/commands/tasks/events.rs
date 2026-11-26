@@ -56,6 +56,29 @@ pub(in crate::commands) fn settle_usage(run: &mut TaskRun) {
     );
 }
 
+/// Records the context size of the latest top-level model call, keeping a window the
+/// provider reported earlier in the attempt.
+pub(super) fn observe_context(run: &mut TaskRun, used: u64, window: Option<u64>) {
+    if used == 0 {
+        return;
+    }
+    let window = window.or(run.context.as_ref().and_then(|context| context.window));
+    run.context = Some(ContextUsage { used, window });
+}
+
+/// The context window Claude Code's result reports for the model that served the turn:
+/// `modelUsage` lists each model the turn used, subagents' included.
+fn reported_context_window(models: &Value, served: Option<&str>) -> Option<u64> {
+    let models = models.as_object()?;
+    let window = |entry: &Value| entry["contextWindow"].as_u64().filter(|n| *n > 0);
+    if let Some(entry) = served.and_then(|model| models.get(model)) {
+        return window(entry);
+    }
+    let mut windows = models.values().filter_map(window);
+    let first = windows.next()?;
+    windows.all(|other| other == first).then_some(first)
+}
+
 #[cfg(test)]
 pub(super) fn consume_event(run: &mut TaskRun, line: &str) {
     let adapter = run.agent.clone();
@@ -70,8 +93,9 @@ pub(in crate::commands) fn consume_adapter_event(run: &mut TaskRun, line: &str, 
     run.efficiency.observe(&event, adapter, &run.workspace);
     let kind = event["type"].as_str().unwrap_or("");
     if let Some(failure) = super::routing::quota_failure(&event) {
-        run.quota_failure = Some(failure);
+        super::usage_limit::record(run, failure);
     }
+    super::usage_limit::observe_snapshot(run, &event);
     let protocol = crate::commands::agents::find(adapter).map(|agent| agent.protocol);
     if protocol == Some(Protocol::Opencode) {
         consume_opencode_event(run, &event, kind);
@@ -114,6 +138,9 @@ pub(in crate::commands) fn consume_adapter_event(run: &mut TaskRun, line: &str, 
                     cache_read: read,
                     cache_write: write,
                 };
+                if child.is_none() {
+                    observe_context(run, observation.input, None);
+                }
                 if let Some(old) = run
                     .usage_observations
                     .iter_mut()
@@ -132,6 +159,18 @@ pub(in crate::commands) fn consume_adapter_event(run: &mut TaskRun, line: &str, 
 
     if let Some(id) = event["thread_id"].as_str().or(event["session_id"].as_str()) {
         run.session_id = Some(id.into());
+    }
+    // The last message Claude Code wrote to the session, which a rewind resumes up to.
+    if protocol == Some(Protocol::ClaudeStream) && matches!(kind, "assistant" | "user") {
+        if let (Some(session), Some(entry)) = (
+            run.session_id.clone(),
+            event["uuid"].as_str().filter(|uuid| uuid.len() <= 100),
+        ) {
+            run.rewind.mark = Some(super::rewind::ConversationMark {
+                session,
+                entry: entry.into(),
+            });
+        }
     }
     if let Some(model) = event["model"]
         .as_str()
@@ -316,6 +355,13 @@ pub(in crate::commands) fn consume_adapter_event(run: &mut TaskRun, line: &str, 
                     estimated_cost_usd: event["total_cost_usd"].as_f64(),
                 };
             }
+            if let Some(window) =
+                reported_context_window(&event["modelUsage"], run.model.as_deref())
+            {
+                if let Some(context) = &mut run.context {
+                    context.window = Some(window);
+                }
+            }
             if let Some(denials) = event["permission_denials"]
                 .as_array()
                 .filter(|v| !v.is_empty())
@@ -371,6 +417,7 @@ fn consume_opencode_event(run: &mut TaskRun, event: &Value, kind: &str) {
                 .saturating_add(read)
                 .saturating_add(write);
             let output = num(tokens, "output").saturating_add(num(tokens, "reasoning"));
+            observe_context(run, input, None);
             run.usage_observations.push(UsageObservation {
                 session_id: None,
                 message_id: id.into(),

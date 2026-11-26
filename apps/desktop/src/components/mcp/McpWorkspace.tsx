@@ -4,7 +4,6 @@ import {
   ConfirmDialog,
   EmptyState,
   InlineNotice,
-  LoadingIcon,
   DropdownMenu as Menu,
   SearchField,
   SegmentedControl,
@@ -12,6 +11,7 @@ import {
   SettingGroup,
   SettingRow,
   Switch,
+  ThinkingOrb,
 } from '@jackalope/ui';
 import { Activity, CheckCircle, Globe, MoreHorizontal, Search, Server, X } from 'lucide-react';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
@@ -610,6 +610,7 @@ export function McpWorkspace({
                     <SearchField
                       aria-label="Search MCP marketplace"
                       placeholder="Search MCP servers…"
+                      busy={loadingMarketplace && showDirectory}
                       value={searchQuery}
                       onValueChange={(value) => setSearchQuery(value)}
                     />
@@ -683,8 +684,9 @@ export function McpWorkspace({
                           </InlineNotice>
                         )}
                         {loadingMarketplace ? (
-                          <p className="task-muted" role="status">
-                            <LoadingIcon size={16} /> Searching AllMCPs…
+                          <p className="task-muted ui-thinking-status" role="status">
+                            <ThinkingOrb state="searching" size={20} aria-hidden="true" />
+                            Searching AllMCPs…
                           </p>
                         ) : directoryResults.length > 0 ? (
                           <div className="mcp-grid">{directoryResults.map(renderCard)}</div>

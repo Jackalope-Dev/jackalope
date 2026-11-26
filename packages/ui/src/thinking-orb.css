@@ -1,0 +1,18 @@
+@import "./foundation.css";
+@layer components {
+  .ui-thinking-orb {
+    display: inline-block;
+    flex: none;
+    vertical-align: middle;
+  }
+  /* A line of status text led by its orb. */
+  .ui-thinking-status {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  /* A 20px orb leads a badge without making it taller than its text. */
+  .ui-badge > .ui-thinking-orb {
+    margin: -3px 0 -3px -5px;
+  }
+}

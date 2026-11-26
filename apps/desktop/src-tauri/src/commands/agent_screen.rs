@@ -1,6 +1,7 @@
-//! Read-only view of what an attempt's agent can see: its task browser and any
-//! user-granted desktop window. Viewing never starts a browser, changes a grant
-//! or records an artifact; revoking reuses the existing ownership paths.
+//! Read-only view of what an attempt's agent can see: its task browser, the
+//! iOS Simulator its tools use and any user-granted desktop window. Viewing
+//! never starts a browser or a simulator, changes a grant or records an
+//! artifact; revoking reuses the existing ownership paths.
 
 use super::{browser, desktop_control, tasks::TaskRuntime};
 use base64::Engine as _;
@@ -25,6 +26,8 @@ pub struct AgentScreen {
     pub desktop: Option<desktop_control::DesktopView>,
     /// The run's bot or task computer, when it has one.
     pub computer: Option<super::computers::ComputerStatus>,
+    /// The simulator the attempt's simulator tools use, once they used one.
+    pub simulator: Option<super::simulator::SimulatorView>,
     pub captured_at: String,
 }
 
@@ -78,6 +81,11 @@ pub async fn task_agent_screen(
             browser,
             desktop: desktop_control::view(&run_id),
             computer: super::computers::view_for_run(&runtime, &run_id),
+            simulator: if capture.unwrap_or(true) {
+                super::simulator::view(&run_id)
+            } else {
+                None
+            },
             captured_at: chrono::Utc::now().to_rfc3339(),
         }
     })

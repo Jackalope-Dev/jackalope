@@ -1,5 +1,244 @@
 [
   {
+    "id": "small-tasks-finish-sooner",
+    "date": "2026-11-25",
+    "title": "Small tasks finish sooner.",
+    "description": "Short, fully specified requests now skip the agent's opening restatement turn, so they finish faster with the same results.",
+    "items": [
+      "Bigger or open-ended tasks still show Understood as, the agent's restatement of the goal, while work runs."
+    ]
+  },
+  {
+    "id": "long-conversations-stay-fast",
+    "date": "2026-11-25",
+    "title": "Long conversations stay fast.",
+    "description": "Conversations with thousands of messages now open and stream instantly.",
+    "items": [
+      "Jackalope keeps your place while you read and shows Jump to latest when new replies arrive.",
+      "Press Cmd/Ctrl+F to find text anywhere in a conversation, including older replies.",
+      "Imported Claude Code and Codex conversations get the same fast view."
+    ]
+  },
+  {
+    "id": "build-ios-apps-with-your-agents",
+    "date": "2026-11-25",
+    "title": "Build iOS apps with your agents.",
+    "description": "iOS projects on a Mac get their own Simulator per task, agent tools that see and drive the app, a live Simulator preview and review screenshots.",
+    "items": [
+      "Jackalope finds Xcode even when xcode-select points at the Command Line Tools, and suggests setup and checks for Xcode, XcodeGen, Tuist, CocoaPods and Swift package projects.",
+      "Agents launch your app in the task's Simulator, read the screen, tap, type and take screenshots while you watch, and Preview shows a live screen you can tap, rotate and switch to dark mode or larger text.",
+      "Finished work that changes the app gets light, dark and large-text screenshots before and after.",
+      "New task workspaces reuse resolved Swift packages and Pods, and parallel tasks that add files no longer conflict in project.pbxproj.",
+      "Attach your own iPhone or iPad to run a task's build on it, upload a finished task to TestFlight after you confirm the build, or pair a Mac you own so iOS work runs there."
+    ],
+    "note": "Physical devices, TestFlight uploads and Mac computers are still being tested with real accounts."
+  },
+  {
+    "id": "edit-from-an-earlier-turn",
+    "date": "2026-11-25",
+    "title": "Edit from an earlier turn.",
+    "description": "Rewind a Claude Code or Codex conversation to any earlier turn and send it differently.",
+    "items": [
+      "Files and the agent's own conversation both go back, and your later changes are saved first.",
+      "Undo the rewind until you send the next message.",
+      "Undone turns stay in the history, collapsed, so nothing disappears."
+    ]
+  },
+  {
+    "id": "every-shortcut-is-yours-to-change",
+    "date": "2026-11-24",
+    "title": "Every shortcut is yours to change.",
+    "description": "All keyboard shortcuts can now be rebound, and the composer works from the keyboard.",
+    "items": [
+      "Record any shortcut, including two-key chords, in Settings; clashes are caught and can be swapped.",
+      "Open the agent, model and effort pickers, plan mode and the branch menu without the mouse.",
+      "Import and export your shortcuts as JSON."
+    ]
+  },
+  {
+    "id": "start-without-an-account",
+    "date": "2026-11-24",
+    "title": "Start without an account.",
+    "description": "Jackalope no longer requires an account to run your agents.",
+    "items": [
+      "Choose Continue without an account to run tasks, conversations and terminals with the agents you already have.",
+      "Connect a free account any time for settings, lesson and skill sync, invitations and the Microsoft Store beta."
+    ]
+  },
+  {
+    "id": "work-with-gitlab-and-bitbucket",
+    "date": "2026-11-24",
+    "title": "Work with GitLab and Bitbucket.",
+    "description": "Open, follow and merge GitLab merge requests and Bitbucket Cloud pull requests, and import their issues.",
+    "items": [
+      "GitLab uses your own glab sign-in, on gitlab.com or your own server; merge requests from a fork open on the parent project.",
+      "Bitbucket uses an Atlassian API token kept in your system's credential store.",
+      "Failed pipeline logs and review threads go into the fix draft for the task's agent, like they do for GitHub."
+    ]
+  },
+  {
+    "id": "your-projects-found-for-you",
+    "date": "2026-11-24",
+    "title": "Your projects, found for you.",
+    "description": "Setup lists the repositories you already work in, from your agent history, code folders and editor, so you can add them in one step.",
+    "items": [
+      "Find projects on this computer in command search adds more later.",
+      "Only Git details are read, and folders like Documents and Desktop are never opened."
+    ]
+  },
+  {
+    "id": "kimi-requests-get-the-full-risk-check",
+    "date": "2026-11-24",
+    "title": "Kimi requests get the full risk check.",
+    "description": "Automatic approval now reads what Kimi and other ACP agents are about to run or change, so risky requests ask you first.",
+    "items": [
+      "Destructive commands and writes outside the project ask instead of being approved; a request Jackalope cannot read also asks."
+    ]
+  },
+  {
+    "id": "an-overview-of-everything-running",
+    "date": "2026-11-24",
+    "title": "An Overview of everything running.",
+    "description": "A new Overview page shows live work, each project's status and accounts near their limits in one place.",
+    "items": [
+      "Open it from the sidebar or with Cmd/Ctrl+Shift+O; work waiting on you is listed first.",
+      "Project cards show open pull requests, check results and running previews.",
+      "Inbox's Running now lines up with Needs you and no longer lists finished conversations."
+    ]
+  },
+  {
+    "id": "worktrees-that-set-themselves-up",
+    "date": "2026-11-24",
+    "title": "Worktrees that set themselves up.",
+    "description": "New task worktrees can copy your local files, run setup commands and clean themselves up later.",
+    "items": [
+      "List local files such as .env in .worktreeinclude to copy them into every task worktree.",
+      "Run a saved command whenever a worktree is created, and stop dev servers when the task is merged or archived.",
+      "Optionally remove finished worktrees after a few days; anything with local files or unmerged work is kept."
+    ]
+  },
+  {
+    "id": "faster-interruptible-codex-conversations",
+    "date": "2026-11-24",
+    "title": "Faster, interruptible Codex conversations.",
+    "description": "Codex now keeps one session per conversation instead of starting fresh every turn.",
+    "items": [
+      "Codex asks before leaving its sandbox, and your project's approval settings decide, as they do for Claude Code.",
+      "Send now adds a message to a running Codex turn, and Stop ends the turn cleanly.",
+      "Older Codex versions fall back to the previous way of running, and the activity line says why."
+    ]
+  },
+  {
+    "id": "composer-shortcuts",
+    "date": "2026-11-24",
+    "title": "Composer shortcuts.",
+    "description": "Every composer now has slash commands, file mentions and a per-message effort choice.",
+    "items": [
+      "Type / for /model, /effort, /plan, /clear and your Claude skills, or @ to mention a project file.",
+      "Ask a side question with /btw; a read-only fork answers without touching the main conversation.",
+      "Press Up to bring back earlier prompts, and see how full the context window is when the agent reports it."
+    ]
+  },
+  {
+    "id": "pick-up-where-a-usage-limit-stopped-you",
+    "date": "2026-11-24",
+    "title": "Pick up where a usage limit stopped you.",
+    "description": "When an agent hits a usage limit, Jackalope shows when it resets and can resume the work then.",
+    "items": [
+      "The banner counts down to the reset time the provider reports and shows its own message.",
+      "Resume at reset survives a restart, and tasks can switch to another account or agent instead.",
+      "Notifications and the Inbox say which limit stopped the work and when it resets."
+    ]
+  },
+  {
+    "id": "bring-your-claude-code-and-codex-history",
+    "date": "2026-11-24",
+    "title": "Bring your Claude Code and Codex history.",
+    "description": "Import past conversations into Jackalope, grouped by project, and continue them where they ran.",
+    "items": [
+      "Choose conversations by project and date; the import runs in the background and can be canceled.",
+      "Importing again updates conversations that grew since last time."
+    ]
+  },
+  {
+    "id": "keep-api-keys-off-agent-computers",
+    "date": "2026-11-24",
+    "title": "Keep API keys off agent computers.",
+    "description": "Agents on a computer can now reach Anthropic and OpenAI through Jackalope, so your saved API key never leaves this device.",
+    "items": [
+      "Turn on Keep API keys on this device in Settings → Computers. Each attempt gets its own token, which stops working when the attempt ends.",
+      "Responses still stream to the agent as they arrive. Claude Code sign-in tokens go to the computer as before."
+    ]
+  },
+  {
+    "id": "see-where-a-task-s-time-went",
+    "date": "2026-11-24",
+    "title": "See where a task's time went.",
+    "description": "Finished tasks now have a Report tab that shows how long the agent spent thinking, reading code, running tests and trying the app.",
+    "items": [
+      "The report covers every attempt: total time, checks, setup, time waiting on you, tokens, cost and changed files, plus each tool's calls and time.",
+      "Usage & quota compares where agent time goes across agents and lists the slowest tools."
+    ],
+    "note": "Activity is timed for tasks started from this version. ACP agents show tool counts only."
+  },
+  {
+    "id": "split-a-merge-into-smaller-commits",
+    "date": "2026-11-24",
+    "title": "Split a merge into smaller commits.",
+    "description": "A ready merge review can now land as a short series of ordered commits instead of one large one.",
+    "items": [
+      "Choose Split into commits and your default agent proposes up to 12 commits, with lock files kept beside their manifests.",
+      "Review each commit's files, hunks, dependencies and message, then approve or keep one commit.",
+      "Jackalope applies a split only when its commits add up to exactly the reviewed files.",
+      "Agents reconciling overlapping work resolve conflicts block by block instead of editing marker text."
+    ]
+  },
+  {
+    "id": "credentials-stay-out-of-what-leaves-the-app",
+    "date": "2026-11-24",
+    "title": "Credentials stay out of what leaves the app.",
+    "description": "Feedback reports, phone companion responses, Jev requests and exported plans now mask API keys, tokens and passwords before they are sent or written.",
+    "items": [
+      "Common token formats, private keys and connection-string passwords are replaced with a labeled placeholder.",
+      "Secret values Jackalope gave an agent are masked too; local history and agent input are unchanged."
+    ]
+  },
+  {
+    "id": "lessons-that-steer-agents-as-they-work",
+    "date": "2026-11-24",
+    "title": "Lessons that steer agents as they work.",
+    "description": "Turn a project lesson into a tool rule that warns about or blocks matching shell commands and file changes while an agent works.",
+    "items": [
+      "Match a command or the text being written with a pattern, a file path, or both.",
+      "Warnings let the call run and show the agent your message; blocks refuse it and tell the agent why.",
+      "Every match is recorded in the task's activity."
+    ],
+    "note": "Rules apply to Claude Code on this device and to permission requests from OpenCode and ACP agents. Codex, Claude Code with persistent sessions turned off, and agents running on a computer are not checked yet."
+  },
+  {
+    "id": "a-second-opinion-on-every-turn",
+    "date": "2026-11-24",
+    "title": "A second opinion on every turn.",
+    "description": "Turn on the Turn advisor in Project settings and another agent reads each finished task turn, then leaves a few graded notes.",
+    "items": [
+      "Jackalope prefers an advisor from a different model family. It reads the request, reply, changes and checks, and never runs tools.",
+      "Concerns and blockers go back to the working agent as a follow-up it can push back on. Asides are only shown to you.",
+      "Notes appear under each reply in the task's Result tab, marked as sent to the agent or kept for you."
+    ],
+    "note": "The advisor uses its own agent account's quota. It skips turns when that quota is low, when every execution slot is busy, or once a task reaches its review limit."
+  },
+  {
+    "id": "agents-work-in-windows-behind-yours",
+    "date": "2026-11-24",
+    "title": "Agents work in windows behind yours.",
+    "description": "On Windows and macOS, an agent controlling a window clicks, types, presses keys and scrolls in it while it stays behind your work, without moving your pointer or taking your keyboard.",
+    "items": [
+      "A glow outlines the window it is working in and the bar stays at the top of the screen, so you can see it and stop it.",
+      "Resuming control leaves the window where it is, and an app grant can switch to its app's other windows or, on macOS, open the app without bringing it forward.",
+      "Safari, Firefox-based browsers and Windows Store apps still take only button presses and field edits in the background."
+    ]
+  },
+  {
     "id": "pick-up-quota-stopped-work-where-it-left-off",
     "date": "2026-11-20",
     "title": "Pick up quota-stopped work where it left off.",

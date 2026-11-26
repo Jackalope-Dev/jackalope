@@ -1,23 +1,25 @@
 import { X } from 'lucide-react';
 import { type CSSProperties, useEffect, useMemo, useRef } from 'react';
+import {
+  type KeybindingHandler,
+  useKeybindingHandlers,
+  useResolvedKeybindings,
+} from '../../hooks/useKeybindings';
 import { navigateWorkspace } from '../../lib/app-events';
-import { matchesShortcut, resolveShortcuts } from '../../lib/shortcuts';
+import { type KeybindingId, withShortcut } from '../../lib/keybindings';
 import { workPresence } from '../../lib/task-collection';
 import { openWork, useWorkspaceWork, workProjectId } from '../../lib/work-selection';
 import { useExecutionStore } from '../../stores/executionStore';
 import { useOpenWorkStore } from '../../stores/openWorkStore';
 import { useProjectStore } from '../../stores/projectStore';
-import { useSettingsStore } from '../../stores/settingsStore';
 import { AgentStack } from '../agents/AgentAvatar';
 import { ProjectMark } from '../projects/ProjectMark';
 import { isUnread, signalKey, useOpenSignalKey, useWorkSignals } from '../tasks/WorkSignals';
 import './work-tabs.css';
 
-const isMac = typeof navigator !== 'undefined' && /Mac/i.test(navigator.platform);
-
 /**
  * Tabs for recently opened tasks, chats and plans. Mod+1–9 jumps to a tab and
- * Ctrl+Tab cycles through them; closing a tab never stops or archives work.
+ * Ctrl+Tab cycles through them (both rebindable); closing a tab never stops or archives work.
  */
 export function WorkTabs() {
   const keys = useOpenWorkStore((state) => state.keys);
@@ -25,7 +27,7 @@ export function WorkTabs() {
   const loading = useExecutionStore((state) => state.loading);
   const openKey = useOpenSignalKey();
   const signals = useWorkSignals();
-  const shortcuts = useSettingsStore((state) => state.shortcuts);
+  const shortcuts = useResolvedKeybindings();
   const projects = useProjectStore((state) => state.projects);
   const strip = useRef<HTMLElement>(null);
   const byKey = useMemo(() => new Map(work.map((item) => [signalKey(item), item])), [work]);
@@ -44,28 +46,22 @@ export function WorkTabs() {
         ?.querySelector('[data-current]')
         ?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
   }, [openKey]);
-  useEffect(() => {
-    if (tabs.length < 2) return;
-    const handle = (event: KeyboardEvent) => {
-      if (event.defaultPrevented || event.isComposing) return;
-      const bindings = Object.values(resolveShortcuts(shortcuts));
-      if (bindings.some((binding) => matchesShortcut(event, binding))) return;
-      const modifier = isMac ? event.metaKey : event.ctrlKey;
-      let target = -1;
-      if (modifier && !event.altKey && !event.shiftKey && /^[1-9]$/.test(event.key))
-        target = Math.min(Number(event.key), tabs.length) - 1;
-      else if (event.ctrlKey && event.key === 'Tab') {
-        const current = tabs.findIndex((tab) => tab.key === openKey);
-        target = (current + (event.shiftKey ? -1 : 1) + tabs.length) % tabs.length;
-      }
-      if (target < 0) return;
-      event.preventDefault();
-      openWork(tabs[target].item);
-      navigateWorkspace('kanban');
-    };
-    window.addEventListener('keydown', handle);
-    return () => window.removeEventListener('keydown', handle);
-  }, [tabs, openKey, shortcuts]);
+  const go = (target: (current: number) => number) => () => {
+    if (tabs.length < 2) return false;
+    const item = tabs[target(tabs.findIndex((tab) => tab.key === openKey))].item;
+    openWork(item);
+    navigateWorkspace('kanban');
+  };
+  useKeybindingHandlers({
+    ...Object.fromEntries(
+      Array.from({ length: 9 }, (_, index) => [
+        `tab${index + 1}`,
+        go(() => Math.min(index, tabs.length - 1)),
+      ]),
+    ),
+    nextTab: go((current) => (current + 1) % tabs.length),
+    previousTab: go((current) => (current - 1 + tabs.length) % tabs.length),
+  } as Partial<Record<KeybindingId, KeybindingHandler>>);
   if (tabs.length < 2) return null;
   return (
     <nav ref={strip} className="work-tabs" aria-label="Open work">
@@ -83,7 +79,11 @@ export function WorkTabs() {
               type="button"
               className="work-tab-open"
               aria-current={current ? 'page' : undefined}
-              title={`${label}${index < 9 ? ` (${isMac ? '⌘' : 'Ctrl+'}${index + 1})` : ''}`}
+              title={
+                index < 9
+                  ? withShortcut(label, shortcuts[`tab${index + 1}` as KeybindingId])
+                  : label
+              }
               onClick={() => {
                 openWork(item);
                 navigateWorkspace('kanban');

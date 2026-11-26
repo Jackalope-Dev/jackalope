@@ -1,11 +1,12 @@
 # Account setup and settings sync
 
-Launch checks account access outside the numbered setup flow. App appearance and
-privacy controls live on this screen. Approval shows a brief animated checkmark
-(with a reduced-motion alternative), then enters the workspace or project setup.
-Every desktop build requires a native verified account access lease, including
-local development builds. Native execution checks remain authoritative
-including after revocation and offline expiry. Saved work remains reviewable.
+The first-run welcome screen offers an account outside the numbered setup flow. App
+appearance and privacy controls live on this screen. Approval shows a brief animated
+checkmark (with a reduced-motion alternative), then enters project setup; **Continue
+without an account** goes straight to project setup. Settings sync, lesson sync and
+skill sync are account features: the native host refuses them before any request
+unless an approved account with a current offline lease is connected. Local work
+never depends on the account.
 
 Project setup has six steps: Project, Agents, Decisions, Behavior, Appearance and
 First task. Adding another project reuses this flow without replaying the launch
@@ -87,8 +88,8 @@ as tombstones. History records carry their id, lesson id, time, action, reason,
 revision, origin and title. Evidence references and excerpts, use counts,
 opportunities, recent runs, last use, source tasks and commits, project IDs, names and
 folder paths never leave the desktop. A lesson whose text looks like it holds a
-credential, email address, credential URL or the home folder stays local; the status
-line counts them.
+credential, email address, credential URL or the home folder, or holds a secret value
+Jackalope gave an agent this session, stays local; the status line counts them.
 
 Projects match by a key derived from the repository's root commits, so a clone of the
 same repository matches on every computer without sending a path or remote URL. A
@@ -231,7 +232,8 @@ import offer the same **Keep out of commits** choice, on by default, and an untr
 project skill offers it from its menu.
 
 The page shows which of the account's computers hold each synced skill and whether they
-have the newest revision.
+have the newest revision. It counts this computer and the computers holding a synced
+skill, so connections that never synced anything are not counted.
 
 ### Stopping and deleting
 
@@ -257,8 +259,12 @@ except deletion:
   returns `stored` with the new revision and update time, or `conflict` with the
   current revision. `baseRevision` is 0 for a new skill; a removal omits `skill`.
 - `POST /v1/desktop/skills/have` with `{epoch, have}` records the revision this device
-  holds of each skill and returns up to 10 of the account's devices and which revision
-  each holds.
+  holds of each skill and returns up to 10 of the account's computers and which revision
+  each holds. Connections sharing a machine key are one computer, shown as the calling
+  connection or its most recently seen one, with their holdings moved to it. A computer
+  is listed when it is the caller's, holds a synced skill, or has settings sync on and
+  checked in within 30 days. Entries keep the `{id, name, platform, here}` shape older
+  desktops parse strictly.
 - `DELETE /v1/desktop/skills` deletes every synced skill and advances the epoch.
 
 A stale epoch receives `409 skills_reset`; missing consent receives

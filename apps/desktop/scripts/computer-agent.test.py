@@ -264,6 +264,139 @@ class RunProtocol(Harness):
         self.assertIn("nothing ran", answer["result"]["content"][0]["text"])
         self.assertEqual(self.call(action="run_read", run="r9", out=0, err=0)["bridge"], [])
 
+    def start_provider_run(self, run, script):
+        self.upload(run, archive({"a.txt": b"x"}))
+        self.call(action="run_start", run=run, argv=[sys.executable, "-c", script],
+                  env={"ANTHROPIC_BASE_URL": self.agent.RELAY_URL + "/provider/anthropic",
+                       "ANTHROPIC_API_KEY": "jkp-run-token"},
+                  relay=True)
+
+    def provider_calls(self, run):
+        deadline = time.time() + 20
+        while time.time() < deadline:
+            calls = self.call(action="run_read", run=run, out=0, err=0, wait_ms=500)["bridge"]
+            if calls:
+                return calls
+        self.fail("No provider request arrived.")
+
+    def piece(self, run, call, offset, data, last=False, headers=None):
+        return self.agent.respond({
+            "action": "run_answer", "run": run, "call": call, "status": 200,
+            "contentType": "text/event-stream", "body": base64.b64encode(data).decode(),
+            "piece": {"offset": offset, "last": last, "headers": headers or []},
+        })
+
+    def test_provider_requests_stream_through_the_relay(self):
+        script = (
+            "import http.client,os,urllib.parse;"
+            "base=urllib.parse.urlsplit(os.environ['ANTHROPIC_BASE_URL']);"
+            "key=os.environ['ANTHROPIC_API_KEY'];"
+            "c=http.client.HTTPConnection(base.netloc);"
+            "c.request('POST',base.path+'/v1/messages',body=iter([b'{\"stream\":',b'true}']),"
+            "headers={'x-api-key':key,'content-type':'application/json','cookie':'a=b'},"
+            "encode_chunked=True);"
+            "r=c.getresponse();"
+            "print(r.status,r.getheader('request-id'),r.getheader('set-cookie'),"
+            "r.getheader('transfer-encoding'),r.getheader('content-type'));"
+            "print(repr(r.read()));"
+            "c2=http.client.HTTPConnection(base.netloc);"
+            "c2.request('POST',base.path+'/v1/messages',body=b'{}');"
+            "print('anonymous',c2.getresponse().status)"
+        )
+        self.start_provider_run("p1", script)
+        calls = self.provider_calls("p1")
+        self.assertEqual(len(calls), 1)
+        call = calls[0]
+        self.assertEqual((call["method"], call["path"]),
+                         ("POST", "/provider/anthropic/v1/messages"))
+        # The chunked body arrives whole, with the token for Jackalope to check
+        # and without headers the provider never sees.
+        self.assertEqual(base64.b64decode(call["body"]), b'{"stream":true}')
+        headers = {name.lower(): value for name, value in call["headers"].items()}
+        self.assertEqual(headers["x-api-key"], "jkp-run-token")
+        self.assertNotIn("cookie", headers)
+        self.assertNotIn("transfer-encoding", headers)
+        identifier = call["id"]
+        head = [["request-id", "req_1"], ["set-cookie", "a=b"], ["x-other", "1"]]
+        self.assertTrue(self.piece("p1", identifier, 0, b"", headers=head)["result"]["delivered"])
+        self.assertTrue(self.piece("p1", identifier, 0, b"event: a\n\n")["result"]["delivered"])
+        # A piece sent again is not stored twice; one past a gap is refused.
+        self.assertTrue(self.piece("p1", identifier, 0, b"event: a\n\n")["result"]["delivered"])
+        gap = self.piece("p1", identifier, 99, b"x")
+        self.assertFalse(gap["ok"])
+        self.assertIn("missing", gap["error"])
+        # Not handed over again while it streams, even when reclaimed.
+        self.assertEqual(self.call(action="run_read", run="p1", out=0, err=0,
+                                   reclaim=True)["bridge"], [])
+        self.assertTrue(self.piece("p1", identifier, 7, b"a\n\nevent: b\n\n",
+                                   last=True)["result"]["delivered"])
+        exit, stdout, _ = self.finish("p1")
+        self.assertEqual(exit["code"], 0, stdout)
+        lines = stdout.decode().splitlines()
+        self.assertEqual(lines[0], "200 req_1 None chunked text/event-stream")
+        self.assertEqual(lines[1], repr(b"event: a\n\nevent: b\n\n"))
+        # A request without a token is refused on the computer.
+        self.assertEqual(lines[2], "anonymous 401")
+        self.assertFalse(self.piece("p1", identifier, 25, b"", last=True)["result"]["delivered"])
+        queue = os.listdir(os.path.join(self.temp.name, "p1", "bridge"))
+        self.assertEqual([name for name in queue if name.startswith(identifier)], [])
+
+    def test_a_provider_stream_the_agent_left_is_forgotten(self):
+        script = (
+            "import http.client,os,urllib.parse;"
+            "base=urllib.parse.urlsplit(os.environ['ANTHROPIC_BASE_URL']);"
+            "c=http.client.HTTPConnection(base.netloc);"
+            "c.request('POST',base.path+'/v1/messages',body=b'{}',"
+            "headers={'authorization':'Bearer '+os.environ['ANTHROPIC_API_KEY']});"
+            "r=c.getresponse();print(r.status,r.readline().decode().strip(),flush=True);"
+            "c.close();open('left','w').close();"
+            "import time;time.sleep(3)"
+        )
+        self.start_provider_run("p2", script)
+        identifier = self.provider_calls("p2")[0]["id"]
+        self.assertTrue(self.piece("p2", identifier, 0, b"first\n")["result"]["delivered"])
+        left = os.path.join(self.temp.name, "p2", "workspace", "left")
+        deadline = time.time() + 20
+        delivered = True
+        offset = 6
+        while delivered and time.time() < deadline:
+            time.sleep(0.1)
+            if not os.path.exists(left):
+                continue
+            delivered = self.piece("p2", identifier, offset, b"more\n")["result"]["delivered"]
+            offset += 5
+        self.assertFalse(delivered, "Jackalope is told to stop sending the answer.")
+        exit, stdout, _ = self.finish("p2")
+        self.assertEqual(stdout, b"200 first\n")
+
+    def test_provider_requests_are_bounded_and_answered_whole_when_refused(self):
+        script = (
+            "import http.client,os,socket,urllib.parse;"
+            "base=urllib.parse.urlsplit(os.environ['ANTHROPIC_BASE_URL']);"
+            "host,port=base.netloc.split(':');"
+            "s=socket.create_connection((host,int(port)));"
+            "s.sendall(('POST '+base.path+'/v1/messages HTTP/1.1\\r\\nHost: x\\r\\n'"
+            "'x-api-key: t\\r\\nContent-Length: 999999999\\r\\n\\r\\n').encode());"
+            "print(s.recv(100).split(b' ')[1].decode());s.close();"
+            "c=http.client.HTTPConnection(base.netloc);"
+            "c.request('GET',base.path+'/v1/models',headers={'x-api-key':'t','Origin':'http://x'});"
+            "print(c.getresponse().status);"
+            "c=http.client.HTTPConnection(base.netloc);"
+            "c.request('GET',base.path+'/v1/models',headers={'x-api-key':'t'});"
+            "r=c.getresponse();print(r.status,r.read().decode())"
+        )
+        self.start_provider_run("p3", script)
+        calls = self.provider_calls("p3")
+        self.assertEqual([(call["method"], call["path"]) for call in calls],
+                         [("GET", "/provider/anthropic/v1/models")])
+        self.call(action="run_answer", run="p3", call=calls[0]["id"], status=401,
+                  contentType="application/json",
+                  body=base64.b64encode(b'{"type":"error"}').decode())
+        exit, stdout, _ = self.finish("p3")
+        self.assertEqual(exit["code"], 0, stdout)
+        self.assertEqual(stdout.decode().splitlines(),
+                         ["413", "403", '401 {"type":"error"}'])
+
     def test_status_reports_a_run_whose_supervisor_died(self):
         self.assertEqual(self.call(action="run_status", run="r8"),
                          {"exists": False, "runs": self.agent.RUNS_PROTOCOL,
@@ -447,7 +580,9 @@ class RunProtocol(Harness):
     def test_uv_is_pinned_and_a_mismatched_download_is_refused(self):
         agent = self.agent
         self.assertRegex(agent.UV_VERSION, r"^\d+\.\d+\.\d+$")
-        self.assertEqual(sorted(agent.UV_SHA256), ["aarch64", "x86_64"])
+        self.assertEqual(sorted(agent.UV_SHA256), [
+            "aarch64-apple-darwin", "aarch64-unknown-linux-gnu",
+            "x86_64-apple-darwin", "x86_64-unknown-linux-gnu"])
         for digest in agent.UV_SHA256.values():
             self.assertRegex(digest, r"^[0-9a-f]{64}$")
         good = archive({"uv-x86_64-unknown-linux-gnu/uv": b"#!/bin/sh\n",
@@ -476,6 +611,7 @@ class RunProtocol(Harness):
         urlopen = agent.urllib.request.urlopen
         try:
             agent.LOCAL_PREFIX = local
+            agent.MACOS = False
             agent.platform.machine = lambda: "x86_64"
             agent.urllib.request.urlopen = fake_open
             # The real recorded hash does not match this stand-in archive.
@@ -487,9 +623,16 @@ class RunProtocol(Harness):
                 f"https://github.com/astral-sh/uv/releases/download/{agent.UV_VERSION}/"
                 "uv-x86_64-unknown-linux-gnu.tar.gz"])
             # Only the archive is fetched: no published checksum is trusted.
-            agent.UV_SHA256 = dict(agent.UV_SHA256, x86_64=hashlib.sha256(good).hexdigest())
+            agent.UV_SHA256 = dict(agent.UV_SHA256, **{
+                "x86_64-unknown-linux-gnu": hashlib.sha256(good).hexdigest()})
             agent.install_uv()
             self.assertEqual(len(fetched), 2)
+            # A Mac downloads the macOS build, checked against its own hash.
+            agent.MACOS = True
+            with self.assertRaises(agent.Failure):
+                agent.install_uv()
+            self.assertTrue(fetched[-1].endswith("/uv-x86_64-apple-darwin.tar.gz"), fetched[-1])
+            agent.MACOS = False
             for name in ("uv", "uvx"):
                 self.assertTrue(os.access(os.path.join(local, "bin", name), os.X_OK))
             agent.UV_LIMIT = len(good) - 1
@@ -631,6 +774,88 @@ class Runner(unittest.TestCase):
         status = self.call(action="run_status", run="c1")
         self.assertEqual((status["runs"], status["capabilities"]),
                          (self.agent.RUNS_PROTOCOL, self.agent.capabilities()))
+
+    def fake_xcode(self, root, name, version, build):
+        developer = os.path.join(root, name, "Contents", "Developer")
+        os.makedirs(os.path.join(developer, "usr", "bin"))
+        open(os.path.join(developer, "usr", "bin", "xcodebuild"), "w").close()
+        with open(os.path.join(root, name, "Contents", "version.plist"), "wb") as handle:
+            self.agent.plistlib.dump({"CFBundleShortVersionString": version,
+                                      "ProductBuildVersion": build}, handle)
+        return developer
+
+    def test_a_mac_reports_its_xcode_and_no_desktop(self):
+        agent = self.agent
+        apps = os.path.join(self.temp.name, "Applications")
+        beta = self.fake_xcode(apps, "Xcode-beta.app", "28.0", "28A1")
+        main = self.fake_xcode(apps, "Xcode.app", "27.2", "27B52")
+        tools = os.path.join(self.temp.name, "CommandLineTools")
+        os.makedirs(tools)
+        environment = dict(os.environ)
+        os.environ.pop("DEVELOPER_DIR", None)
+        try:
+            agent.MACOS = True
+            agent.XCODE_ROOTS = [apps]
+            agent.xcode_selected = lambda: tools
+            agent.simulator_runtimes = lambda developer: [{"name": "iOS 27.0", "version": "27.0",
+                                                          "identifier": "ios-27", "platform": "iOS"}]
+            # Xcode.app wins over a newer beta when xcode-select names the
+            # Command Line Tools.
+            found = agent.xcode_toolchain()
+            self.assertEqual((found["developerDir"], found["version"], found["build"], found["source"]),
+                             (main, "27.2", "27B52", "installed"))
+            agent.xcode_environment()
+            self.assertEqual(os.environ["DEVELOPER_DIR"], main)
+            # An explicit DEVELOPER_DIR wins and is left alone.
+            os.environ["DEVELOPER_DIR"] = beta
+            self.assertEqual(agent.xcode_toolchain()["source"], "environment")
+            agent.xcode_environment()
+            self.assertEqual(os.environ["DEVELOPER_DIR"], beta)
+            os.environ.pop("DEVELOPER_DIR")
+            # A full Xcode selection needs no DEVELOPER_DIR.
+            agent.xcode_selected = lambda: beta
+            self.assertEqual(agent.xcode_toolchain()["source"], "selected")
+            agent.xcode_environment()
+            self.assertNotIn("DEVELOPER_DIR", os.environ)
+
+            agent.xcode_selected = lambda: tools
+            hello = self.call(action="hello")
+            self.assertEqual(hello["os"], "macos")
+            self.assertIn(hello["arch"], ("arm64", "x86_64"))
+            self.assertEqual(hello["xcode"]["developerDir"], main)
+            self.assertEqual(hello["xcode"]["runtimes"][0]["name"], "iOS 27.0")
+            self.assertNotIn("screen", hello)
+            self.assertFalse(hello["browser"])
+            self.assertNotIn("browser", hello["capabilities"])
+            self.assertIn("git-sync", hello["capabilities"])
+            # Desktop actions are unsupported; exec still runs a command.
+            refused = self.agent.respond({"id": 1, "action": "screenshot"})
+            self.assertEqual((refused["ok"], refused["code"]), (False, "unsupported"))
+            ran = self.call(action="exec", command="echo mac", cwd=self.temp.name)
+            self.assertEqual(ran["stdout"], "mac\n")
+        finally:
+            os.environ.clear()
+            os.environ.update(environment)
+
+    def test_a_mac_without_xcode_reports_none(self):
+        agent = self.agent
+        agent.MACOS = True
+        agent.XCODE_ROOTS = [os.path.join(self.temp.name, "none")]
+        agent.xcode_selected = lambda: None
+        environment = dict(os.environ)
+        os.environ.pop("DEVELOPER_DIR", None)
+        try:
+            hello = self.call(action="hello")
+            self.assertEqual(hello["os"], "macos")
+            self.assertIsNone(hello["xcode"])
+        finally:
+            os.environ.clear()
+            os.environ.update(environment)
+
+    def test_linux_reports_its_system_without_xcode(self):
+        self.agent.MACOS = False
+        self.assertEqual(self.agent.system()["os"], "linux")
+        self.assertNotIn("xcode", self.agent.system())
 
     def test_slots_follow_the_machine_size_unless_overridden(self):
         agent = self.agent

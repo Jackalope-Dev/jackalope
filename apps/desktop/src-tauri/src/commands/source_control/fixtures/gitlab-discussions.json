@@ -1,0 +1,91 @@
+[
+  {
+    "id": "6a9c1750b37d513a43987b574953fceb50b03ce7",
+    "individual_note": false,
+    "notes": [
+      {
+        "id": 1126,
+        "type": "DiffNote",
+        "body": "This drops the cart when the session ends. Keep it for signed-in people.",
+        "author": { "id": 1, "username": "reviewer", "name": "Rae Viewer" },
+        "system": false,
+        "noteable_type": "MergeRequest",
+        "noteable_iid": 42,
+        "resolvable": true,
+        "resolved": false,
+        "position": {
+          "base_sha": "a",
+          "start_sha": "b",
+          "head_sha": "c",
+          "old_path": "src/cart.ts",
+          "new_path": "src/cart.ts",
+          "position_type": "text",
+          "old_line": null,
+          "new_line": 18
+        }
+      },
+      {
+        "id": 1127,
+        "type": "DiffNote",
+        "body": "Agreed, and add a test.",
+        "author": { "id": 2, "username": "maintainer", "name": "Mo Maintainer" },
+        "system": false,
+        "noteable_type": "MergeRequest",
+        "noteable_iid": 42,
+        "resolvable": true,
+        "resolved": false
+      }
+    ]
+  },
+  {
+    "id": "87805b7c09016a7058e91bdbe7b29d1f284a39e6",
+    "individual_note": false,
+    "notes": [
+      {
+        "id": 1128,
+        "type": "DiffNote",
+        "body": "Rename this?",
+        "author": { "id": 1, "username": "reviewer", "name": "Rae Viewer" },
+        "system": false,
+        "resolvable": true,
+        "resolved": true,
+        "resolved_by": { "id": 3, "username": "author" },
+        "position": {
+          "old_path": "src/api.ts",
+          "new_path": "src/api.ts",
+          "position_type": "text",
+          "old_line": 4,
+          "new_line": 4
+        }
+      }
+    ]
+  },
+  {
+    "id": "c3f0a1",
+    "individual_note": true,
+    "notes": [
+      {
+        "id": 1129,
+        "type": null,
+        "body": "Thanks!",
+        "author": { "username": "author" },
+        "system": false,
+        "resolvable": false
+      }
+    ]
+  },
+  {
+    "id": "c3f0a2",
+    "individual_note": true,
+    "notes": [
+      {
+        "id": 1130,
+        "type": null,
+        "body": "added 1 commit",
+        "author": { "username": "author" },
+        "system": true,
+        "resolvable": false
+      }
+    ]
+  }
+]

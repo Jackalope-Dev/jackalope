@@ -1,8 +1,8 @@
 # Architecture
 
 Jackalope has three applications and shared UI, branding, knowledge and contract packages. Desktop execution
-is local; verified account access is required to start new work in every build.
-Saved history and running tasks remain accessible when access expires.
+is local and needs no Jackalope account. An optional account adds service-backed
+features such as settings sync and invitations.
 
 ## Repository ownership
 
@@ -48,7 +48,11 @@ lib/navigation.ts (label, group, icon, telemetry feature, search keywords) with
 their pages in layout/workspace-views.tsx; Shell, its subnavigation and command search
 read that registry. Commands shared by keyboard shortcuts, the tray and window menus,
 command search and the shortcut sheet live in layout/commands.ts; the tray and macOS
-menu items name their command in layout/menu-actions.json, which the native menus read. Work is read through
+menu items name their command in layout/menu-actions.json, which the native menus read.
+Every app-level keyboard shortcut is an action in lib/keybindings.ts with its default
+binding, group, label and context; `settings.shortcuts` keeps only the person's changes.
+Components run actions through `useKeybindingHandlers` (hooks/useKeybindings.ts), whose
+single window listener resolves bindings at key time, so Settings changes apply at once. Work is read through
 lib/work-selection.ts (`useWorkspaceWork`, `useAllRuns`) and opened with `openWork`,
 `openRun` or `openConversation`, which clear the other selections and focus the
 project. Zustand stores keep
@@ -96,6 +100,7 @@ changes must preserve both sides and old saved records.
 | cli_host.rs, cli_host/, cli_install.rs, cli_terminal.rs, project_registry.rs | Terminal-command host endpoint and its mapping of conversations, plans and projects onto the terminal protocol, PATH links, opening the command in the system terminal and the shared project mirror (settings and their defaults live in cli/project_settings.rs, shared with the CLI) |
 | scope_path.rs | Repository-relative paths tasks own or name, with one case-folding rule for containment and overlap |
 | git.rs, git_command.rs, repo.rs, worktree_cleanup.rs | Worktree operations, explicit Git environment policies and Git plumbing shared with the CLI (private indexes, synthetic commits, `-z` parsers) |
+| merge_tree.rs, pbxproj.rs | `merge-tree` and stopped `git merge` results with Xcode project files merged object by object |
 | history.rs, reset.rs | Atomic writes, quarantine, recovery and explicit reset |
 | process_control.rs, pty.rs | Owned process trees, Unix pipe-based crash guardians and separate tested PTY primitives |
 | notifications.rs, notifications/, window_behavior.rs | Native task notification activation, bounded listeners, tray-host availability and Dock reopening |
@@ -104,9 +109,12 @@ changes must preserve both sides and old saved records.
 | mcp.rs, mcp_broker.rs, harness.rs | Connection configuration, attempt-owned discovery/execution and task-scoped questions |
 | bridge.rs, bridge/ | The attempt bridge: one table defines every tool (input, description, hints, placement, HTTP route, optional group, who is offered it, handler); the MCP server, HTTP routes and help, runner placement, Codex approvals and deferred loading are derived from it, and each handler serves both transports after one authorization |
 | agent_decider.rs, question_risk.rs | Autonomy policy, question classification and read-only decider attempts that answer plan questions, rounds and deviations for the person |
+| turn_advisor.rs, turn_advisor/ | The opt-in turn advisor: a tool-free helper turn from another model family that grades notes on finished task attempts and routes concerns and blockers back to the working agent |
 | schedules.rs, browser.rs, codebase.rs | Recurring dispatch, browser sessions and repository analysis |
 | bot_hub.rs, bot_hub/ | Mirrored bot directory, wake-ups, bot-to-bot hand-offs, cards and suggestions over persona live sessions |
 | desktop_control.rs, desktop_control/, resources/gnome-extension/ | Attempt-scoped window, app and desktop grants, remembered project permissions, resident native helpers, accessibility refs, capture and guarded Windows/macOS/X11/GNOME 46 Wayland input |
+| devices.rs, devices/ | The person's iPhones and iPads through `devicectl` JSON: listing, conversation and project grants, the `device_app` and `device_logs` tools, owned console capture and Run on device builds |
+| simulator.rs, simulator/, resources/simulator-driver/ | Agent tools for iOS apps in the Simulator: `simctl` app, settings, screenshot and log commands, and the bundled XCUITest driver, built once per Xcode and run per device as an owned process, that reads accessibility trees and acts by ref |
 | computers.rs, computers/, desktop_control/computer.rs, resources/computer/ | Bot, task and project computers: provider trait, local Docker sandboxes, paired cloud machines, Agent37 machines, the in-sandbox agent image, run routing for desktop and browser tools, and the run protocol, command translation and sign-ins for agents on a computer |
 | computers/runner.rs, computers/policy.rs | The control plane / runner boundary: runner capability negotiation, the table of where each bridge tool executes for any runner (this device's included) and each running attempt's attached placement, and the device's answers to a computer runner's policy callbacks and events |
 | computers/pool.rs, coordination/hosts.rs | The capacity pool of execution hosts (this device and the person's computers): per-project host choices, limits, health, the deterministic placer for planned and swarm forks, and the one retry of a fork whose host was lost |
@@ -117,6 +125,7 @@ changes must preserve both sides and old saved records.
 | account/skill_sync.rs | Opt-in account sync of chosen skills behind settings sync consent: account binding, the per-account choice, pull, revision-checked push, device holdings and deletion |
 | outcomes.rs | Frozen task contracts, workflow step gates and snapshot-bound human acceptance |
 | readiness.rs, previews.rs | Read-only workspace suggestions and owned local preview process trees |
+| xcode.rs, xcode/, simulators.rs, simulators/ | The resolved Xcode toolchain, Xcode project detection, and each iOS workspace's own Simulator with its ledger, boot pool and cleanup; see [iOS development](IOS-DEVELOPMENT.md) |
 | issues.rs, github_workflows.rs | Read-only issue intake and protected Linear/Jira connections |
 | cloudflare.rs, cloudflare/ | The protected Cloudflare connection and Connect Cloudflare sign-in, the product scopes it may request, and the v4 account API client shared by Artifacts, cloud resources and Swarm setup |
 | cloudflare_artifacts.rs, cloudflare_resources.rs | Artifacts repository creation, host-scoped token pushes and review snapshots; per-project cloud resources and their manifest |
@@ -273,7 +282,8 @@ access/feedback.ts owns authenticated campaign state, shared cooldowns, opt-in e
 eligibility and scoped website replies through the existing inbox/outbox. Anonymous
 telemetry remains separate. See [feedback invitations](FEEDBACK-INVITATIONS.md).
 Shared brand/tokens exports pure theme calculation for browser and Worker rendering.
-Native commands/account.rs owns the required account connection; its
+Native commands/account.rs owns the optional account connection and `AccountFeature`,
+the one gate every service-backed feature passes before a request; its
 credential is protected by account_storage.rs with Windows DPAPI or a macOS Keychain /
 Linux Secret Service reference. platform.rs initializes the Unix GUI login PATH before
 runtime threads start; children inherit the discovery environment. Worker access/devices.ts
@@ -321,4 +331,8 @@ and persistence. Rust tests use disposable repositories/profiles, with opt-in
 provider/browser trials separate. Worker tests use local workerd/D1/R2. Rendered
 checks and signed installed-upgrade trials supplement the suites; see [TODO.md](TODO.md).
 
-Store preview admission is owned by native `commands/execution_access.rs`. Account verification supplies a bounded lease, checked before native launch/coordination/scheduled dispatch and PTY creation. The renderer presents connection/recovery state but cannot grant access. Store builds use Microsoft Store updates; see [STORE-RELEASE.md](STORE-RELEASE.md).
+Native launch, coordination, scheduled dispatch and PTY creation do not consult the
+account. Account verification supplies a bounded lease (`account/lease.rs`) that only
+account features check. The renderer mirrors the feature list in `lib/account.ts` and
+gates their views with `RequiresAccount`, but cannot grant access. Store builds use
+Microsoft Store updates; see [STORE-RELEASE.md](STORE-RELEASE.md).

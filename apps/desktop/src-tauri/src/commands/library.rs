@@ -3,7 +3,8 @@
 //! under `.jackalope/attachments/`, and images and PDFs a task changed in its
 //! workspace. Screenshots are listed from run records instead. Folders and changed
 //! files come from recorded runs, never from the caller, and previews and opens
-//! stay inside them.
+//! stay inside them. Files Jackalope saved can be moved to the system Trash; files a
+//! task changed belong to the project and stay.
 
 use super::repo::{self, Policy};
 use super::tasks::{TaskRun, TaskRuntime};
@@ -32,6 +33,8 @@ const OPENABLE_TYPES: [&str; 14] = [
     "png", "jpg", "jpeg", "gif", "webp", "svg", "pdf", "txt", "md", "json", "csv", "log", "html",
     "htm",
 ];
+/// The most files one call moves to the Trash.
+const MAX_TRASH: usize = 500;
 
 macro_rules! tauri_commands {
     ($next:ident $finish:ident [$($done:tt)*] $($rest:tt)*) => {
@@ -39,6 +42,7 @@ macro_rules! tauri_commands {
             commands::library::library_files,
             commands::library::library_file_preview,
             commands::library::library_file_open,
+            commands::library::library_files_trash,
         ] $($rest)*)
     };
 }
@@ -313,6 +317,117 @@ fn confined(roots: &[Root], changed: &HashSet<PathBuf>, path: &str) -> Result<Pa
     Ok(file)
 }
 
+/// Screenshot files the runs recorded: agent screenshots, desktop captures and review
+/// captures, wherever they were saved.
+fn recorded_captures(runs: &[TaskRun]) -> HashSet<PathBuf> {
+    runs.iter()
+        .flat_map(|run| {
+            run.screenshots
+                .iter()
+                .chain(
+                    run.desktop_actions
+                        .iter()
+                        .filter_map(|action| action.capture.as_ref()),
+                )
+                .chain(run.review_captures.iter().flat_map(|captures| {
+                    captures
+                        .pages
+                        .iter()
+                        .flat_map(|page| page.before.iter().chain(page.after.iter()))
+                }))
+        })
+        .filter(|shot| !shot.file_path.is_empty())
+        .filter_map(|shot| dunce::canonicalize(&shot.file_path).ok())
+        .collect()
+}
+
+fn display_name(path: &str) -> String {
+    Path::new(path).file_name().map_or_else(
+        || path.to_string(),
+        |name| name.to_string_lossy().into_owned(),
+    )
+}
+
+/// `path` when Jackalope saved it, so it may go to the Trash: a regular file inside the
+/// Library's output or attachment folders, or a screenshot a run recorded. A file a task
+/// changed in the repository belongs to the project and is refused.
+fn trashable(
+    roots: &[Root],
+    captures: &HashSet<PathBuf>,
+    changed: &HashSet<PathBuf>,
+    path: &str,
+) -> Result<PathBuf, String> {
+    let name = display_name(path);
+    let file = dunce::canonicalize(path).map_err(|_| format!("{name} is no longer available"))?;
+    if changed.contains(&file) {
+        return Err(format!(
+            "{name} is part of the project, so it stays in the repository"
+        ));
+    }
+    let saved = captures.contains(&file)
+        || roots.iter().any(|root| {
+            dunce::canonicalize(&root.folder).is_ok_and(|folder| file.starts_with(folder))
+        });
+    if !saved || !file.is_file() {
+        return Err(format!(
+            "{name} isn't a file Jackalope saved, so it stays where it is"
+        ));
+    }
+    Ok(file)
+}
+
+#[derive(Debug, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct TrashResult {
+    /// The paths moved to the Trash, as the caller named them.
+    pub trashed: Vec<String>,
+    /// Why the first file that stayed could not be moved; the rest were still tried.
+    pub error: Option<String>,
+}
+
+/// Moves files Jackalope saved to the system Trash (the Recycle Bin on Windows), so they
+/// can be put back. Never deletes outright.
+#[tauri::command]
+pub async fn library_files_trash(
+    paths: Vec<String>,
+    state: State<'_, TaskRuntime>,
+) -> Result<TrashResult, String> {
+    if paths.len() > MAX_TRASH {
+        return Err(format!(
+            "Move at most {MAX_TRASH} files to the Trash at a time"
+        ));
+    }
+    let runs = state.inner().integration_runs()?;
+    tauri::async_runtime::spawn_blocking(move || {
+        let roots = roots(&runs);
+        let captures = recorded_captures(&runs);
+        let changed = listed_changes();
+        let mut result = TrashResult {
+            trashed: Vec::new(),
+            error: None,
+        };
+        for path in paths {
+            let moved = trashable(&roots, &captures, &changed, &path).and_then(|file| {
+                trash::delete(&file).map_err(|error| {
+                    format!(
+                        "Could not move {} to the Trash: {error}",
+                        display_name(&path)
+                    )
+                })
+            });
+            match moved {
+                Ok(()) => result.trashed.push(path),
+                Err(error) => {
+                    result.error.get_or_insert(error);
+                }
+            }
+        }
+        result
+    })
+    .await
+    .map_err(|e| e.to_string())
+}
+
 #[tauri::command]
 pub async fn library_files(state: State<'_, TaskRuntime>) -> Result<Vec<LibraryFile>, String> {
     let runs = state.inner().integration_runs()?;
@@ -459,6 +574,57 @@ mod tests {
         .is_err());
         std::fs::remove_dir_all(&base).unwrap();
         assert!(list(&roots).is_empty());
+    }
+
+    #[test]
+    fn only_files_jackalope_saved_may_go_to_the_trash() {
+        let base = std::env::temp_dir().join(format!("jackalope-library-{}", uuid::Uuid::new_v4()));
+        let project = base.join("project");
+        let worktree = project.join(".worktrees/task");
+        let output = worktree.join(".jackalope/artifacts");
+        let captures_folder = base.join("captures");
+        std::fs::create_dir_all(output.join("charts")).unwrap();
+        std::fs::create_dir_all(&captures_folder).unwrap();
+        std::fs::create_dir_all(worktree.join("assets")).unwrap();
+        std::fs::write(output.join("report.html"), "<p>").unwrap();
+        std::fs::write(captures_folder.join("desktop.png"), "png").unwrap();
+        std::fs::write(captures_folder.join("unrecorded.png"), "png").unwrap();
+        std::fs::write(worktree.join("assets/logo.png"), "png").unwrap();
+        std::fs::write(base.join("private.png"), "png").unwrap();
+
+        let mut task = run("task", &project, &worktree, "2026-02-01T00:00:00Z");
+        task.screenshots
+            .push(crate::commands::harness::ScreenshotArtifact {
+                id: "shot".into(),
+                name: "Desktop".into(),
+                url: String::new(),
+                file_path: captures_folder.join("desktop.png").to_string_lossy().into(),
+                width: 1,
+                height: 1,
+                timestamp: String::new(),
+            });
+        let runs = [task];
+        let roots = roots(&runs);
+        let captures = recorded_captures(&runs);
+        let logo = dunce::canonicalize(worktree.join("assets/logo.png")).unwrap();
+        let changed: HashSet<PathBuf> = [logo.clone()].into();
+        let check = |path: &Path| trashable(&roots, &captures, &changed, &path.to_string_lossy());
+
+        assert!(check(&output.join("report.html")).is_ok());
+        assert!(check(&captures_folder.join("desktop.png")).is_ok());
+        let repo = check(&logo).unwrap_err();
+        assert!(repo.contains("part of the project"), "{repo}");
+        assert!(check(&captures_folder.join("unrecorded.png")).is_err());
+        assert!(check(&base.join("private.png")).is_err());
+        assert!(check(&output.join("../../../../private.png")).is_err());
+        assert!(
+            check(&output.join("charts")).is_err(),
+            "a folder is never trashed"
+        );
+        assert!(check(&output.join("missing.png"))
+            .unwrap_err()
+            .contains("no longer available"));
+        std::fs::remove_dir_all(&base).unwrap();
     }
 
     #[test]

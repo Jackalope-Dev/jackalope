@@ -1,0 +1,47 @@
+[
+  {
+    "id": 18329813041,
+    "name": "lint",
+    "stage": "test",
+    "status": "success",
+    "allow_failure": false,
+    "failure_reason": null,
+    "web_url": "https://gitlab.com/acme/platform/web/-/jobs/18329813041"
+  },
+  {
+    "id": 18329813049,
+    "name": "unit",
+    "stage": "test",
+    "status": "failed",
+    "allow_failure": false,
+    "failure_reason": "script_failure",
+    "web_url": "https://gitlab.com/acme/platform/web/-/jobs/18329813049"
+  },
+  {
+    "id": 18329813050,
+    "name": "flaky-e2e",
+    "stage": "test",
+    "status": "failed",
+    "allow_failure": true,
+    "failure_reason": "script_failure",
+    "web_url": "https://gitlab.com/acme/platform/web/-/jobs/18329813050"
+  },
+  {
+    "id": 18329813051,
+    "name": "deploy-review",
+    "stage": "deploy",
+    "status": "manual",
+    "allow_failure": true,
+    "failure_reason": null,
+    "web_url": "https://gitlab.com/acme/platform/web/-/jobs/18329813051"
+  },
+  {
+    "id": 18329813052,
+    "name": "docs",
+    "stage": "build",
+    "status": "running",
+    "allow_failure": false,
+    "failure_reason": null,
+    "web_url": "https://gitlab.com/acme/platform/web/-/jobs/18329813052"
+  }
+]

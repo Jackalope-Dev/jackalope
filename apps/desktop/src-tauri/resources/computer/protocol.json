@@ -8,7 +8,8 @@
     "workspace-tools",
     "policy-callbacks",
     "git-sync",
-    "artifacts"
+    "artifacts",
+    "provider-proxy"
   ],
   "slotsMax": 32,
   "runActions": [
@@ -42,6 +43,58 @@
     "pendingLimit": 32,
     "tooLarge": "Jackalope tool calls from a computer are limited to 64 KB, so this call was not sent and nothing ran. Send smaller arguments, for example over several calls.",
     "headers": ["content-type", "accept", "mcp-protocol-version", "mcp-session-id", "last-event-id"]
+  },
+  "providerProxy": {
+    "prefix": "/provider/",
+    "providers": ["anthropic", "openai"],
+    "requestLimit": 16777216,
+    "pieceLimit": 262144,
+    "credentialHeaders": ["authorization", "x-api-key"],
+    "headers": [
+      "content-type",
+      "accept",
+      "user-agent",
+      "anthropic-version",
+      "anthropic-beta",
+      "openai-beta",
+      "originator",
+      "session_id",
+      "conversation_id",
+      "x-client-request-id"
+    ],
+    "responseHeaders": [
+      "retry-after",
+      "retry-after-ms",
+      "request-id",
+      "x-request-id",
+      "anthropic-ratelimit-requests-limit",
+      "anthropic-ratelimit-requests-remaining",
+      "anthropic-ratelimit-requests-reset",
+      "anthropic-ratelimit-tokens-limit",
+      "anthropic-ratelimit-tokens-remaining",
+      "anthropic-ratelimit-tokens-reset",
+      "x-ratelimit-limit-requests",
+      "x-ratelimit-remaining-requests",
+      "x-ratelimit-reset-requests",
+      "x-ratelimit-limit-tokens",
+      "x-ratelimit-remaining-tokens",
+      "x-ratelimit-reset-tokens"
+    ],
+    "anthropicBetas": [
+      "claude-code-",
+      "interleaved-thinking-",
+      "fine-grained-tool-streaming-",
+      "context-1m-",
+      "context-management-",
+      "token-efficient-tools-",
+      "prompt-caching-",
+      "extended-cache-ttl-",
+      "output-128k-",
+      "effort-",
+      "structured-outputs-",
+      "tool-search-tool-",
+      "advanced-tool-use-"
+    ]
   },
   "localTools": {
     "workspace-tools": {

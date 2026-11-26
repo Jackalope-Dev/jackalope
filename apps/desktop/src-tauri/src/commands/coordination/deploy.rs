@@ -184,7 +184,9 @@ fn run(directory: &Path, project: &Path, head: &str, deploy: &DeployPolicy) -> D
             }
         }
     };
-    let step = |command: &str| verification::run_disposable(command, &workspace, false);
+    let step = |command: &str| {
+        verification::run_disposable(command, &workspace, false, &Default::default())
+    };
     let deployed = match step(&deploy.command) {
         Ok(result) if result.success => output(&result),
         Ok(result) => return finish(Outcome::Failed, output(&result)),
@@ -513,8 +515,7 @@ mod tests {
         .unwrap();
         assert!(halted(&directory, &project).unwrap().contains("paused"));
         let reason = autonomy::accept_before_merge(
-            &crate::commands::tasks::TaskRuntime::with_test_access(directory.join("history"))
-                .unwrap(),
+            &crate::commands::tasks::TaskRuntime::new(directory.join("history")).unwrap(),
             &directory,
             &project,
             "HEAD",

@@ -44,6 +44,9 @@ pub(crate) const GIT_SYNC: &str = "git-sync";
 /// Content-addressed, chunked and resumable transfers (`artifact_*`, see
 /// [`super::artifacts`]).
 pub(crate) const ARTIFACTS: &str = "artifacts";
+/// The runner's relay takes model provider requests under the provider
+/// prefix, streaming their answers (see [`super::provider_proxy`]).
+pub(crate) const PROVIDER_PROXY: &str = "provider-proxy";
 /// The runner is this device: the workspace, account profiles and sign-ins
 /// are this device's own, so tools placed [`Placement::DeviceOnly`] are
 /// available. Only the local runner has it; a computer cannot claim it.

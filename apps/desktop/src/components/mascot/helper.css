@@ -107,7 +107,7 @@
   box-shadow: none;
   color: var(--color-text-primary);
 }
-.helper-composer .helper-field textarea:focus-visible {
+.helper-composer .helper-field textarea:focus {
   outline: none;
   box-shadow: none;
 }

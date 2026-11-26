@@ -503,17 +503,32 @@ export function lineDiff(before: string, after: string, limit = 600): DiffLine[]
   return lines;
 }
 
+/**
+ * The computers sync involves: this one and any that holds a synced skill. Account rows for
+ * old profiles, data resets and reconnects that never synced anything are left out, so the
+ * count matches the computers the person actually uses.
+ */
+export function syncingDevices(cards: SkillCard[], devices: SkillDevice[]): SkillDevice[] {
+  const holding = new Set(
+    cards
+      .filter((card) => card.syncedId !== null)
+      .flatMap((card) => card.holders.map((holder) => holder.device)),
+  );
+  return devices.filter((device) => device.here || holding.has(device.id));
+}
+
 /** One line under the page heading describing sync on this computer. */
 export function syncSummary(page: SkillsPage, busy: boolean): string {
   const { sync } = page;
   if (sync.reset)
     return 'Synced skills were deleted from another computer, so skill sync turned off here.';
-  if (!sync.available) return 'Sign in to sync skills between your computers.';
+  if (!sync.available)
+    return 'Connect your Jackalope account to sync skills between your computers.';
   if (!sync.settingsSync) return 'Turn on settings sync in Settings → Privacy to sync skills.';
   if (!sync.enabled) return 'Skills stay on this computer until you sync one.';
   if (busy) return 'Syncing skills…';
   const synced = page.skills.filter((card) => card.syncedId !== null).length;
-  const devices = page.devices.length;
+  const devices = syncingDevices(page.skills, page.devices).length;
   const skills = synced === 1 ? '1 skill' : `${synced} skills`;
   return devices > 1
     ? `${skills} synced across ${devices} computers.`

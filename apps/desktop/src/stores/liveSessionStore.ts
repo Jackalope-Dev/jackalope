@@ -5,15 +5,32 @@ import { type SessionSnapshot, sessionCommand } from '../lib/live-session';
 import { isTauriEnvironment } from '../lib/native/env';
 import { observeRefresh } from '../lib/observe-refresh';
 import { knownSessionRevisions, mergeSessionChanges } from '../lib/session-changes';
+import {
+  expandCompactRuns,
+  keepLoadedReplies,
+  loadReplyPages,
+  REPLY_WINDOW,
+  replyOmitted,
+  type SessionReply,
+  withReplies,
+} from '../lib/session-replies';
 
 interface SessionsState extends SessionSnapshot {
   selectedId: string | null;
   loading: boolean;
   refresh: (id?: string | null) => Promise<void>;
   select: (id: string | null) => void;
+  /** Fills in replies a snapshot left out, such as older ones scrolling into view. */
+  loadReplies: (sessionId: string, runIds: readonly string[]) => Promise<void>;
+  /** Loads every reply of a conversation, for exports that need the whole text. */
+  loadAllReplies: (sessionId: string) => Promise<void>;
+  /** Occurrences of `query` in each reply of a conversation, counted natively. */
+  searchReplies: (sessionId: string, query: string) => Promise<Record<string, number>>;
 }
 let refresh: Promise<void> | undefined;
 let pendingId: string | null | undefined;
+/** Replies being fetched, so rows scrolling past do not ask twice. */
+const loading = new Set<string>();
 export const useLiveSessionStore = create<SessionsState>((set, get) => ({
   sessions: [],
   runs: [],
@@ -33,10 +50,20 @@ export const useLiveSessionStore = create<SessionsState>((set, get) => ({
     refresh = sessionCommand<SessionSnapshot>('snapshot', {
       id,
       known: knownSessionRevisions(get().revisions),
+      // Older replies of the open conversation load as they are read, and runs outside
+      // the window arrive trimmed.
+      replies: REPLY_WINDOW,
     })
-      .then((snapshot) => {
+      .then(({ compactRuns, ...received }) => {
+        const snapshot = compactRuns?.length
+          ? { ...received, runs: [...received.runs, ...expandCompactRuns(compactRuns)] }
+          : received;
         const current = get();
-        const next = mergeSessionChanges(current, snapshot);
+        const merged = mergeSessionChanges(current, snapshot);
+        const next = {
+          ...merged,
+          runs: keepLoadedReplies(current.runs, merged.runs, snapshot.runs),
+        };
         if (
           !current.loading &&
           next.sessions === current.sessions &&
@@ -52,6 +79,36 @@ export const useLiveSessionStore = create<SessionsState>((set, get) => ({
       });
     return refresh;
   },
+  loadReplies: (sessionId, runIds) => {
+    const wanted = runIds.filter(
+      (id) => !loading.has(id) && replyOmitted(get().runs.find((run) => run.id === id)),
+    );
+    if (!wanted.length) return Promise.resolve();
+    for (const id of wanted) loading.add(id);
+    return loadReplyPages(
+      wanted,
+      (ids) => sessionCommand<SessionReply[]>('results', { id: sessionId, runIds: ids }),
+      (replies) => set((state) => ({ runs: withReplies(state.runs, replies) })),
+    ).finally(() => {
+      for (const id of wanted) loading.delete(id);
+    });
+  },
+  loadAllReplies: async (sessionId) => {
+    const session = get().sessions.find((item) => item.id === sessionId);
+    const ids = new Set(session?.batches.map((batch) => batch.runId));
+    const missing = () =>
+      get()
+        .runs.filter((run) => ids.has(run.id) && replyOmitted(run))
+        .map((run) => run.id);
+    await get().loadReplies(sessionId, missing());
+    // Replies another row was already loading finish before the export reads them.
+    while (missing().some((id) => loading.has(id)))
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    await get().loadReplies(sessionId, missing());
+    if (missing().length) throw new Error('Some replies could not be loaded. Try again.');
+  },
+  searchReplies: (sessionId, query) =>
+    sessionCommand<Record<string, number>>('search', { id: sessionId, query }),
 }));
 
 export function observeLiveSessions(id?: string) {

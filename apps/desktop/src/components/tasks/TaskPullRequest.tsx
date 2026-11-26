@@ -32,6 +32,13 @@ import {
   type TrackedPullRequest,
 } from '../../lib/pull-requests';
 import type { TaskRun } from '../../lib/run-types';
+import {
+  type HostKind,
+  hostTerms,
+  type MergeMethod,
+  mergeMethodLabel,
+  mergeMethods,
+} from '../../lib/source-control';
 import { usePullRequestStore } from '../../stores/pullRequestStore';
 import { ActionError } from '../ui/ActionError';
 import { DraftedMessageFields, useDraftedMessage } from './DraftedMessage';
@@ -39,16 +46,18 @@ import { DraftedMessageFields, useDraftedMessage } from './DraftedMessage';
 const count = (value: number, noun: string) => `${value} ${noun}${value === 1 ? '' : 's'}`;
 
 function checksSummary(pr: TrackedPullRequest) {
-  if (!pr.checkedAt) return 'Reading from GitHub…';
-  if (!pr.checks) return 'No checks reported';
-  if (pr.failing.length) return `${pr.failing.length} of ${count(pr.checks, 'check')} failed`;
-  if (pr.pending) return `${pr.pending} of ${count(pr.checks, 'check')} running`;
-  return `${count(pr.checks, 'check')} passed`;
+  if (!pr.checkedAt) return `Reading from ${hostTerms(pr.provider).host}…`;
+  const noun = pr.provider === 'gitlab' ? 'pipeline job' : 'check';
+  if (!pr.checks) return `No ${noun}s reported`;
+  if (pr.failing.length) return `${pr.failing.length} of ${count(pr.checks, noun)} failed`;
+  if (pr.pending) return `${pr.pending} of ${count(pr.checks, noun)} running`;
+  return `${count(pr.checks, noun)} passed`;
 }
 
 /**
- * The pull request a task opened: where it stands on GitHub and the next step. Fixes go
- * back to the task's own agent as an editable follow-up; pushing and merging each ask first.
+ * The pull request (a merge request on GitLab) a task opened: where it stands on its host
+ * and the next step. Fixes go back to the task's own agent as an editable follow-up;
+ * pushing and merging each ask first.
  */
 export function TaskPullRequest({
   run,
@@ -63,7 +72,17 @@ export function TaskPullRequest({
 }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const view = pullRequestPhaseView(pr.phase);
+  const view = pullRequestPhaseView(pr.phase, pr.provider);
+  const terms = hostTerms(pr.provider);
+  /** The host's own record of an item, as a labeled excerpt; a convenience the agent can do without. */
+  const context = (kind: 'review' | 'ci', number: string) =>
+    invokeNative<{ text: string }>('project_github_context', {
+      projectPath: run.projectPath,
+      kind,
+      number,
+    })
+      .then((context) => context.text)
+      .catch(() => '');
   const open = isOpenPullRequest(pr);
   const refresh = () => usePullRequestStore.getState().refresh(run.taskId);
   const act = async (work: () => Promise<void> | void) => {
@@ -81,37 +100,38 @@ export function TaskPullRequest({
     pr.phase === 'failing'
       ? {
           label: 'Ask the agent to fix',
-          draft: async () => checksHandoff(run, pr.url, pr.failing),
+          draft: async () =>
+            pr.provider && pr.provider !== 'github'
+              ? checksHandoff(
+                  run,
+                  pr.url,
+                  pr.failing,
+                  pr.provider,
+                  pr.pipeline ? await context('ci', pr.pipeline) : '',
+                )
+              : checksHandoff(run, pr.url, pr.failing),
         }
       : pr.phase === 'changes'
         ? {
             label: 'Ask the agent to address it',
             draft: async () => {
-              // The threads are a convenience; the agent can read them itself without them.
-              const threads = pr.number
-                ? await invokeNative<{ text: string }>('project_github_context', {
-                    projectPath: run.projectPath,
-                    kind: 'review',
-                    number: String(pr.number),
-                  })
-                    .then((context) => context.text)
-                    .catch(() => '')
-                : '';
-              return reviewHandoff(run, pr.url, threads);
+              const threads = pr.number ? await context('review', String(pr.number)) : '';
+              return reviewHandoff(run, pr.url, threads, pr.provider);
             },
           }
         : pr.phase === 'conflict'
           ? {
               label: 'Ask the agent to resolve',
-              draft: async () => conflictHandoff(run, pr.url),
+              draft: async () => conflictHandoff(run, pr.url, pr.provider),
             }
           : null;
   return (
-    <section className="task-pull-request" aria-label="Pull request">
+    <section className="task-pull-request" aria-label={terms.Noun}>
       <div className="task-pull-request-summary">
         <GitPullRequest size={16} aria-hidden="true" />
         <span className="task-pull-request-title">
-          Pull request{pr.number ? ` #${pr.number}` : ''}
+          {terms.Noun}
+          {pr.number ? ` ${pr.provider === 'gitlab' ? '!' : '#'}${pr.number}` : ''}
         </span>
         <Badge
           variant={
@@ -127,6 +147,7 @@ export function TaskPullRequest({
         </span>
       </div>
       {pr.failing.length > 0 && <p className="task-muted">Failed: {pr.failing.join(', ')}</p>}
+      {open && pr.blocker && <p className="task-muted">{pr.blocker}</p>}
       <div className="flex flex-wrap gap-2">
         {fix && (
           <Button
@@ -140,19 +161,27 @@ export function TaskPullRequest({
           </Button>
         )}
         {pr.phase === 'ready' && (
-          <MergePullRequest run={run} url={pr.url} disabled={disabled || busy} onMerged={refresh} />
+          <MergePullRequest
+            run={run}
+            url={pr.url}
+            provider={pr.provider}
+            head={pr.headRefOid}
+            methods={mergeMethods(pr.provider, pr.mergeMethods)}
+            disabled={disabled || busy}
+            onMerged={refresh}
+          />
         )}
         {open && <PushUpdate run={run} disabled={disabled || busy} onPushed={refresh} />}
         <Button
           variant="outline"
           onClick={() => void act(() => openExternalUrl(pr.url))}
-          aria-label="Open pull request on GitHub"
+          aria-label={`Open ${terms.noun} on ${terms.host}`}
         >
-          Open on GitHub <ExternalLinkIcon />
+          Open on {terms.host} <ExternalLinkIcon />
         </Button>
         <Menu.Root>
           <Menu.Trigger asChild>
-            <Button variant="ghost" aria-label="Pull request options">
+            <Button variant="ghost" aria-label={`${terms.Noun} options`}>
               <MoreHorizontal size={18} />
             </Button>
           </Menu.Trigger>
@@ -160,14 +189,14 @@ export function TaskPullRequest({
             <Menu.Content className="workspace-menu" align="end" sideOffset={8}>
               <Menu.Item className="workspace-menu-item" onSelect={() => void act(refresh)}>
                 <RefreshCw size={16} aria-hidden="true" />
-                Check GitHub now
+                Check {terms.host} now
               </Menu.Item>
               <Menu.Item
                 className="workspace-menu-item"
                 onSelect={() => usePullRequestStore.getState().untrack(run.taskId)}
               >
                 <CircleX size={16} aria-hidden="true" />
-                Stop following this pull request
+                Stop following this {terms.noun}
               </Menu.Item>
             </Menu.Content>
           </Menu.Portal>
@@ -175,7 +204,7 @@ export function TaskPullRequest({
       </div>
       {pr.error && (
         <InlineNotice tone="warning">
-          GitHub could not be read, so this may be out of date. {pr.error}
+          {terms.host} could not be read, so this may be out of date. {pr.error}
         </InlineNotice>
       )}
       <ActionError error={error} />
@@ -183,60 +212,85 @@ export function TaskPullRequest({
   );
 }
 
-const METHODS = [
-  { id: 'merge', label: 'Merge commit' },
-  { id: 'squash', label: 'Squash and merge' },
-  { id: 'rebase', label: 'Rebase and merge' },
-] as const;
+/** What merging does on each host, in the confirmation. */
+function mergeDescription(provider: HostKind | undefined, branch: string, target: string) {
+  if (provider === 'gitlab')
+    return `Merges ${branch} into ${target} on GitLab with your GitLab CLI. GitLab still requires its pipeline, approvals and threads to allow it. Anything that deploys from that branch will run.`;
+  if (provider === 'bitbucket')
+    return `Merges ${branch} into ${target} on Bitbucket with your API token, under the repository's merge checks. Anything that deploys from that branch will run.`;
+  return `Merges ${branch} into ${target} on GitHub with your GitHub CLI. Anything that deploys from that branch will run.`;
+}
 
 function MergePullRequest({
   run,
   url,
+  provider,
+  head,
+  methods,
   disabled,
   onMerged,
 }: {
   run: TaskRun;
   url: string;
+  provider?: HostKind;
+  /** The head commit last read; GitLab and Bitbucket merge only at it. */
+  head?: string;
+  methods: MergeMethod[];
   disabled?: boolean;
   onMerged: () => Promise<void>;
 }) {
-  const [method, setMethod] = useState<(typeof METHODS)[number]['id']>('merge');
+  const [method, setMethod] = useState<MergeMethod>(methods[0] ?? 'merge');
+  const title = provider === 'gitlab' ? 'Merge this merge request' : 'Merge pull request';
   return (
     <ConfirmDialog
       trigger={
         <Button variant="primary" disabled={disabled}>
-          <GitMerge size={16} aria-hidden="true" /> Merge pull request
+          <GitMerge size={16} aria-hidden="true" /> {provider === 'gitlab' ? 'Merge' : title}
         </Button>
       }
-      title="Merge pull request"
-      description={`Merges ${run.branch || 'the task branch'} into ${run.targetBranch?.trim() || 'its target'} on GitHub with your GitHub CLI. Anything that deploys from that branch will run.`}
-      label="Merge pull request"
+      title={title}
+      description={mergeDescription(
+        provider,
+        run.branch || 'the task branch',
+        run.targetBranch?.trim() || 'its target',
+      )}
+      label={provider === 'gitlab' ? 'Merge' : title}
       busyLabel="Merging…"
       variant="primary"
+      onOpenChange={(open) => {
+        if (open && !methods.includes(method)) setMethod(methods[0] ?? 'merge');
+      }}
       onConfirm={async () => {
         try {
-          await invokeNative('task_pull_request_merge', { id: run.id, url, method });
+          await invokeNative(
+            'task_pull_request_merge',
+            provider && provider !== 'github' && head
+              ? { id: run.id, url, method, head }
+              : { id: run.id, url, method },
+          );
         } catch (cause) {
           throw new Error(describeError(cause));
         }
         await onMerged();
       }}
     >
-      {({ busy }) => (
-        <FormField label="Merge method">
-          <Select
-            value={method}
-            disabled={busy}
-            onValueChange={(value) => setMethod(value as typeof method)}
-          >
-            {METHODS.map((item) => (
-              <SelectItem key={item.id} value={item.id}>
-                {item.label}
-              </SelectItem>
-            ))}
-          </Select>
-        </FormField>
-      )}
+      {({ busy }) =>
+        methods.length > 1 ? (
+          <FormField label="Merge method">
+            <Select
+              value={method}
+              disabled={busy}
+              onValueChange={(value) => setMethod(value as MergeMethod)}
+            >
+              {methods.map((item) => (
+                <SelectItem key={item} value={item}>
+                  {mergeMethodLabel(provider, item)}
+                </SelectItem>
+              ))}
+            </Select>
+          </FormField>
+        ) : null
+      }
     </ConfirmDialog>
   );
 }

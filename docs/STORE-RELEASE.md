@@ -75,8 +75,8 @@ One-time setup:
    `STORE_PUBLISHER_DISPLAY_NAME`.
 4. Run `pnpm release:setup --apply` to configure protected branches, branch-scoped
    Store/Cloud environments and immutable release tags. It selects
-   `RELEASE_DISTRIBUTION=store` and removes Windows from Cloud targets. Existing
-   enablement flags are preserved. Keep them off until their prerequisites pass.
+   `RELEASE_DISTRIBUTION=store` and leaves Windows out of new Cloud target lists.
+   Existing enablement flags and target choices are preserved. Keep them off until their prerequisites pass.
 5. Prepare two increasing beta versions with `pnpm release:prepare patch`, review
    notes, set `Status: ready`, verify, commit and push each. Run **Store release**
    in candidate mode to inspect the package. After the first manual Partner Center
@@ -89,8 +89,8 @@ One-time setup:
 Ready release commits pushed to beta or stable automatically build and submit after
 verification. Beta targets the configured flight; stable targets the base product,
 preserving its audience and listings, and requires `store-stable` approval after
-packaging. Both require a Jackalope account for new execution, and publication
-does not change the product's Partner Center audience. Required source checks must succeed
+packaging. Neither requires a Jackalope account, and publication does not change the
+product's Partner Center audience. Required source checks must succeed
 before any Store write. Publication reserves `store-beta/vX.Y.Z` or
 `store-stable/vX.Y.Z` automatically at the source commit. Do not manually push tags
 to trigger releases, move them or delete them. See [release automation](RELEASE-AUTOMATION.md).
@@ -153,7 +153,8 @@ Leaving the beta does not downgrade: the account receives the next stable packag
 whose version is newer than its installed beta.
 
 On a disposable Windows user/profile, install the older published Store package,
-connect an approved account, execute a real task, save work and restart. After the
+execute a real task without an account, then connect an approved account, save work
+and restart. After the
 newer flight is certified and available to that Microsoft account, check from the
 app, exercise cancellation and retry, and install while idle. Confirm the new version,
 saved work and account connection after reopening. Also check task blocking,
@@ -181,10 +182,10 @@ product. Removing a tester from the Store private audience does not revoke an
 installed app. The Jackalope email used inside the app can differ from the Store
 account email.
 
-Store installation does not replace the Jackalope account. Every build requires one
-for new execution, so Store discoverability does not change the account
-requirement. With the service's open signup on (the tracked production setting),
-a person signs up on the website and connects the app. In waitlist mode, approve
+Store installation and the Jackalope account are independent. The app runs without
+an account; one adds account features such as settings sync. With the service's
+open signup on (the tracked production setting), a person signs up on the website
+and connects the app. In waitlist mode, approve
 members through the existing administration flow; the referral system also grants
 invitations to approved members, so approval does not cap the cohort at an
 operator-chosen size. Membership and device revocation are handled by Jackalope's
@@ -202,46 +203,43 @@ email and see platform availability. Pass `STAGING_ACCESS_STORE_URL` /
 `ACCESS_STORE_URL` in the private community configuration. No raw installer download
 is needed for this path.
 
-## Native beta gate
+## Account features
 
-Every native build requires verified account access, including local development
-and Store builds. The `beta-access` feature remains compatible with existing build
-scripts but no longer controls enforcement. Changing build features, a renderer
-preference or update channel cannot disable the gate.
+Every build, including Store and local development builds, runs local work without
+an account. The `beta-access` feature remains compatible with existing build scripts
+but does not control any account behavior. Changing build features, a renderer
+preference or update channel cannot unlock account features.
 
-The native runtime starts denied until it checks the encrypted account record.
-Only a successful server verification supplies an authorization timestamp. The
-lease lasts at most 72 hours from that verification and never beyond device
-expiry. Background checks run once per minute; failures cannot extend the lease.
-Clock rollback before verification, missing/corrupt storage and unverified legacy
-records fail closed. Confirmed revocation removes the credential and denies new work.
+Account features start denied until the encrypted account record is checked. Only a
+successful server verification supplies an authorization timestamp. The lease lasts
+at most 72 hours from that verification and never beyond device expiry. Background
+checks run once per minute; failures cannot extend the lease. Clock rollback before
+verification, missing/corrupt storage and unverified legacy records fail closed.
+Confirmed revocation removes the credential and turns account features off; tasks,
+schedules, terminals and saved work are unaffected. This is account admission
+control for service features, not tamper-proof DRM against someone modifying a
+local binary or running a separately built client.
+See [DESKTOP-ACCOUNT.md](DESKTOP-ACCOUNT.md) for the gated features and credential storage.
 
-Direct launches, continuations, queued and scheduled tasks share native enforcement;
-new PTY sessions are also guarded. Denied schedule occurrences record a skip without
-starting an attempt. Saved results, export/recovery, stopping work and existing
-processes remain available. This is account admission control, not tamper-proof DRM
-against someone modifying a local binary or running a separately built client.
-See [DESKTOP-ACCOUNT.md](DESKTOP-ACCOUNT.md) for approval and credential storage.
-
-Store discovery and installation do not grant account access. With open signup, a
-new person creates a free account on the website and connects the app. In waitlist
+Store discovery and installation do not grant account features. With open signup, a
+new person can create a free account on the website and connect the app. In waitlist
 mode, verified waitlist members can connect to view queue position, referral
-progress and sharing, and follow website/tour links while waiting. Describe the
-account requirement in the listing; installed acceptance covers approved accounts
-and, for waitlist mode, waiting accounts.
+progress and sharing while using the app locally. Describe the account as optional
+in the listing; installed acceptance covers no account, approved accounts and, for
+waitlist mode, waiting accounts.
 
 ## Remaining acceptance
 
-- Provide Partner Center identity and a working certification
-  account with reproducible login/agent instructions. Magic-link-only access must be
-  workable for reviewers; do not add an unauthenticated reviewer bypass.
+- Provide Partner Center identity and reproducible agent instructions. Reviewers can
+  continue without an account; if they test account features, give them a working
+  certification account whose magic-link sign-in they can complete.
 - Test the expanded package in a disposable Windows user/VM with Developer Mode,
   using `Add-AppxPackage -Register <expanded-package>\AppxManifest.xml`. For testing
   the actual MSIX installation, use a test certificate trusted only in the disposable
   machine, or install a certified private Store submission. Do not install local
   signing certificates or replace an everyday installation as part of a build.
-- Test installed clean-profile startup, the missing-WebView2 dialog, approved/pending/
-  revoked accounts, grace expiry/restart, project creation, Git worktrees, agent
+- Test installed clean-profile startup, the missing-WebView2 dialog, continuing
+  without an account, approved/pending/revoked accounts, grace expiry/restart, project creation, Git worktrees, agent
   discovery and execution, provider credentials, PTY, cancellation, scheduled work,
   browser pairing and saved-data persistence. MSIX file/registry virtualization
   must be tested with real supported agent CLIs.

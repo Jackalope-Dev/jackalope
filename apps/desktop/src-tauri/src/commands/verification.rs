@@ -15,10 +15,12 @@ use std::{
 };
 use tauri::State;
 mod leases;
+mod limits;
 pub(super) mod native_output;
 pub(super) mod output;
 mod test_report;
 pub use leases::{ensure_all_idle, ensure_idle};
+pub use limits::TimeLimits;
 
 /// Holds a workspace like a running check does, so checks, previews and
 /// integration wait while Jackalope runs its own process there.
@@ -76,9 +78,9 @@ impl Drop for DisposableWorktree {
     }
 }
 
-/// Ceiling on a single check or setup command. Commands are cut off for going quiet
-/// (see the stall budgets) long before this; it only bounds a command that keeps
-/// printing forever.
+/// Default ceiling on a single check or setup command. Commands are cut off for going
+/// quiet (see the stall budgets) long before this; it only bounds a command that keeps
+/// printing forever. Projects may set their own budgets ([`TimeLimits`]).
 pub(super) const CHECK_TIMEOUT_SECS: u64 = 1800;
 /// A verification command that has printed nothing for this long is treated as wedged.
 /// Generous, because a compile or test step can legitimately think in silence.
@@ -88,13 +90,16 @@ pub(super) const PREPARE_STALL_SECS: u64 = 300;
 /// How many times a setup command that was cut off mid-progress is retried in total.
 pub(super) const PREPARE_ATTEMPTS: u32 = 2;
 pub(super) const QUEUE_TIMEOUT_SECS: u64 = 300;
-pub(super) const BRIDGE_TIMEOUT_SECS: u64 = CHECK_TIMEOUT_SECS + QUEUE_TIMEOUT_SECS + 120;
+/// How long an agent waits on a bridge call; it covers the longest check a project may allow.
+pub(super) const BRIDGE_TIMEOUT_SECS: u64 =
+    limits::MAX_CHECK_TIMEOUT_SECS + QUEUE_TIMEOUT_SECS + 120;
 
-fn check_limits(stall: u64) -> process_control::Limits {
-    process_control::Limits::supervised(
-        Duration::from_secs(CHECK_TIMEOUT_SECS),
-        Duration::from_secs(stall),
-    )
+/// The limits saved on an attempt when it started, or the defaults.
+fn run_limits(runtime: &TaskRuntime, id: &str) -> TimeLimits {
+    runtime
+        .run_snapshot(id)
+        .and_then(|run| run.time_limits)
+        .unwrap_or_default()
 }
 
 /// Publish a long command's newest output line onto the run so the interface can show what
@@ -146,6 +151,19 @@ pub struct Verification {
     pub result: process_control::CommandResult,
 }
 
+/// Adds what to do when Xcode refused to run a package's macros or plugins, so
+/// the person and the agent see how to trust them rather than a bare build error.
+fn explain_macros(mut result: process_control::CommandResult) -> process_control::CommandResult {
+    if result.success {
+        return result;
+    }
+    let output = format!("{}\n{}", result.stdout, result.stderr);
+    if let Some(hint) = super::xcode::macros::hint(&output, None) {
+        result.stderr = format!("{}\n\n{hint}", result.stderr.trim_end());
+    }
+    result
+}
+
 fn shell(command: &str, workspace: &str) -> Result<Command, String> {
     if command.trim().is_empty() || command.len() > 4000 || command.contains('\0') {
         return Err("Set a verification command of 1–4,000 characters in Project Settings.".into());
@@ -169,28 +187,92 @@ fn shell(command: &str, workspace: &str) -> Result<Command, String> {
     cmd.current_dir(workspace);
     cmd.env_remove("JACKALOPE_BRIDGE_TOKEN")
         .env_remove("JACKALOPE_BRIDGE_URL");
+    cmd.envs(super::source_packages::environment(Path::new(workspace)));
+    super::xcode::apply_for(&mut cmd, Path::new(workspace));
     Ok(cmd)
+}
+
+/// The task's Simulator for a command in an iOS project, or one that names
+/// `$JACKALOPE_SIMULATOR_UDID`: created for setup, booted for a check. A
+/// device that cannot be had is reported and the command runs without it, so
+/// its own output shows what failed.
+fn task_simulator(
+    runtime: &TaskRuntime,
+    id: &str,
+    workspace: &str,
+    command: &str,
+    booted: bool,
+    canceled: impl Fn() -> bool,
+) -> Option<super::simulators::Device> {
+    if !super::simulators::needed_by_command(workspace, command) {
+        return None;
+    }
+    let device = super::simulators::assign(runtime, id).and_then(|device| {
+        if booted {
+            super::simulators::boot(&device, canceled)
+        } else {
+            Ok(device)
+        }
+    });
+    match device {
+        Ok(device) => Some(device),
+        Err(error) => {
+            runtime.update(id, |run| {
+                activity(run, &format!("No Simulator for this command: {error}"))
+            });
+            None
+        }
+    }
+}
+
+fn with_simulator(
+    mut command: Command,
+    device: Option<&super::simulators::Device>,
+) -> (Command, Option<super::simulators::InUse>) {
+    let Some(device) = device else {
+        return (command, None);
+    };
+    command.envs(device.environment());
+    super::xcode::apply(&mut command);
+    (command, Some(super::simulators::InUse::new(device)))
 }
 
 /// Runs an explicitly requested command in a disposable workspace the caller has reserved,
 /// with a check slot, stall budget and ceiling like a project check. `setup` uses the setup
-/// command's shorter stall budget.
+/// command's stall budget.
 pub(in crate::commands) fn run_disposable(
     command: &str,
     workspace: &str,
     setup: bool,
+    limits: &TimeLimits,
 ) -> Result<process_control::CommandResult, String> {
     let _slot = leases::check_slot(|| false)?;
-    process_control::run_supervised(
-        shell(command, workspace)?,
-        check_limits(if setup {
-            PREPARE_STALL_SECS
-        } else {
-            CHECK_STALL_SECS
-        }),
+    let mut process = shell(command, workspace)?;
+    // A check in a disposable workspace gets a Simulator of its own that is
+    // deleted with it; setup there only gets one when it names the device.
+    let wants = if setup {
+        command.contains("JACKALOPE_SIMULATOR_")
+    } else {
+        super::simulators::needed_by_command(workspace, command)
+    };
+    let simulator = wants.then(|| super::simulators::Disposable::new(workspace, !setup));
+    if let Some(Ok(disposable)) = &simulator {
+        process.envs(disposable.device.environment());
+        super::xcode::apply(&mut process);
+    }
+    let mut result = explain_macros(process_control::run_supervised(
+        process,
+        limits.limits(setup),
         || false,
         |_, _| {},
-    )
+    )?);
+    if let Some(Err(error)) = simulator {
+        result.stderr = format!(
+            "Jackalope could not provide a Simulator: {error}\n{}",
+            result.stderr
+        );
+    }
+    Ok(result)
 }
 
 /// Runs `work` in `workspace` holding its verification lease. Under the
@@ -259,6 +341,58 @@ pub(in crate::commands) fn prepare(
     )
 }
 
+/// Runs one saved project command marked to run when a task worktree is created. It always
+/// runs (no manifest reuse) and is not retried; a failure keeps its output on the attempt.
+pub(in crate::commands) fn run_worktree_command(
+    runtime: &TaskRuntime,
+    id: &str,
+    name: &str,
+    command: &str,
+    workspace: &str,
+) -> Result<PreparationRecord, String> {
+    with_workspace_lease(
+        runtime,
+        workspace,
+        Some(id),
+        "Another attempt owns this workspace. Resolve it before preparation.",
+        |_| Ok(None),
+        |_| {
+            let _slot = runtime.timed(id, "preparationWait", || {
+                leases::check_slot(|| !runtime.is_running(id))
+            })?;
+            runtime.update_checked(id, |run| {
+                run.progress = Some(StepProgress::new("dependencies", name, 1));
+                activity(
+                    run,
+                    &format!("Running {name}, which runs when a worktree is created: {command}"),
+                );
+            })?;
+            let result = runtime
+                .timed(id, "worktreeCommand", || {
+                    process_control::run_supervised(
+                        shell(command, workspace)?,
+                        run_limits(runtime, id).limits(true),
+                        || !runtime.is_running(id),
+                        observer(runtime, id),
+                    )
+                })
+                .map(explain_macros)?;
+            let record = PreparationRecord::from_result(command, 1, &result);
+            runtime.update_checked(id, |run| {
+                run.diagnostics.push(format!(
+                    "{name} (runs when a worktree is created): {command}\n{}\n{}",
+                    result.stdout, result.stderr
+                ));
+                if !record.success {
+                    run.preparation = Some(record.clone());
+                }
+                run.progress = None;
+            })?;
+            Ok(record)
+        },
+    )
+}
+
 fn run_preparation(
     runtime: &TaskRuntime,
     id: &str,
@@ -270,6 +404,10 @@ fn run_preparation(
     let _slot = runtime.timed(id, "preparationWait", || {
         leases::check_slot(|| !runtime.is_running(id))
     })?;
+    let limits = run_limits(runtime, id);
+    let simulator = task_simulator(runtime, id, workspace, command, false, || {
+        !runtime.is_running(id)
+    });
     let mut attempt = 1;
     let record = loop {
         runtime.update_checked(id, |run| {
@@ -287,14 +425,18 @@ fn run_preparation(
                 },
             );
         })?;
-        let result = runtime.timed(id, "preparation", || {
-            process_control::run_supervised(
-                shell(command, workspace)?,
-                check_limits(PREPARE_STALL_SECS),
-                || !runtime.is_running(id),
-                observer(runtime, id),
-            )
-        })?;
+        let result = runtime
+            .timed(id, "preparation", || {
+                let (process, _in_use) =
+                    with_simulator(shell(command, workspace)?, simulator.as_ref());
+                process_control::run_supervised(
+                    process,
+                    limits.limits(true),
+                    || !runtime.is_running(id),
+                    observer(runtime, id),
+                )
+            })
+            .map(explain_macros)?;
         let record = PreparationRecord::from_result(command, attempt, &result);
         let saved = record.clone();
         runtime.update_checked(id, |run| {
@@ -315,9 +457,30 @@ fn run_preparation(
     };
     if record.success {
         preparation::record_prepared(root, &fingerprint, command);
+        save_packages(runtime, id, root);
     }
     runtime.update(id, |run| run.progress = None);
     Ok(record)
+}
+
+/// Keeps the Swift package checkouts a successful command left in a task's workspace for
+/// the project's next worktrees.
+fn save_packages(runtime: &TaskRuntime, id: &str, workspace: &Path) {
+    let Some(run) = runtime.run_snapshot(id) else {
+        return;
+    };
+    if super::source_packages::capture(
+        runtime.data_directory(),
+        Path::new(&run.project_path),
+        workspace,
+    ) {
+        runtime.update(id, |run| {
+            activity(
+                run,
+                "Saved this workspace's Swift package checkouts for the project's next worktrees.",
+            )
+        });
+    }
 }
 
 fn execute(runtime: &TaskRuntime, run: &TaskRun, command: &str) -> Result<Verification, String> {
@@ -334,6 +497,9 @@ fn execute(runtime: &TaskRuntime, run: &TaskRun, command: &str) -> Result<Verifi
         let _slot = runtime.timed(&run.id, "verificationWait", || {
             leases::check_slot(|| active && !runtime.is_running(&run.id))
         })?;
+        let simulator = task_simulator(runtime, &run.id, &run.workspace, command, true, || {
+            active && !runtime.is_running(&run.id)
+        });
         let directory = runtime.integration_directory();
         let before = super::integration::workspace_tree(run, &directory)?;
         runtime.stage(&run.id, Some("verification"));
@@ -345,15 +511,22 @@ fn execute(runtime: &TaskRuntime, run: &TaskRun, command: &str) -> Result<Verifi
                 1,
             ))
         });
-        let result = runtime.timed(&run.id, "verification", || {
-            process_control::run_supervised(
-                shell(command, &run.workspace)?,
-                check_limits(CHECK_STALL_SECS),
-                || agent_active && !runtime.is_running(&run.id),
-                observer(runtime, &run.id),
-            )
-        })?;
+        let result = runtime
+            .timed(&run.id, "verification", || {
+                let (process, _in_use) =
+                    with_simulator(shell(command, &run.workspace)?, simulator.as_ref());
+                process_control::run_supervised(
+                    process,
+                    run.time_limits.unwrap_or_default().limits(false),
+                    || agent_active && !runtime.is_running(&run.id),
+                    observer(runtime, &run.id),
+                )
+            })
+            .map(explain_macros)?;
         runtime.update(&run.id, |r| r.progress = None);
+        if result.success {
+            save_packages(runtime, &run.id, Path::new(&run.workspace));
+        }
         let after = super::integration::workspace_tree(run, &directory)?;
         let verification = Verification {
             command: command.to_string(),
@@ -600,6 +773,7 @@ macro_rules! tauri_commands {
     ($next:ident $finish:ident [$($done:tt)*] $($rest:tt)*) => {
         $next!($finish [$($done)*
             commands::verification::task_verify,
+            commands::verification::project_time_limit_suggestion,
         ] $($rest)*)
     };
 }
@@ -629,4 +803,15 @@ pub async fn task_verify(
             },
         )
     }).await.map_err(|e| e.to_string())?
+}
+
+/// Larger time limits suggested for a project at `path`, or `None` when the defaults suit it.
+/// Nothing is saved: Project settings offer the values and the person chooses.
+#[tauri::command]
+pub async fn project_time_limit_suggestion(path: String) -> Result<Option<TimeLimits>, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        limits::xcode_project(Path::new(&path)).then_some(TimeLimits::XCODE)
+    })
+    .await
+    .map_err(|e| e.to_string())
 }

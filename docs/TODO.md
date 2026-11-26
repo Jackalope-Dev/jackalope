@@ -7,6 +7,28 @@ release dates.
 
 ## Reliability and accessibility
 
+- [ ] Accept iOS development end to end in the installed app: an agent task on an iOS project
+  with its own Simulator (guidance, background boot, idle shutdown), the simulator tools and
+  Screen view, the Simulator preview and review captures, the base-device and time-limit
+  settings, a physical iPhone with a signed team build (`device_app`, `device_logs`, Run on
+  device), a real TestFlight upload through processing, and a Mac computer installed as a
+  LaunchAgent behind Tailscale HTTPS running real Claude Code and Codex tasks.
+- [ ] Snapshot Swift packages that use local package references.
+- [ ] Give agents on a computer a Simulator and the simulator tools on a Mac computer, and send
+  file secrets to computers.
+- [ ] Merge `.xcscheme` and `Package.resolved` structurally, and use one Xcode project detector
+  for simulator tools, devices, TestFlight and host placement.
+
+- [ ] Check virtualized transcripts in installed WKWebView, WebView2 and WebKitGTK: momentum
+  scrolling, the CSS Highlight API, Ctrl+F in WebView2, and Copy as Markdown's pending
+  clipboard write.
+- [ ] Check the new default shortcuts (Mod+Shift+M/E/P/G, Mod+I) in installed WebView2,
+  WKWebView and WebKitGTK, including IBus on Linux.
+- [ ] Accept the optional account in installed builds: continue without an account on a clean
+  profile, run a real task, connect later, and check that expiry and revocation only turn off
+  account features. Update the Microsoft Store listing to say the account is optional.
+- [ ] Accept the Overview page in an installed app with real running work, previews and
+  pull requests, and load Cloudflare swarm state app-wide so swarms appear as one item.
 - [ ] Finish the Android and iOS companion (apps/mobile): push notifications when work needs
   you (host registration of device tokens, a server relay holding the FCM and APNs
   credentials, generic notification text), signed device builds and CI builds for both
@@ -25,6 +47,23 @@ release dates.
 
 ## Agents and task execution
 
+- [ ] Accept Edit from here in an installed app on macOS, Windows and Linux for Claude Code and
+  Codex conversations and tasks, including Undo and the turn after a rewind; watch for changes
+  to Claude Code's hidden `--resume-session-at` flag.
+- [ ] Accept repository discovery on a fresh macOS install with sessions under protected
+  folders (no permission prompts), and on Windows and Linux.
+- [ ] Accept worktree lifecycle in an installed app on macOS, Windows and Linux:
+  `.worktreeinclude` copies, worktree commands and their failure output, stopping a marked
+  terminal on merge and archive, and an automatic cleanup pass keeping and removing the
+  right worktrees.
+- [ ] Accept Codex app-server sessions in an installed app on each platform: approvals,
+  Send now, Stop, and resume after a restart.
+- [ ] Accept composer side questions (Claude fork-session, `codex exec fork`) and per-send
+  effort with real providers in an installed app; move the Codex side question to the
+  app-server's thread fork.
+- [ ] Accept importing Claude Code and Codex history in an installed app on each platform:
+  the onboarding offer, a real import, updating a conversation that grew, and continuing an
+  imported conversation through its CLI.
 - [ ] Extend agents on a computer: automatic routing that does not require the CLI here.
 - [ ] Accept the runner's local bridge in real runs: a protocol 4 image built and run on a
   local sandbox, a cloud machine and a live Agent37 account, with a real Claude Code and
@@ -38,7 +77,8 @@ release dates.
   wake, spend), bridge tools, on-demand connections, stdio connections running on the
   computer (npx and uvx servers, the uv install, Claude Code's approval hook and Codex's
   `mcp_servers` overrides), `execute_tool` approvals and project
-  secrets through the relay, Jackalope context (cloud resources manifest and pasted
+  secrets through the relay, Keep API keys on this device with Claude Code and Codex
+  streaming from Anthropic and OpenAI, Jackalope context (cloud resources manifest and pasted
   images) reaching the agent there, desktop control and the browser tools on
   the agent's computer, read-only planners and swarm orchestrators there, stop, quota
   handoff, lost contact, reattach and restart recovery.
@@ -133,12 +173,25 @@ release dates.
 - [ ] Extend Grok/Antigravity permission protocols and scoped MCP delivery without
   weakening process ownership, usage accounting or saved-session compatibility, so
   their requests pass the same auto-approval risk check.
+- [ ] Extend lesson tool rules beyond Claude Code `PreToolUse` and asked OpenCode/ACP
+  permission requests: Codex has no pre-tool hook, OpenCode's default permissions do
+  not ask for shell or edits, ACP replies carry no reason, one-shot Claude Code
+  sessions register no hooks, and Claude Code on a computer runs without the
+  persistent session that carries them. Exercise rules with real agents before
+  claiming coverage.
 - [ ] Run matched Claude Code session and hook trials on the continuation suite against
   the defaults (persistent session, hooks, fallback) and the off variants before
   changing isolation or shared prompt caching.
 
 ## Context, usage and integrations
 
+- [ ] Accept GitLab merge requests (including from a fork) and Bitbucket pull requests
+  against live repositories in an installed app: create, follow pipelines or builds, failed
+  log and review drafts, each merge method, a merge blocked by a newer push, glab signed
+  out, and a missing or revoked Bitbucket token.
+- [ ] Accept usage-limit resume and account or agent switching against real Claude, Codex
+  and Gemini limits in an installed app, and decide whether conversations may switch
+  agent or account after a limit.
 - [ ] Use Learning activity to calibrate background learning's cadence, probation,
   archive, miss and curator thresholds against real use, and measure whether learned
   lessons reduce repeated corrections before claiming it.
@@ -184,6 +237,9 @@ release dates.
   rounds and accepts in-scope deviations, with escalation rates by category, answers people
   overrode, decider time and cost, restart while deciding, and `request_human_action`
   steps for a sign-in and a secret.
+- [ ] Accept the turn advisor with installed agents on Windows and macOS: how often its
+  concerns and blockers are right, how often working agents push back, follow-up chains,
+  skips for quota and busy slots, advisor time and cost per turn, and a restart mid-review.
 - [ ] Accept automatic delivery end to end in the installed app: a swarm goal on a new
   Artifacts project merges under a committed policy, pushes the branch to Artifacts and
   deploys to a Workers preview, including a failing check that rolls back and pauses merging.

@@ -327,7 +327,7 @@ const comparisons: Comparison[] = [
       {
         question: 'Can I download Jackalope now?',
         answer:
-          'Download Jackalope for Windows, macOS or Linux, then sign in with a free account. Public pricing has not been announced.',
+          'Download Jackalope for Windows, macOS or Linux and start without an account; a free account is optional. Public pricing has not been announced.',
       },
     ],
   },

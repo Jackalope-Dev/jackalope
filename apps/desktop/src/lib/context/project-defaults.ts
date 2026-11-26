@@ -5,6 +5,18 @@ export interface ProjectDefaults {
   prepareCommand?: string | null;
   verifyCommand?: string | null;
   previewCommand?: string | null;
+  /** The Xcode project or Swift package, when there is one. */
+  xcode?: XcodeProject | null;
+}
+
+/** An Xcode project as native project detection reports it. */
+interface XcodeProject {
+  container: 'workspace' | 'project' | 'package';
+  path: string | null;
+  generator: 'xcodeGen' | 'tuist' | null;
+  cocoapods: boolean;
+  ios: boolean;
+  scheme: string | null;
 }
 
 export function missingProjectDefaults(

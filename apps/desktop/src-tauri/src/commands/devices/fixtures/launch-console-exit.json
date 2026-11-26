@@ -1,0 +1,48 @@
+{
+  "info": {
+    "arguments": [
+      "devicectl",
+      "device",
+      "process",
+      "launch",
+      "--device",
+      "5B88C7AF-57B1-46E2-9424-3B98AE662BE4",
+      "--console",
+      "--terminate-existing",
+      "--json-output",
+      "/tmp/out.json",
+      "digital.jackalope.Host"
+    ],
+    "commandType": "devicectl.device.process.launch",
+    "environment": {
+      "TERM": "xterm-256color"
+    },
+    "jsonVersion": 5,
+    "outcome": "success",
+    "version": "651.32"
+  },
+  "result": {
+    "deviceIdentifier": "5B88C7AF-57B1-46E2-9424-3B98AE662BE4",
+    "launchOptions": {
+      "activatedWhenStarted": true,
+      "arguments": [],
+      "environmentVariables": {
+        "TERM": "xterm-256color"
+      },
+      "platformSpecificOptions": {},
+      "startStopped": false,
+      "terminateExistingInstances": true,
+      "user": {
+        "active": true
+      }
+    },
+    "process": {
+      "auditToken": [501, 501, 20, 501, 20, 38615, 100053, 12934814],
+      "processIdentifier": 38615
+    },
+    "terminationResult": {
+      "terminatingSignal": 9,
+      "wasCoreDumpCreated": false
+    }
+  }
+}

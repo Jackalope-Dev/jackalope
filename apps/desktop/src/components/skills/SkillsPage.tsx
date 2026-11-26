@@ -23,6 +23,7 @@ import {
   openSkill,
   type SkillCard,
   type SkillFilter,
+  syncingDevices,
   syncSummary,
   visibleSkills,
 } from '../../lib/skill-sync';
@@ -36,6 +37,7 @@ import { SkillDetailDialog } from './SkillDetailDialog';
 import { SkillConstellation } from './SkillOrbit';
 import { type SkillAction, SkillTile } from './SkillTile';
 import './skills.css';
+import { ConnectAccountButton } from '../account/RequiresAccount';
 
 function since(at: string | null) {
   if (!at) return '';
@@ -90,10 +92,11 @@ export function SkillsPage() {
     () => visibleSkills(page.skills, filter, query),
     [page.skills, filter, query],
   );
-  const coverage = useMemo(
-    () => deviceCoverage(page.skills, page.devices),
+  const devices = useMemo(
+    () => syncingDevices(page.skills, page.devices),
     [page.skills, page.devices],
   );
+  const coverage = useMemo(() => deviceCoverage(page.skills, devices), [page.skills, devices]);
   const detail = page.skills.find((card) => card.id === detailId) ?? null;
   const local = async (work: () => Promise<unknown>) => {
     setLocalError('');
@@ -184,7 +187,7 @@ export function SkillsPage() {
           aria-busy={busy}
         >
           <SkillConstellation
-            devices={page.devices}
+            devices={devices}
             holders={coverage}
             busy={busy}
             enabled={sync.enabled}
@@ -202,6 +205,7 @@ export function SkillsPage() {
               <p className="skill-hero-note">{since(sync.lastSyncedAt)}</p>
             )}
             <div className="skill-hero-actions">
+              {isTauriEnvironment() && !sync.available && !sync.reset && <ConnectAccountButton />}
               {sync.available && !sync.settingsSync && (
                 <Button variant="outline" onClick={() => openSettings('Privacy')}>
                   Open privacy settings
@@ -345,7 +349,7 @@ export function SkillsPage() {
                 <li key={card.id} data-fresh={card.id === fresh || undefined}>
                   <SkillTile
                     card={card}
-                    devices={page.devices}
+                    devices={devices}
                     syncAvailable={canSync && !busy}
                     onAction={onAction}
                   />

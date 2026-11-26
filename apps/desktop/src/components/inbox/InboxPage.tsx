@@ -1,4 +1,4 @@
-import { Badge, Button, SegmentedControl, Select, SelectItem } from '@jackalope/ui';
+import { Badge, Button, LinkButton, SegmentedControl, Select, SelectItem } from '@jackalope/ui';
 import {
   AlertTriangle,
   ArrowRight,
@@ -18,18 +18,22 @@ import {
 import { useEffect, useMemo, useState } from 'react';
 import { navigateWorkspace } from '../../lib/app-events';
 import { buildCatchUp, type CatchUpDecision, catchUpHeadline } from '../../lib/catch-up';
+import { liveWork } from '../../lib/live-work';
 import { pullRequestPhaseView } from '../../lib/pull-requests';
 import { type WorkItem, workPresence } from '../../lib/task-collection';
 import { openWork, useAllRuns, useWorkspaceWork, workProjectId } from '../../lib/work-selection';
 import { compactElapsed, signalKey } from '../../lib/work-signals';
+import { useActivityStore } from '../../stores/activityStore';
 import { useAgentConfigStore } from '../../stores/agentConfigStore';
 import { useCapacityStore } from '../../stores/capacityStore';
 import { type CompanionNotice, sortNotices, useCompanionStore } from '../../stores/companionStore';
+import { useLiveSessionStore } from '../../stores/liveSessionStore';
 import { useManagedTaskStore } from '../../stores/managedTaskStore';
 import { isAgentAllowedForProject, type Project, useProjectStore } from '../../stores/projectStore';
 import { useChangeStats, useWorkSignalsStore } from '../../stores/workSignalsStore';
 import { useWorkViewStore } from '../../stores/workViewStore';
 import { AgentStack } from '../agents/AgentAvatar';
+import { LiveWorkRow } from '../overview/LiveWorkRow';
 import { ProjectMark } from '../projects/ProjectMark';
 import { Picture } from '../tasks/WorkCatchUp';
 import { WorkspacePage } from '../ui/WorkspacePage';
@@ -39,6 +43,8 @@ import './inbox.css';
 /** Results from the last few days that the person has not opened yet. */
 const RECENT_MS = 3 * 24 * 60 * 60_000;
 const PICTURE_LIMIT = 4;
+/** Running rows the rail lists before pointing at Overview for the rest. */
+const RUNNING_LIMIT = 5;
 
 type Kind = 'all' | 'needs' | 'alerts' | 'activity';
 
@@ -206,19 +212,8 @@ function AlertRow({
   );
 }
 
-function WorkRow({
-  item,
-  project,
-  detail,
-  now,
-}: {
-  item: WorkItem;
-  project?: Project;
-  detail: string;
-  now: number;
-}) {
+function WorkRow({ item, project, detail }: { item: WorkItem; project?: Project; detail: string }) {
   const presence = workPresence(item);
-  const started = item.run?.startedAt ?? item.date;
   return (
     <li>
       <button type="button" className="inbox-work-row" onClick={() => openWork(item)}>
@@ -226,9 +221,13 @@ function WorkRow({
         <span className="inbox-work-text">
           <span className="inbox-work-title">{item.title}</span>
           <span className="inbox-work-detail">
-            {project && <ProjectMark project={project} />}
+            {project && (
+              <span className="inbox-work-project">
+                <ProjectMark project={project} />
+                {project.name}
+              </span>
+            )}
             {detail}
-            {item.stage === 'working' && started ? ` · ${compactElapsed(started, now)}` : ''}
           </span>
         </span>
         <ArrowRight size={14} aria-hidden="true" className="inbox-work-arrow" />
@@ -270,6 +269,8 @@ export function InboxPage({ onNewWork }: { onNewWork: () => void }) {
   const sources = useCompanionStore((state) => state.sources);
   const readIds = useCompanionStore((state) => state.readIds);
   const records = useCapacityStore((state) => state.records);
+  const sessions = useLiveSessionStore((state) => state.sessions);
+  const schedules = useActivityStore((state) => state.schedules);
   const enabledAgents = useAgentConfigStore((state) => state.enabledAgents);
 
   const projectById = useMemo(() => new Map(projects.map((p) => [p.id, p])), [projects]);
@@ -315,7 +316,14 @@ export function InboxPage({ onNewWork }: { onNewWork: () => void }) {
   const decisions = catchUp.waiting;
   const happened = catchUp.recent?.happened ?? [];
   const moreHappened = catchUp.recent?.moreHappened ?? 0;
-  const running = work.filter((item) => item.stage === 'working');
+  // Running work waiting on an answer is listed under Needs you instead.
+  const running = useMemo(
+    () =>
+      liveWork({ items: allWork, runs: allRuns, sessions, queue, schedules }).filter(
+        (entry) => !entry.waiting && (projectFilter === 'all' || entry.projectId === projectFilter),
+      ),
+    [allWork, allRuns, sessions, queue, schedules, projectFilter],
+  );
   const othersTurn = work.filter((item) => item.stage === 'inReview');
 
   const alerts = useMemo(() => {
@@ -428,7 +436,7 @@ export function InboxPage({ onNewWork }: { onNewWork: () => void }) {
   );
 
   const alertsSection = show('alerts') && alerts.length > 0 && (
-    <section className="inbox-section inbox-panel" aria-labelledby="inbox-alerts">
+    <section className="inbox-section" aria-labelledby="inbox-alerts">
       <div className="inbox-section-heading">
         <h2 id="inbox-alerts" className="inbox-section-title">
           Alerts <span className="inbox-count">{alerts.length}</span>
@@ -443,65 +451,86 @@ export function InboxPage({ onNewWork }: { onNewWork: () => void }) {
           </Button>
         )}
       </div>
-      <ul className="inbox-alerts">
-        {alerts.map((notice) => (
-          <AlertRow
-            key={notice.id}
-            notice={notice}
-            unread={!readIds.includes(notice.id)}
-            onRead={() => markAlertsRead([notice.id])}
-          />
-        ))}
-      </ul>
+      <div className="inbox-panel">
+        <ul className="inbox-alerts">
+          {alerts.map((notice) => (
+            <AlertRow
+              key={notice.id}
+              notice={notice}
+              unread={!readIds.includes(notice.id)}
+              onRead={() => markAlertsRead([notice.id])}
+            />
+          ))}
+        </ul>
+      </div>
     </section>
   );
 
-  const runningSection = show('activity') && running.length > 0 && (
-    <section className="inbox-section inbox-panel" aria-labelledby="inbox-running">
+  const moreRunning = running.length - RUNNING_LIMIT;
+  const runningSection = show('activity') && (
+    <section className="inbox-section" aria-labelledby="inbox-running">
       <h2 id="inbox-running" className="inbox-section-title">
         Running now <span className="inbox-count">{running.length}</span>
       </h2>
-      <ul className="inbox-work">
-        {running.map((item) => (
-          <WorkRow
-            key={item.id}
-            item={item}
-            project={projectOf(item)}
-            detail={item.statusLabel || 'Working'}
-            now={now}
-          />
-        ))}
-      </ul>
+      <div className="inbox-panel">
+        {running.length > 0 ? (
+          <ul className="inbox-work">
+            {running.slice(0, RUNNING_LIMIT).map((entry) => (
+              <LiveWorkRow
+                key={entry.key}
+                entry={entry}
+                project={entry.projectId ? projectById.get(entry.projectId) : undefined}
+                now={now}
+                compact
+              />
+            ))}
+          </ul>
+        ) : (
+          <p className="inbox-panel-quiet">Nothing is running right now.</p>
+        )}
+        <button
+          type="button"
+          className="inbox-panel-more"
+          onClick={() => navigateWorkspace('overview')}
+        >
+          <span>{moreRunning > 0 ? `${moreRunning} more running` : 'See overview'}</span>
+          {moreRunning > 0 && <span className="inbox-panel-more-hint">See overview</span>}
+          <ArrowRight size={14} aria-hidden="true" />
+        </button>
+      </div>
     </section>
   );
 
   const othersSection = show('activity') && othersTurn.length > 0 && (
-    <section className="inbox-section inbox-panel" aria-labelledby="inbox-others">
+    <section className="inbox-section" aria-labelledby="inbox-others">
       <h2 id="inbox-others" className="inbox-section-title">
         <GitPullRequest size={16} aria-hidden="true" />
         Waiting on others <span className="inbox-count">{othersTurn.length}</span>
       </h2>
-      <ul className="inbox-work">
-        {othersTurn.map((item) => (
-          <WorkRow
-            key={item.id}
-            item={item}
-            project={projectOf(item)}
-            detail={
-              item.pullRequest
-                ? pullRequestPhaseView(item.pullRequest.phase).label
-                : item.statusLabel || 'In review'
-            }
-            now={now}
-          />
-        ))}
-      </ul>
+      <div className="inbox-panel">
+        <ul className="inbox-work">
+          {othersTurn.map((item) => (
+            <WorkRow
+              key={item.id}
+              item={item}
+              project={projectOf(item)}
+              detail={
+                item.pullRequest
+                  ? pullRequestPhaseView(item.pullRequest.phase, item.pullRequest.provider).label
+                  : item.statusLabel || 'In review'
+              }
+            />
+          ))}
+        </ul>
+      </div>
     </section>
   );
 
   const main = [needsSection, resultsSection].filter(Boolean);
   const aside = [alertsSection, runningSection, othersSection].filter(Boolean);
-  const nothingShown = main.length === 0 && aside.length === 0;
+  // An empty Running now card only keeps its place beside other sections.
+  const nothingShown =
+    main.length === 0 && !alertsSection && !othersSection && running.length === 0;
 
   return (
     <WorkspacePage className="inbox-page" aria-labelledby="inbox-title">
@@ -574,6 +603,7 @@ export function InboxPage({ onNewWork }: { onNewWork: () => void }) {
               {scopeName ? ` in ${scopeName}` : ''}
             </h2>
             <p>New questions, results to review and app alerts collect here as they happen.</p>
+            <LinkButton onClick={() => navigateWorkspace('overview')}>See overview</LinkButton>
           </div>
         </div>
       ) : (

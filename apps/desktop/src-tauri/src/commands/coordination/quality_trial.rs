@@ -37,7 +37,7 @@ async fn trial() -> Result<(), Box<dyn std::error::Error>> {
     )?;
     let project_id = Uuid::new_v4().to_string();
     learning::seed(&root, &repo, &project_id, &spec)?;
-    let runtime = TaskRuntime::with_test_access(root.join("profile/history"))?;
+    let runtime = TaskRuntime::new(root.join("profile/history"))?;
     let learning_mode = spec["learningMode"].as_str().unwrap_or("off").to_owned();
     if !["off", "local", "jev"].contains(&learning_mode.as_str()) {
         return Err("Invalid learning mode".into());

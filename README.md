@@ -4,29 +4,54 @@
 
 # Jackalope
 
+Run Codex, Claude Code, Gemini CLI and other coding agents side by side, each in its
+own Git worktree, and review every change in one desktop app before it merges.
+
+[![GitHub stars](https://img.shields.io/github/stars/Jackalope-Dev/jackalope?style=flat&logo=github&label=Stars)](https://github.com/Jackalope-Dev/jackalope/stargazers)
+[![License: Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-blue)](LICENSE)
+[![Get it from Microsoft Store](https://img.shields.io/badge/Microsoft_Store-Get_Jackalope-0078D4)](https://apps.microsoft.com/detail/9NM89QFJQ244)
+[![Platforms: macOS, Windows and Linux](https://img.shields.io/badge/Platforms-macOS_%7C_Windows_%7C_Linux-555)](https://jackalope.dev/download/)
 [![Verify platforms](https://github.com/Jackalope-Dev/jackalope/actions/workflows/verify.yml/badge.svg?branch=master)](https://github.com/Jackalope-Dev/jackalope/actions/workflows/verify.yml)
 [![Security checks](https://github.com/Jackalope-Dev/jackalope/actions/workflows/security.yml/badge.svg?branch=master)](https://github.com/Jackalope-Dev/jackalope/actions/workflows/security.yml)
 [![Join the Jackalope Discord](https://img.shields.io/badge/Discord-Join_the_community-5865F2?logo=discord&logoColor=white)](https://discord.gg/pDfJTGFunC)
 [![Sponsor Jackalope on GitHub](https://img.shields.io/badge/GitHub-Sponsor_Jackalope-EA4AAA?logo=githubsponsors&logoColor=white)](https://github.com/sponsors/Jackalope-Dev)
 [![Support Jackalope on Ko-fi](https://img.shields.io/badge/Ko--fi-Support_Jackalope-FF6433?logo=kofi&logoColor=white)](https://ko-fi.com/jackalope_digital)
 
-Run Codex, Claude Code, Gemini CLI and other coding agents side by side, each in its
-own Git worktree, and review every change in one desktop app before it merges.
+<a href="https://jackalope.dev/tour/"><img src=".github/assets/work.png" alt="Jackalope Work view listing a project's tasks grouped by what needs you, what agents are working on and drafts" width="1440" /></a>
+
+*Work view. [Watch the 64-second tour](https://jackalope.dev/tour/).*
+
 Jackalope uses the agents you already have installed and their existing sign-ins.
 
 [Website](https://jackalope.dev/) · [App tour](https://jackalope.dev/tour/) ·
 [User guides](https://jackalope.dev/knowledge/) · [Documentation](docs/README.md) ·
 [Contributing](CONTRIBUTING.md) · [Apache-2.0](LICENSE)
 
-**Available for macOS, Windows and Linux.** [Download Jackalope](https://jackalope.dev/download/)
-and sign up for a free account, or build from source. Running native tasks requires
-a Jackalope account, including in source builds. See [current status](docs/STATUS.md)
-and [release requirements](docs/CROSS-PLATFORM-RELEASES.md) for what is still being
-validated on each platform.
+## Install
 
-<img src=".github/assets/work.png" alt="Jackalope Work view listing a project's tasks grouped by what needs you, what agents are working on and drafts" width="1440" />
+| Platform | Install |
+| --- | --- |
+| Windows 10 or later (x64) | [Get it from Microsoft Store](https://apps.microsoft.com/detail/9NM89QFJQ244) |
+| macOS | Download the DMG for [Apple silicon](https://cdn.crabnebula.app/download/jackalope-digital/jackalope/latest/platform/dmg-aarch64?channel=stable) or [Intel](https://cdn.crabnebula.app/download/jackalope-digital/jackalope/latest/platform/dmg-x86_64?channel=stable) |
+| Linux (x64) | Download the [AppImage](https://cdn.crabnebula.app/download/jackalope-digital/jackalope/latest/platform/appimage-x86_64?channel=stable) |
 
-*Work view. [Watch the tour](https://jackalope.dev/tour/).*
+On macOS you can also install with [Homebrew](https://github.com/Jackalope-Dev/homebrew-tap), which adds the `jackalope` command too:
+
+```sh
+brew tap jackalope-dev/tap
+brew trust jackalope-dev/tap
+brew install --cask jackalope
+```
+
+These are the same builds as the [download page](https://jackalope.dev/download/), or you
+can [build from source](#run-from-source). A free Jackalope account is optional: tasks,
+conversations and terminals run with your own agents without one, and connecting adds
+settings, lesson and skill sync across computers, invitations and the Microsoft Store beta.
+See [current status](docs/STATUS.md) and [release requirements](docs/CROSS-PLATFORM-RELEASES.md)
+for what is still being validated on each platform.
+
+If Jackalope is useful to you, please [star the repo](https://github.com/Jackalope-Dev/jackalope)
+so other developers can find it.
 
 ## What you can do
 
@@ -67,8 +92,8 @@ For interface development, run `pnpm dev` for the desktop browser preview or
 and 5180. The desktop browser preview cannot execute native tasks.
 
 Building the source and running automated tests do not require a Jackalope cloud
-account, deployment secrets or a reporting endpoint. Running native tasks requires
-a Jackalope account in every build; signup is free. See [privacy and reporting](docs/BETA-MONITORING.md).
+account, deployment secrets or a reporting endpoint, and neither does running native
+tasks. See [privacy and reporting](docs/BETA-MONITORING.md).
 
 Run `pnpm verify` before submitting changes. [CONTRIBUTING.md](CONTRIBUTING.md)
 covers the toolchain, focused tests, secret checks and pull-request workflow.
@@ -79,7 +104,7 @@ covers the toolchain, focused tests, secret checks and pull-request workflow.
 | --- | --- |
 | [apps/desktop](apps/desktop) | React interface and Tauri/Rust task runtime |
 | [apps/website](apps/website) | Product website, guides and sample media |
-| [apps/server](apps/server) | Account access, optional feedback and update services |
+| [apps/server](apps/server) | Optional accounts, feedback and update services |
 | [packages](packages) | Shared branding, knowledge and packages |
 | [docs](docs/README.md) | User workflows, architecture and contributor reference |
 | [scripts](scripts) | Verification, dependency notices and release tooling |

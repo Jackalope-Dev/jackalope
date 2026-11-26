@@ -1,11 +1,16 @@
 import { PLATFORMS, RELEASE_CHANNELS, SEMVER } from '@jackalope/contracts/platform';
 import {
+  ACTIONS,
+  COUNT_BUCKETS,
   ERROR_CODES,
+  ERROR_KINDS,
   FEATURES,
   OPERATION_OUTCOMES,
   OPERATIONS,
+  SETTING_NAMES,
   TASK_STATES,
   TELEMETRY_AGENTS,
+  WORK_SHAPES,
   WORKFLOWS,
 } from '@jackalope/contracts/telemetry';
 import { z } from 'zod';
@@ -36,6 +41,7 @@ const event = z.discriminatedUnion('name', [
     feature: feature.optional(),
     operation: operation.optional(),
     code: z.enum(ERROR_CODES),
+    kind: z.enum(ERROR_KINDS).optional(),
   }),
   z.strictObject({
     ...common,
@@ -43,6 +49,16 @@ const event = z.discriminatedUnion('name', [
     operation,
     outcome: z.enum(OPERATION_OUTCOMES),
   }),
+  z.strictObject({
+    ...common,
+    name: z.literal('work_sent'),
+    shape: z.enum(WORK_SHAPES),
+    agent: z.enum(TELEMETRY_AGENTS).optional(),
+    attachments: z.enum(COUNT_BUCKETS),
+    window: z.boolean(),
+  }),
+  z.strictObject({ ...common, name: z.literal('action_used'), action: z.enum(ACTIONS) }),
+  z.strictObject({ ...common, name: z.literal('setting_changed'), setting: z.enum(SETTING_NAMES) }),
 ]);
 export const telemetrySchema = z.strictObject({
   schemaVersion: z.literal(2),

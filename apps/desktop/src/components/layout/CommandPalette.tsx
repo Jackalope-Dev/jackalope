@@ -4,15 +4,16 @@ import { isTerminal } from '@jackalope/contracts/runs';
 import { SearchField } from '@jackalope/ui';
 import * as Dialog from '@radix-ui/react-dialog';
 import { FileText, Folder, MessageSquare, Paperclip } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
+import { useResolvedKeybindings } from '../../hooks/useKeybindings';
+import { useProjectFiles } from '../../hooks/useProjectFiles';
 import { emitAppEvent } from '../../lib/app-events';
 import { searchFiles } from '../../lib/file-search';
-import { isTauriEnvironment } from '../../lib/native/env';
+import { displayBinding } from '../../lib/keybindings';
 import { invokeNative } from '../../lib/native/transport';
 import { type ActiveTab, WORKSPACE_VIEWS } from '../../lib/navigation';
 import { projectNameHints } from '../../lib/project-name-hints';
 import { attachmentReference } from '../../lib/prompt-attachments';
-import { displayShortcut, resolveShortcuts } from '../../lib/shortcuts';
 import { workShape } from '../../lib/task-collection';
 import { taskDecision } from '../../lib/task-workflow';
 import { showWork, useWorkspaceWork, workProjectId } from '../../lib/work-selection';
@@ -23,34 +24,6 @@ import { useSettingsStore } from '../../stores/settingsStore';
 import { useThemeStore } from '../../stores/themeStore';
 import { useWorkViewStore } from '../../stores/workViewStore';
 import { type Command, type CommandContext, matchingCommands } from './commands';
-
-const fileCache = new Map<string, { files: string[]; loadedAt: number }>();
-
-/** Files in the active project for quick open, refreshed at most every 30 seconds. */
-function useProjectFiles(projectPath: string | undefined, enabled: boolean) {
-  const [files, setFiles] = useState<string[]>(
-    () => (projectPath && fileCache.get(projectPath)?.files) || [],
-  );
-  useEffect(() => {
-    if (!enabled || !projectPath || !isTauriEnvironment()) return;
-    const cached = fileCache.get(projectPath);
-    if (cached) setFiles(cached.files);
-    if (cached && Date.now() - cached.loadedAt < 30_000) return;
-    let canceled = false;
-    invokeNative<string[]>('project_files_list', { projectPath })
-      .then((list) => {
-        fileCache.set(projectPath, { files: list, loadedAt: Date.now() });
-        if (!canceled) setFiles(list);
-      })
-      .catch(() => {
-        if (!canceled) setFiles([]);
-      });
-    return () => {
-      canceled = true;
-    };
-  }, [projectPath, enabled]);
-  return files;
-}
 
 export function CommandPalette({
   isOpen,
@@ -68,7 +41,7 @@ export function CommandPalette({
   onCommand: (command: Command) => void;
 }) {
   const [query, setQuery] = useState('');
-  const shortcuts = useSettingsStore((state) => state.shortcuts);
+  const shortcuts = useResolvedKeybindings();
   const previousFocus = useRef<HTMLElement | null>(null);
   const setTheme = useThemeStore((state) => state.setTheme);
   const search = query.trim().toLowerCase();
@@ -323,12 +296,8 @@ export function CommandPalette({
               >
                 <command.icon className="size-4 text-[var(--color-accent-ink)]" />
                 <span>{command.label(context)}</span>
-                {(command.shortcut || command.key) && (
-                  <kbd>
-                    {command.shortcut
-                      ? displayShortcut(resolveShortcuts(shortcuts)[command.shortcut])
-                      : command.key}
-                  </kbd>
+                {command.shortcut && shortcuts[command.shortcut] && (
+                  <kbd>{displayBinding(shortcuts[command.shortcut])}</kbd>
                 )}
               </button>
             ))}

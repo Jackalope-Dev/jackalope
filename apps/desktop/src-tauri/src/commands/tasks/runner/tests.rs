@@ -65,6 +65,7 @@ fn request(id: &str, workspace: &Path) -> RunRequest {
     RunRequest {
         retry_of: None,
         handoff_focus: None,
+        reasoning_effort: None,
         continues: None,
         live_session_id: None,
         effort: None,
@@ -136,7 +137,7 @@ fn drive(
 
 #[test]
 fn both_runners_place_tools_from_one_table() {
-    let local = local::LocalRunner::new(false, None, None, None, Vec::new(), None, None);
+    let local = local::LocalRunner::new(false, None, None, None, Vec::new(), None, None, None);
     let remote = Access {
         runner: computers::runner::RunnerCapabilities::from_status(Some(
             &json!({"runs": 4, "capabilities": CAPABILITIES}),
@@ -211,7 +212,7 @@ fn one_launch_records_the_same_result_through_both_runners() {
         ),
     )
     .unwrap();
-    let runtime = TaskRuntime::with_test_access(folder.join("history")).unwrap();
+    let runtime = TaskRuntime::new(folder.join("history")).unwrap();
     computers::credentials::set(
         &runtime.computers_root(),
         "openai-key",
@@ -220,7 +221,7 @@ fn one_launch_records_the_same_result_through_both_runners() {
     .unwrap();
     let input = "Task:\nFixture only\n";
 
-    let mut local = local::LocalRunner::new(false, None, None, None, Vec::new(), None, None);
+    let mut local = local::LocalRunner::new(false, None, None, None, Vec::new(), None, None, None);
     // Like every agent launch, the fixture gets its own process group (unix) so its tree can be stopped.
     let mut agent = super::super::command("node");
     agent.arg(&script);
@@ -323,7 +324,7 @@ fn insert_run(runtime: &TaskRuntime, workspace: &Path) -> String {
 fn placement_is_recorded_once_and_continuations_keep_their_host() {
     let folder = std::env::temp_dir().join(format!("jackalope-placed-{}", uuid::Uuid::new_v4()));
     std::fs::create_dir_all(&folder).unwrap();
-    let runtime = TaskRuntime::with_test_access(folder.join("history")).unwrap();
+    let runtime = TaskRuntime::new(folder.join("history")).unwrap();
     let id = insert_run(&runtime, &folder);
     let req = request(&id, &folder);
     // A project without a computer runs here, as before, with nothing to
@@ -428,7 +429,7 @@ fn placed_on(runtime: &TaskRuntime, workspace: &Path, computer: &Computer) -> St
 fn computers_only_never_runs_a_placed_fork_on_this_device() {
     let folder = std::env::temp_dir().join(format!("jackalope-strict-{}", uuid::Uuid::new_v4()));
     std::fs::create_dir_all(&folder).unwrap();
-    let runtime = TaskRuntime::with_test_access(folder.join("history")).unwrap();
+    let runtime = TaskRuntime::new(folder.join("history")).unwrap();
     let computer = fixture_computer(&format!("strict{}", uuid::Uuid::new_v4().simple()));
     save_computer(&runtime, &computer);
     let gemini = |id: &str| RunRequest {
@@ -542,7 +543,7 @@ fn a_computer_that_does_not_answer_is_a_lost_host() {
     let folder = std::env::temp_dir().join(format!("jackalope-lost-{}", uuid::Uuid::new_v4()));
     std::fs::create_dir_all(&folder).unwrap();
     std::fs::write(folder.join("README.md"), "fixture\n").unwrap();
-    let runtime = TaskRuntime::with_test_access(folder.join("history")).unwrap();
+    let runtime = TaskRuntime::new(folder.join("history")).unwrap();
     computers::credentials::set(
         &runtime.computers_root(),
         "openai-key",
@@ -661,7 +662,7 @@ fn changes_left_on_a_lost_computer_are_saved_when_it_answers_never_applied() {
     let folder = root.join("work");
     std::fs::create_dir_all(&folder).unwrap();
     std::fs::write(folder.join("README.md"), "fixture\n").unwrap();
-    let runtime = TaskRuntime::with_test_access(root.join("history")).unwrap();
+    let runtime = TaskRuntime::new(root.join("history")).unwrap();
     let computer = fixture_computer(&format!("left{}", uuid::Uuid::new_v4().simple()));
     let lost = lost_attempt(&runtime, &folder, &computer);
     let all = |runtime: &TaskRuntime| -> Vec<TaskRun> {
@@ -773,7 +774,7 @@ fn a_later_attempt_on_that_computer_never_picks_up_a_lost_attempts_changes() {
     let folder = root.join("work");
     std::fs::create_dir_all(&folder).unwrap();
     std::fs::write(folder.join("README.md"), "fixture\n").unwrap();
-    let runtime = TaskRuntime::with_test_access(root.join("history")).unwrap();
+    let runtime = TaskRuntime::new(root.join("history")).unwrap();
     computers::credentials::set(
         &runtime.computers_root(),
         "openai-key",
@@ -844,4 +845,59 @@ fn a_later_attempt_on_that_computer_never_picks_up_a_lost_attempts_changes() {
     assert!(left.note.unwrap().contains(&next));
     drop(runtime);
     let _ = std::fs::remove_dir_all(root);
+}
+
+#[test]
+fn xcode_projects_never_run_on_a_computer_that_cannot_build_them() {
+    let folder = std::env::temp_dir().join(format!("jackalope-xcode-{}", uuid::Uuid::new_v4()));
+    std::fs::create_dir_all(folder.join("App.xcodeproj")).unwrap();
+    let runtime = TaskRuntime::new(folder.join("history")).unwrap();
+    let mut computer = fixture_computer(&format!("mac{}", uuid::Uuid::new_v4().simple()));
+    computer.machine_id = Some("m1".into());
+    save_computer(&runtime, &computer);
+    let root = runtime.computers_root();
+    let machine = |os: &str| {
+        std::fs::write(
+            root.join("machines.json"),
+            serde_json::to_vec(&json!({"machines": [{
+                "id": "m1", "name": "Box", "url": "https://box.example.com",
+                "createdAt": "2026-01-01T00:00:00Z", "os": os,
+                "xcode": (os == "macos").then(|| json!({"version": "27.2"})),
+            }]}))
+            .unwrap(),
+        )
+        .unwrap();
+    };
+
+    // A Linux computer refuses the attempt and says how to fix it.
+    machine("linux");
+    let linux = placed_on(&runtime, &folder, &computer);
+    let error = runtime
+        .placed_target(&linux, &request(&linux, &folder), "codex", None)
+        .unwrap_err();
+    assert!(
+        error.contains("builds with Xcode (it has the Xcode project App.xcodeproj)")
+            && error.contains("Box is a Linux computer")
+            && error.contains("Agents run on"),
+        "{error}"
+    );
+    let run = runtime.run_snapshot(&linux).unwrap();
+    assert_eq!(run.host.unwrap().id, computer.id);
+    assert!(run
+        .activity
+        .iter()
+        .any(|line| line == &format!("Placement: {error}")));
+
+    // A Mac with Xcode takes it.
+    machine("macos");
+    let mac = placed_on(&runtime, &folder, &computer);
+    let target = runtime
+        .placed_target(&mac, &request(&mac, &folder), "codex", None)
+        .unwrap();
+    assert_eq!(
+        target.map(|computer| computer.id),
+        Some(computer.id.clone())
+    );
+    drop(runtime);
+    let _ = std::fs::remove_dir_all(folder);
 }

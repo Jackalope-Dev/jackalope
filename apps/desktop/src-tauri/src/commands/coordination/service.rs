@@ -260,7 +260,7 @@ impl Coordinator {
         self.auto_start_managed()?;
         // Swarm rounds take the plan store and coordinator locks one at a time.
         crate::commands::planning::rounds::tick(self);
-        self.runtime.access.ensure()?;
+        crate::commands::turn_advisor::tick(self);
         self.transact(|inner, guard| {
             self.refresh_pool_locked(inner);
             self.runtime.ensure_history_saved()?;
@@ -512,6 +512,7 @@ impl Coordinator {
                 if let Err(error) = service.dispatch_followups() {
                     service.state().error = Some(error);
                 }
+                service.resume_limited();
                 if let Err(error) = service.tick() {
                     let mut inner = service.state();
                     inner.error = Some(error);
@@ -523,7 +524,6 @@ impl Coordinator {
     }
 
     pub fn start_manual(&self, request: RunRequest) -> Result<String, String> {
-        self.runtime.access.ensure()?;
         self.ensure_storage_loaded()?;
         self.transact(|inner, guard| self.start_manual_locked(inner, guard, request))
     }
@@ -531,7 +531,6 @@ impl Coordinator {
     /// Starts a live session's next attempt, or reports that it waits for a
     /// free execution slot.
     pub(crate) fn start_session(&self, request: RunRequest) -> Result<SessionStart, String> {
-        self.runtime.access.ensure()?;
         self.ensure_storage_loaded()?;
         self.transact(|inner, guard| {
             if self.awaits_capacity(inner, &request)? {
@@ -540,6 +539,18 @@ impl Coordinator {
             self.start_manual_locked(inner, guard, request)
                 .map(|_| SessionStart::Started)
         })
+    }
+
+    /// Whether the coordinator is running and fewer attempts are active than
+    /// its execution limit, so optional helper work may run now.
+    pub(in crate::commands) fn has_free_slot(&self) -> bool {
+        if !self.alive.load(Ordering::Relaxed) {
+            return false;
+        }
+        let limit = self.state().concurrency;
+        self.runtime
+            .integration_runs()
+            .is_ok_and(|runs| runs.iter().filter(|run| run.status.is_active()).count() < limit)
     }
 
     /// Whether a session or planner attempt that has not started would exceed
@@ -705,7 +716,13 @@ impl Coordinator {
 
     pub fn shutdown(&self) {
         self.alive.store(false, Ordering::Relaxed);
+        crate::commands::turn_advisor::cancel_all();
         self.state().enabled.clear();
+    }
+
+    /// Whether the coordinator has not been shut down or reset.
+    pub(in crate::commands) fn running(&self) -> bool {
+        self.alive.load(Ordering::Relaxed)
     }
 
     /// The grant a bridge token was issued for: its task and attempt.

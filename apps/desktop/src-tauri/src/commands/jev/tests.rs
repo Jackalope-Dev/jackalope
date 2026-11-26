@@ -81,6 +81,7 @@ async fn transport_sends_bearer_and_json_but_never_exposes_error_bodies() {
             |headers: axum::http::HeaderMap, axum::Json(value): axum::Json<Value>| async move {
                 assert_eq!(headers["authorization"], "Bearer fixture-key");
                 assert_eq!(value["model"], MODEL);
+                assert_eq!(value["context"], "pushed with [redacted GitHub token]");
                 (
                     axum::http::StatusCode::UNAUTHORIZED,
                     "private echoed fixture-key",
@@ -89,7 +90,10 @@ async fn transport_sends_bearer_and_json_but_never_exposes_error_bodies() {
         ),
     );
     let (endpoint, task) = server(router).await;
-    let error = evaluate_at(&endpoint, "fixture-key", &json!({"model":MODEL}), || false)
+    // Built at runtime so the repository's secret scan ignores it.
+    let token = format!("ghp_{}", "a1B2c3D4e5".repeat(4));
+    let payload = json!({"model":MODEL,"context":format!("pushed with {token}")});
+    let error = evaluate_at(&endpoint, "fixture-key", &payload, || false)
         .await
         .unwrap_err();
     assert!(error.contains("rejected this key"));

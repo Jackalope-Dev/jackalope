@@ -14,6 +14,7 @@ import {
   GitFork,
   History,
   Images,
+  LayoutDashboard,
   ListTodo,
   type LucideIcon,
   MonitorSmartphone,
@@ -26,7 +27,15 @@ import {
 } from 'lucide-react';
 import { openExternalUrl } from './native/env.ts';
 import type { SettingsCategory } from './settings-categories';
-export type ViewGroup = 'tasks' | 'library' | 'bots' | 'hosts' | 'project' | 'agents' | 'settings';
+export type ViewGroup =
+  | 'tasks'
+  | 'overview'
+  | 'library'
+  | 'bots'
+  | 'hosts'
+  | 'project'
+  | 'agents'
+  | 'settings';
 
 /**
  * Every workspace view. Shell renders each page from workspace-views.tsx, records the
@@ -68,6 +77,15 @@ export const WORKSPACE_VIEWS = [
     feature: 'tasks',
   },
   {
+    id: 'overview',
+    label: 'Overview',
+    description: 'What is running, how each project stands and account usage, at a glance.',
+    icon: LayoutDashboard,
+    group: 'overview',
+    feature: 'tasks',
+    keywords: 'dashboard running live status projects pull requests checks previews usage home',
+  },
+  {
     id: 'library',
     label: 'Library',
     description: 'Screenshots, images and files your work created, by project.',
@@ -97,11 +115,11 @@ export const WORKSPACE_VIEWS = [
   {
     id: 'remote-hosts',
     label: 'Devices',
-    description: 'Use other computers from here, or let a phone or another computer use this one.',
+    description: 'Pair your phone and other computers, and the cloud machines bots and tasks use.',
     icon: MonitorSmartphone,
     group: 'hosts',
     feature: 'connections',
-    keywords: 'hosts remote access phone companion pair pairing SSH Tailscale',
+    keywords: 'hosts remote access phone companion pair pairing SSH Tailscale cloud machine',
   },
   {
     id: 'project-overview',

@@ -10,10 +10,20 @@
   flex-wrap: wrap;
 }
 .remote-pair {
+  position: relative;
+  border-radius: var(--radius-xl);
   display: flex;
   align-items: center;
   gap: 1.25rem;
   flex-wrap: wrap;
+}
+.remote-pair-waiting {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
 }
 .remote-pair-hero {
   flex-direction: column;

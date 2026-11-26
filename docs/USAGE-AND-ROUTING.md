@@ -189,6 +189,39 @@ is kept on the attempt under Task details.
 Codex, Claude, Grok, OpenCode and Kimi can coordinate; Antigravity and Gemini CLI are worker-only.
 Automatic quota handoff can be enabled or disabled in the Defaults section of the Agents page with All projects selected.
 
+### Usage limits on stopped work
+
+`tasks/usage_limit.rs` and `tasks/failure.rs` type a failed attempt's limit as a used-up
+allowance (`quota_exhausted`), a short rate window (`rate_limited`) or a billing or credit
+limit (`billing`), separately from sign-in failures. The quota record keeps the provider's
+own message and, only when the provider states it, the reset (`resetsAt`, Unix seconds):
+Claude Code's rejected `rate_limit_event` `resetsAt`, `usage limit reached|<epoch>` and
+"resets 3pm (Zone)" wording, Codex's "try again at 4:12 PM" text, `resets_at` and
+`resets_in_seconds` error bodies and used-up `rate_limits` snapshots, and Gemini's
+"reset after 2h3m" and `retryDelay`. A time without a named zone is read in this
+computer's zone, which is where a local CLI prints it. Billing limits never carry a reset.
+Jackalope does not retry rate limits itself; the agent CLIs retry transient ones.
+
+A task or conversation stopped this way shows a banner naming the provider and account,
+the reset as a local time with a live countdown (or that it was not reported) and the
+provider's message under a toggle. **Resume at reset** is offered when a reset was
+reported: a task retries its latest attempt (continuing its workspace like any quota
+retry) and a conversation resumes its queue, adding a short "continue" message when
+nothing is queued. Both start a minute after the reset, are saved with the attempt or
+conversation so they survive a restart, can be cancelled, and are dropped by any pause,
+resume or finish the person chooses or by a newer attempt. A task resume that cannot
+start keeps its reason on the attempt. **Switch account** and **Switch agent** retry a
+task's latest attempt on another account or agent the project allows, with the same
+progress context as a quota handoff; conversations stay pinned to their agent and
+account, so they offer resuming only. Notifications and Inbox read "Usage limit — resets
+3:40 PM" instead of a generic failure. Usage & quota lists accounts recent work found
+limited until the reported reset; without one, until later work uses the account or
+twelve hours pass. That list is local observation, and routing still reads capacity
+from the providers' readers. With the desktop Vite server running,
+`node scripts/verification/verify-usage-limit.mjs` checks the task banner's countdown,
+keyboard scheduling and cancelling, switching, dismissal, themes and a 960 by 640 window
+with fake IPC; it does not prove a real provider limit or a native resume.
+
 Routing attempts and failed worker legs retain separate provider usage with
 agent/model/account attribution. Decision copies are explanatory and excluded from
 usage totals. Missing reports stay unavailable. New continuations do not duplicate
@@ -246,6 +279,29 @@ reconstructed. Connected capacity remains a separate account-wide view
 that may include other applications. Opening Usage and reading capacity do not
 send model prompts. Unreadable task history hides summaries until reload succeeds.
 
+Where agent time goes shows, for attempts that measured it, the agents' working time
+by activity: thinking and writing, reading the code, tests and builds, trying the app
+and other work, compared across agents, with the slowest tools by measured time. It
+follows the project, account, agent and period filters and says how many attempts
+in scope ran before activity was timed.
+
+### Agent working time
+
+Each attempt's `efficiency.activity` splits the agent's working time by kind, from
+tool start and finish events as they arrive. `tool_activity::activity_kind` names the
+kind from the tool and, for shell commands, the command: `ask` (waiting on the person),
+`check` (tests, builds, linters, type checks and saved checks), `app` (browser and
+desktop use), `command`, `helper`, `web`, `edit`, `read`, `search`, `plan` and `tool`.
+`think` is time with no tool running, when the model reads results, plans and writes.
+The clock starts with the execution stage and advances on every event, so the kinds
+add up to the time from launch to the agent's last event. A moment with several calls
+running goes to one kind, in the order listed above, and a helper agent's own calls
+stay inside its parent call. `efficiency.toolTime` keeps each tool's total and
+longest measured call, in which overlapping calls each count in full; both maps keep
+at most 100 tool names. Codex, Claude Code, Grok, OpenCode, Gemini CLI and Antigravity
+are timed. ACP agents and attempts recorded earlier have tool counts at most. Timing
+starts again from the next event after Jackalope restarts mid-attempt.
+
 Task assessments have a separate project/period-scoped ledger, including calls that
 never launched work and failed calls with unavailable reports. Immutable receipt IDs
 deduplicate reused assessments. They are excluded from worker and routing totals and
@@ -288,6 +344,25 @@ that parent and restarts paused. Dependencies use verified predecessor snapshots
 final integration is explicit and project automatic merge excludes managed tasks.
 Existing live-session batch and cost limits retain their serial execution path.
 See [parallel workflows](PARALLEL-WORKFLOWS.md) for recovery and review behavior.
+
+## Composer effort and context
+
+The composers' effort picker sends a provider level for one send (`reasoningEffort` on
+the request, saved on each conversation message and queued follow-up), separate from
+the prompt-only task approach. It wins over the approach's level, and a conversation
+batch never mixes levels. `task_effort_levels` offers only levels the run sends
+unchanged: the levels Decisions records for that adapter and model that the measured
+table in `tasks/effort.rs` also accepts (the measured levels when none overlap),
+otherwise the measured levels, otherwise the recorded ones, otherwise low to high, limited to what the CLI flag takes (Claude Code `--effort` up to `max`,
+Codex `model_reasoning_effort` up to `xhigh`). Agents without an effort flag get no
+picker. Automatic offers low to high and the routed model clamps the level, as it does
+for any level a model lacks.
+
+The context meter shows `TaskRun.context`: the input (with cache) of the latest
+top-level model call, and the window only when the provider states it (Claude Code's
+`modelUsage.contextWindow`, Kimi's `usage_update`). OpenCode reports usage without a
+window, so only the count shows. Codex `exec --json` reports only turn totals, and
+Gemini and Antigravity only totals, so they show no meter.
 
 ## Usage interface contracts
 

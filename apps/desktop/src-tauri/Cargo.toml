@@ -1,6 +1,6 @@
 [package]
 name = "jackalope-desktop"
-version = "0.1.40"
+version = "0.1.41"
 description = "Jackalope - Ultra-performant desktop shell and harness for agentic workflows"
 authors = ["Jackalope Contributors"]
 edition = "2021"
@@ -50,8 +50,16 @@ rmcp = { version = "=3.9.0", default-features = false, features = ["server", "ma
 toml_edit = { version = "0.25", features = ["serde"] }
 toml = "1"
 base64 = "0.23"
+# ES256 signing for App Store Connect API tokens. Already in the graph
+# through rustls, so it adds no crate.
+ring = "0.17"
+aho-corasick = "1"
 reqwest = { version = "0.13", default-features = false }
 ignore = "0.4"
+# Project tool rules. The regex crate matches in linear time, so a saved
+# pattern cannot stall an agent's tool call.
+regex = "1"
+globset = "0.4"
 tree-sitter = "0.27"
 tree-sitter-typescript = "0.23"
 tree-sitter-javascript = "0.25"
@@ -81,6 +89,8 @@ crossterm = "0.29.0"
 # Already in the graph through ratatui; the CLI measures input columns with it.
 unicode-width = "0.2.2"
 qrcode = { version = "0.14", default-features = false }
+# The Library moves files Jackalope saved to the system Trash, never deleting outright.
+trash = "5.4.0"
 # Local voice to text with whisper.cpp; builds it from source, so cmake and a C++
 # compiler are required. macOS adds Metal below.
 whisper-rs = "0.16"

@@ -8,6 +8,7 @@ import { invokeNative } from '../../lib/native/transport';
 import { type PlanSummary, planCommands } from '../../lib/plan-mode';
 import type { TaskRun } from '../../lib/run-types';
 import { openRun, selectWork } from '../../lib/work-selection';
+import { useAccountStore } from '../../stores/accountStore';
 import { useBotStore } from '../../stores/botStore';
 import { useCompanionStore } from '../../stores/companionStore';
 import { useExecutionStore } from '../../stores/executionStore';
@@ -44,12 +45,13 @@ export function CompanionSources() {
   useEffect(() => {
     if (!isTauriEnvironment()) return;
     let alive = true;
-    void invokeNative<{ state: string; email: string | null }>('app_account_status')
+    void useAccountStore
+      .getState()
+      .load()
       .then((account) => {
-        if (alive && account.state === 'connected' && account.email)
+        if (alive && account?.state === 'connected' && account.email)
           setReferralAccount(account.email);
-      })
-      .catch(() => undefined);
+      });
     return () => {
       alive = false;
     };

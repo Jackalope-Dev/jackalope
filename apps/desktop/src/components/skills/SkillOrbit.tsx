@@ -94,7 +94,7 @@ export function SkillConstellation({
       </ul>
       <figcaption className="ui-sr-only">
         {enabled
-          ? `${devices.length} computers connected to your account.`
+          ? `${devices.length} computers syncing skills.`
           : 'Skill sync is off on this computer.'}
       </figcaption>
     </figure>

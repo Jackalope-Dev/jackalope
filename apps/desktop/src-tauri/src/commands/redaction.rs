@@ -3,9 +3,13 @@
 //! text Jackalope keeps as evidence; this one replaces known values wherever
 //! they appear, in any shape, and leaves everything else as the agent wrote it.
 
+mod outbound;
+
 use base64::Engine as _;
 use serde::{de::DeserializeOwned, Serialize};
 use serde_json::Value;
+
+pub(crate) use outbound::{outbound, outbound_clipped, outbound_value};
 
 /// What a value is replaced with.
 pub(crate) const MARK: &str = "[redacted]";
@@ -218,11 +222,12 @@ fn json_escaped(text: &str) -> String {
 /// The values of the variables Jackalope gave an agent that the attempt's
 /// record must not show: the project secrets in `secret_names`, and every
 /// credential, such as a managed account's key or the attempt's bridge token.
+/// Outbound text never shows them for the rest of the app session either.
 pub(crate) fn injected<N: AsRef<str>, V: AsRef<str>>(
     environment: impl IntoIterator<Item = (N, V)>,
     secret_names: &[String],
 ) -> Vec<String> {
-    environment
+    let values: Vec<String> = environment
         .into_iter()
         .filter(|(name, _)| {
             let name = name.as_ref();
@@ -230,7 +235,38 @@ pub(crate) fn injected<N: AsRef<str>, V: AsRef<str>>(
                 || secret_names.iter().any(|secret| secret == name)
         })
         .map(|(_, value)| value.as_ref().to_string())
-        .collect()
+        .collect();
+    outbound::remember(&values);
+    values
+}
+
+/// What a secret file given to an agent must not show in the attempt's record:
+/// its whole text, and each line of it long enough to identify it, since a
+/// key is often printed or quoted a line at a time. PEM armor lines are left
+/// out; the body is also matched joined into one line, as a key's DER is
+/// often handled. Outbound text never shows them for the rest of the session.
+pub(crate) fn file_contents(contents: &str) -> Vec<String> {
+    const LINE_CHARS: usize = 16;
+    let mut values = vec![contents.to_string(), contents.trim().to_string()];
+    let lines: Vec<&str> = contents
+        .lines()
+        .map(str::trim)
+        .filter(|line| !line.starts_with("-----"))
+        .collect();
+    values.extend(
+        lines
+            .iter()
+            .filter(|line| line.chars().count() >= LINE_CHARS)
+            .map(|line| line.to_string()),
+    );
+    if lines.len() > 1 {
+        values.push(lines.concat());
+    }
+    values.retain(|value| value.chars().count() >= MIN_CHARS);
+    values.sort();
+    values.dedup();
+    outbound::remember(&values);
+    values
 }
 
 /// [`injected`] for the variables set on `command`.
@@ -249,6 +285,39 @@ pub(crate) fn injected_into(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A PEM private key around `body`, spelled so secret scanners do not
+    /// take the fixture for a real key.
+    fn armored(body: &str) -> String {
+        let kind = ["PRIVATE", "KEY"].join(" ");
+        format!("-----BEGIN {kind}-----\n{body}\n-----END {kind}-----\n")
+    }
+
+    #[test]
+    fn a_secret_file_is_redacted_whole_line_by_line_and_joined() {
+        let first = "MIGTAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBHkwdwIBAQQg";
+        let second = "c2VjcmV0LWtleS1ib2R5LXRoYXQtaXMtbG9uZw";
+        let key = armored(&format!("{first}\n{second}"));
+        let values = file_contents(&key);
+        assert!(!values
+            .iter()
+            .any(|value| value.starts_with("-----BEGIN") && value.len() < 30));
+        let secrets = KnownSecrets::new(values).unwrap();
+        for printed in [
+            key.clone(),
+            format!("line: {first}"),
+            format!("{{\"key\":{}}}", serde_json::to_string(&key).unwrap()),
+            format!("der {first}{second} end"),
+        ] {
+            let mut text = printed.clone();
+            secrets.text(&mut text);
+            assert!(!text.contains(first), "{text}");
+            assert!(!text.contains(second), "{text}");
+        }
+        let mut path = "/data/secret-files/run/ASC_KEY/AuthKey_ABC.p8".to_string();
+        assert!(!secrets.text(&mut path));
+        assert_eq!(outbound(&format!("see {second}")), "see [redacted]");
+    }
 
     #[test]
     fn every_form_of_a_value_is_replaced_longest_first() {
@@ -327,6 +396,10 @@ mod tests {
                 "project-secret-value",
                 "sk-managed-0123456789"
             ]
+        );
+        assert_eq!(
+            outbound("uses project-secret-value and /profiles/codex"),
+            "uses [redacted] and /profiles/codex"
         );
     }
 }

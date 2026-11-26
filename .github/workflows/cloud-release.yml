@@ -31,6 +31,7 @@ jobs:
       mode: ${{ steps.plan.outputs.mode }}
       matrix: ${{ steps.plan.outputs.matrix }}
       targets: ${{ steps.plan.outputs.targets }}
+      windows_signing: ${{ steps.plan.outputs.windows_signing }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -45,6 +46,7 @@ jobs:
           CLOUD_RELEASE_ENABLED: ${{ vars.CLOUD_RELEASE_ENABLED }}
           CLOUD_RELEASE_TARGETS: ${{ vars.CLOUD_RELEASE_TARGETS }}
           CLOUD_SIGNING_READY: ${{ vars.CLOUD_SIGNING_READY }}
+          WINDOWS_AUTHENTICODE: ${{ vars.WINDOWS_AUTHENTICODE }}
           APPLE_SIGNING_READY: ${{ vars.APPLE_SIGNING_READY }}
           CLOUD_DRAFT_UPLOAD_ENABLED: ${{ vars.CLOUD_DRAFT_UPLOAD_ENABLED }}
           CLOUD_PUBLISH_ENABLED: ${{ vars.CLOUD_PUBLISH_ENABLED }}
@@ -66,6 +68,8 @@ jobs:
       RUST_TEST_THREADS: '2'
       CLOUD_MODE: ${{ needs.plan.outputs.mode == 'rehearsal' && 'rehearsal' || 'candidate' }}
       RELEASE_CHANNEL: ${{ needs.plan.outputs.channel }}
+      # azure, or unsigned when WINDOWS_AUTHENTICODE=unsigned and Azure signing is not configured.
+      CLOUD_WINDOWS_SIGNING: ${{ needs.plan.outputs.windows_signing }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -85,19 +89,20 @@ jobs:
       - run: rustup override set 1.98.1
       # Verify platforms runs the repository checks on this same commit, and
       # publication requires them (scripts/release/source-checks.mjs), so the
-      # candidate only adds the account-access tests its build features need.
+      # candidate only adds the account tests its build features need: account
+      # features refuse without an account and local work runs without one.
       # Signed builds start from a clean target directory instead of a shared cache.
-      - run: cargo test --locked --manifest-path apps/desktop/src-tauri/Cargo.toml --lib --no-default-features --features beta-access execution_access
+      - run: cargo test --locked --manifest-path apps/desktop/src-tauri/Cargo.toml --lib --no-default-features --features beta-access -- commands::account without_account without_a_current_jackalope_account without_a_jackalope_account
       - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68
-        if: runner.os == 'Windows' && env.CLOUD_MODE == 'candidate'
+        if: runner.os == 'Windows' && env.CLOUD_MODE == 'candidate' && env.CLOUD_WINDOWS_SIGNING == 'azure'
         with:
           dotnet-version: '8.0.x'
       - name: Install Windows signing tools
-        if: runner.os == 'Windows' && env.CLOUD_MODE == 'candidate'
+        if: runner.os == 'Windows' && env.CLOUD_MODE == 'candidate' && env.CLOUD_WINDOWS_SIGNING == 'azure'
         shell: pwsh
         run: ./scripts/release/cloud-tools.ps1 -Azure
       - uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906
-        if: runner.os == 'Windows' && env.CLOUD_MODE == 'candidate'
+        if: runner.os == 'Windows' && env.CLOUD_MODE == 'candidate' && env.CLOUD_WINDOWS_SIGNING == 'azure'
         with:
           client-id: ${{ vars.AZURE_CLIENT_ID }}
           tenant-id: ${{ vars.AZURE_TENANT_ID }}
@@ -108,6 +113,7 @@ jobs:
         shell: pwsh
         env:
           CLOUD_SIGNING_READY: ${{ vars.CLOUD_SIGNING_READY }}
+          WINDOWS_AUTHENTICODE: ${{ vars.WINDOWS_AUTHENTICODE }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ env.CLOUD_MODE == 'candidate' && secrets.TAURI_SIGNING_PRIVATE_KEY || '' }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ env.CLOUD_MODE == 'candidate' && secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD || '' }}
           TAURI_UPDATER_PUBLIC_KEY: ${{ vars.TAURI_UPDATER_PUBLIC_KEY }}
@@ -171,6 +177,8 @@ jobs:
           CLOUD_PUBLISH_ENABLED: ${{ vars.CLOUD_PUBLISH_ENABLED }}
           CLOUD_ACCEPTED_TARGETS: ${{ vars.CLOUD_ACCEPTED_TARGETS }}
           CLOUD_BETA_TEST_TARGETS: ${{ vars.CLOUD_BETA_TEST_TARGETS }}
+          CLOUD_SIGNING_READY: ${{ vars.CLOUD_SIGNING_READY }}
+          WINDOWS_AUTHENTICODE: ${{ vars.WINDOWS_AUTHENTICODE }}
           TAURI_UPDATER_PUBLIC_KEY: ${{ vars.TAURI_UPDATER_PUBLIC_KEY }}
           RELEASE_MODE: ${{ needs.plan.outputs.mode }}
         run: node scripts/release/cloud-publish.mjs output/cloud-candidates $env:RELEASE_MODE
@@ -182,3 +190,37 @@ jobs:
             output/cloud-candidates/cloud-release.json
             output/cloud-candidates/cloud-notes.md
           if-no-files-found: ignore
+  # Mirrors a confirmed stable Cloud publication to a public GitHub Release with
+  # the same bytes. It has no environment secrets and only writes the release.
+  github-release:
+    needs: [plan, release]
+    if: needs.plan.outputs.channel == 'stable' && needs.plan.outputs.mode == 'publish'
+    runs-on: windows-2022
+    timeout-minutes: 60
+    permissions:
+      contents: write
+    env:
+      RELEASE_CHANNEL: ${{ needs.plan.outputs.channel }}
+      CLOUD_RELEASE_TARGETS: ${{ needs.plan.outputs.targets }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version-file: '.node-version'
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
+        with:
+          pattern: cloud-candidate-*
+          path: output/cloud-candidates
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
+        with:
+          pattern: cloud-publication-*
+          path: output/cloud-publication
+      - name: Mirror the stable release to GitHub Releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CLOUD_SIGNING_READY: ${{ vars.CLOUD_SIGNING_READY }}
+          WINDOWS_AUTHENTICODE: ${{ vars.WINDOWS_AUTHENTICODE }}
+          TAURI_UPDATER_PUBLIC_KEY: ${{ vars.TAURI_UPDATER_PUBLIC_KEY }}
+        run: node scripts/release/github-release.mjs output/cloud-candidates output/cloud-publication

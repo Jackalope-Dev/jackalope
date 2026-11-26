@@ -17,6 +17,47 @@ Sharpen in either composer rewrites the draft into a deeper version of the same 
 one-step undo; it runs one helper call on request and never sends (see
 [HELPER.md](HELPER.md#sharpen)).
 
+### Composer commands, mentions and history
+
+The new-work, conversation and task follow-up composers share these keyboard aids
+(`components/composer/useComposerAssist.tsx`):
+
+- `/` at the start of the draft opens a command menu (arrows, Enter or Tab, Escape).
+  Commands appear only where they work: `/model` (new work) opens the agent and model
+  picker, `/effort` the effort picker when the agent's model takes a level, `/plan`
+  (new work, not General) toggles plan mode so Send starts **Plan with me**, or plans
+  `/plan <goal>` at once, `/clear` (conversations and follow-ups in the main window)
+  opens new work in the same project and keeps the current work, and `/btw <question>`
+  asks a side question. For Claude Code, personal and project skills under
+  `.claude/skills` on this computer are listed and inserted as `/name`. Any other text
+  that starts with `/`, `/compact` included, is sent to the agent unchanged; Jackalope
+  offers no compaction command because it cannot confirm the CLI applies one in the
+  print-mode turns it runs.
+- `@` after whitespace searches the project's Git-listed files (`project_files_list`,
+  which honours `.gitignore`) and inserts `@path` plus the same `Attached file:` line a
+  picked file adds. Tab picks the highlighted file; Enter picks it only after moving
+  through the list or when a file or folder name starts with what was typed, and
+  otherwise sends. A word-like `@name` with no such match shows no list. Mentions are
+  unavailable through a remote host or outside Git.
+- ArrowUp on the first line (or in an empty field) recalls earlier prompts of that
+  conversation, task or project's new work, newest first; ArrowDown goes forward and
+  past the newest returns the draft, with any edits kept while browsing.
+- Pasting text of 32 KiB or more, or more than the draft can still hold, saves it as a
+  `.txt` file under `.jackalope/attachments` and adds its attachment line, with a chip
+  whose Undo puts the text back where the line was. If saving fails, the error shows and
+  the text goes into the draft instead.
+
+A side question (`/btw`) runs a read-only fork of the attempt's saved agent session
+(`tasks/side_chat.rs`): Claude Code with `--resume --fork-session
+--no-session-persistence` in plan mode with only Read, Grep and Glob (Bash, edits,
+subagents and skills refused by name), Codex with `codex exec fork
+--ephemeral` in its read-only sandbox, both without MCP servers, in the attempt's folder
+and account. It takes no coordinator lock or execution guard and claims no workspace, so
+it neither waits for nor interrupts running work, and its answer never enters the
+transcript or queue; it can be copied or added to the draft. Other agents, work on a
+computer and attempts without a saved session say why they cannot answer. A fork sees
+only what the running session has saved so far.
+
 New work is non-code when it is in General, when a window is attached and the request
 names no code, or when a short request only reads or operates something outside the
 repository (a web page, a connection, email) and mentions no code or changes. Non-code
@@ -120,6 +161,9 @@ Make recurring share the task actions menu. Questions and save recovery remain
 visible above the task sections. Follow-up stays visible while the content scrolls.
 Preview and Delivery are separate task sections. Their setup, ownership, evidence and
 publication boundaries are described in [parallel workflows](PARALLEL-WORKFLOWS.md).
+For an iOS app, Preview builds and runs the app in the task's own Simulator with a live,
+tappable screen, and review screenshots come from the Simulator; see
+[iOS development](IOS-DEVELOPMENT.md#simulator-previews-and-review-captures).
 
 HTTP(S) result links open through the OS browser in desktop. Other schemes are
 not executed. Copy result reports clipboard failures. Screenshots still use the
@@ -172,6 +216,48 @@ must still exist. **Send to the author** adds the selected findings, with their
 commands, output and the reviewer's workspace path, to the follow-up draft; it
 never sends.
 
+## Turn advisor
+
+**Turn advisor** in Project settings (off by default, stored as `advisor` in the project's
+plan settings) has another agent read every task attempt that ends with a result
+(`commands/turn_advisor.rs`). Conversations, planning and decider attempts, agent and
+Challenge reviewers, archived attempts, attempts of managed tasks (planners, assignments,
+their follow-ups and delivery repairs, which have their own checks and review) and
+attempts already loaded from history when Jackalope starts are never advised. Only agents
+with a tool-free helper mode can advise: Claude Code, Codex, Grok, Kimi and OpenCode. The
+advisor is chosen among those like the Autonomy decider's Automatic choice, preferring
+another model family than the working agent and otherwise the same one, and uses the
+account that project would bind for it. It runs as a one-shot helper turn with tools
+off and shares the three decider slots. Its brief holds the task's first request, this
+turn's instruction, the reply, the project check and agent-recorded checks, and the
+workspace diff since the task base (bounded), each in a code fence longer than any
+backtick run inside it and marked as untrusted data, plus the notes the previous review
+sent the agent. Stopping or archiving the task, or quitting Jackalope, ends a review in
+progress and its agent process.
+
+The advisor returns up to `maxNotes` (default 3, 1–5) notes graded aside, concern or
+blocker. Jackalope flattens each note to one line, drops unknown grades, empty or
+content-free notes ("looks good", "no issues") and duplicates, and keeps the most
+serious first. Asides are shown only to
+the person. Concerns and blockers go to the working agent as a queued follow-up starting
+`Advisor notes from <agent>`, which tells it the notes are another agent's opinion and
+asks it to explain any it disagrees with. When the task has already moved on, they arrive
+as a direct message only if a newer attempt is running to read it. They stay with the
+person, with the reason, when the follow-up cannot be queued (for example the task was
+merged) and nothing is running, when the task was stopped or archived, after two advisor
+follow-ups in a row, or when they repeat notes the previous advisor follow-up already
+carried.
+
+A turn is not advised, and the attempt records why, after `maxReviews` (default 10, 1–50)
+reviews on that task (a review counts once the advisor replied; one that failed earlier,
+such as an agent that could not start, does not), when the attempt hit its account's usage limit, when the
+advisor's account has under 15% of any quota window left, when every execution slot is
+busy, when no installed agent can advise, or when no decider slot frees within a minute.
+The review, its notes, delivery, reason and the advisor turn's own usage are saved on the
+attempt as `advisor`; a review interrupted by a restart is marked failed. The task's
+Result tab shows the notes under each attempt's reply, separating those sent to the
+agent from those only for the person.
+
 ## Preparation and verification
 
 A project's optional preparation command authorizes a bounded, cancellable command
@@ -189,7 +275,15 @@ runtime: a command is stopped when it produces no output for its stall budget, s
 slow command that keeps reporting progress is allowed to finish. Both are still
 capped by an overall ceiling. The recorded outcome distinguishes a command that was
 stopped for going quiet, one stopped at the ceiling, and one that exited with a
-failing status, and the task's error repeats that distinction.
+failing status, and the task's error repeats that distinction. The defaults are five
+quiet minutes for preparation, ten for checks and 30 minutes in total. Time limits in
+Project settings override each one (quiet limits 1–60 minutes, total 5–120 minutes);
+they are mirrored to the native project registry, an attempt keeps the values it
+started with (`TaskRun.timeLimits`), and combined checks and challenge reruns use the
+attempt's values. For a project with an `.xcodeproj` or `.xcworkspace` at its top level
+or one folder down, Project settings suggest 15 and 20 quiet minutes and 60 in total
+until the person saves their own values; nothing changes until they accept. Bridge
+calls wait long enough for the longest allowed check.
 
 A workspace records the dependency manifests its preparation command completed
 against. When a later attempt finds those manifests unchanged, preparation is
@@ -197,16 +291,71 @@ skipped and reported as skipped rather than run again. A preparation command tha
 was stopped mid-progress is retried once automatically; a command that ran and
 reported a failing status is not repeated.
 
-Before preparing a new isolated worktree, Jackalope clones each `node_modules` folder the
-project checkout has beside a `package.json` into the same place, but only when both
-checkouts' dependency manifests fingerprint the same for the preparation command. Clones
-are copy-on-write (`clonefile` on APFS, `FICLONE` on Btrfs or XFS); a volume or platform
-that cannot clone, including Windows, gets no copy and the command installs in full.
-Existing folders and linked paths are never used. A clone is removed when a link inside it
-points into the project checkout or resolves outside the worktree, or when it holds a
-`pyvenv.cfg` or `CMakeCache.txt`; tool caches (`.cache`, `.vite`) are dropped. Python
-environments and Cargo `target/` are not cloned. The preparation command still runs, so
-it brings the clone current (pnpm also rewrites its `.bin` shims for the new path).
+Before preparing a new isolated worktree, Jackalope clones the installed folders the
+project checkout has beside their manifests into the same place, but only when both
+checkouts' dependency manifests fingerprint the same for the preparation command:
+
+| Manifest | Folder | Kept only when |
+| --- | --- | --- |
+| `package.json` | `node_modules` | Tool caches (`.cache`, `.vite`) are dropped |
+| `Podfile.lock` | `Pods` | `Pods/Manifest.lock` matches the checkout's `Podfile.lock`, and no generated project, configuration or script file names the checkout's path |
+| `Cartfile.resolved` | `Carthage/Build` | The general rules below hold |
+| `Package.resolved` beside `Package.swift` | `.build` (resolution only) | Every dependency is remote and each absolute path in SwiftPM's state lies inside the folder |
+
+Clones are copy-on-write (`clonefile` on APFS, `FICLONE` on Btrfs or XFS); a volume or
+platform that cannot clone, including Windows, gets no copy and the command installs in
+full. Existing folders and linked paths are never used. A clone is removed when a link
+inside it points into the project checkout or resolves outside the worktree, or when it
+holds a `pyvenv.cfg` or `CMakeCache.txt`. For a Swift package only `checkouts`,
+`repositories`, `artifacts`, `prebuilts` and `workspace-state.json` are cloned, never
+build products, and the absolute repository paths SwiftPM records (each checkout's Git
+alternates and `origin`, prebuilt and artifact paths) are rewritten for the new place.
+Python environments and Cargo `target/` are not cloned. The preparation command still
+runs, so it brings the clone current (pnpm also rewrites its `.bin` shims for the new path).
+
+The fingerprint also covers `Podfile`, `Package.swift`, `Package.resolved` (including the
+ones inside `.xcodeproj` and `.xcworkspace` bundles), `project.yml`, `.xcode-version` and
+`DEVELOPER_DIR`, and the walk skips `Pods`, `DerivedData`, `.build`, `SourcePackages` and
+`Carthage`. A marker stays valid only while every installed folder it recorded
+(`node_modules`, `.venv`, `venv`, `Pods`, `Carthage/Build`, `.build`,
+`.jackalope/DerivedData/SourcePackages`) still exists.
+
+Preparation, checks, disposable check worktrees and agents on this device get
+`JACKALOPE_DERIVED_DATA` (`<workspace>/.jackalope/DerivedData`) and `JACKALOPE_SPM_CACHE`
+(its `SourcePackages` folder); `.jackalope/` is excluded from Git in every task workspace.
+Swift package checkouts for Xcode projects are seeded into new worktrees from snapshots
+whether or not a preparation command is set; see
+[iOS development](IOS-DEVELOPMENT.md#workspaces-and-build-caches).
+
+A `.worktreeinclude` file at the project root, in `.gitignore` syntax, names Git-ignored
+files to copy from the project checkout into each new isolated worktree, such as `.env`
+files and local configuration. A file is copied only when Git ignores it in both the
+checkout and the task's branch and a pattern matches it, so tracked and untracked
+nonignored files never are. Negated patterns (`!.env.example`) exclude files. A pattern
+without a slash (`.env`) matches at any depth but does not reach into a folder Git ignores
+as a whole, such as `node_modules/`; name a path inside it (`config/local/app.json`) or
+the folder itself (`config/local/`) for that. The copy never replaces an existing file,
+recreates a link only when it is relative and stays inside the worktree, and skips links
+that leave it. Copies made file by file stop at 10,000 files and 256 MiB; everything
+skipped is listed with its reason in the task's activity, after the list of copied paths.
+Files are copy-on-write clones where the volume allows and ordinary copies elsewhere. A
+whole matched folder is cloned in one step on APFS (and per file on Btrfs or XFS), then
+checked like a dependency clone; it is copied file by file when the volume cannot clone or
+the pattern file has negations. The copies happen before the setup files, dependency
+clones and preparation command, so those can use them. Removing a worktree later treats an
+unchanged copy of a checkout file as disposable, while an edited one keeps the worktree.
+
+A saved terminal command (Project settings → Commands) can be marked **Run when a worktree
+is created**. Marked commands run in order in each new isolated worktree after the
+preparation command, with the same stall and time limits, the workspace reservation and a
+check slot; they always run, with no manifest reuse or automatic retry. When none is set,
+the first marked command decides whether dependency folders are cloned. A failure stops
+the task with the command's name, exit status and recorded output. **Stop its terminal when
+the task finishes** marks the task terminal that runs the command from its button: preparing
+the task's merge or archiving it stops that whole terminal and everything running in it, not
+only the command, because a merge needs the workspace free of any running terminal. The
+terminal says so while it is marked. Commands typed into the terminal are not tracked, and
+both options are off for commands saved before they existed.
 
 Automatic verification is on for a project unless Check results automatically is turned
 off in Project settings, and does nothing until the project has a check command. Every
@@ -255,18 +404,49 @@ repository, in a read-only Outside Jackalope group. Its own attempts are left ou
 session IDs they recorded, by its data folder and by the `.worktrees/<name>` folders on
 `jackalope/<name>` branches it creates. A background index keyed by file path, modification
 time and size reads only new and changed files and skips lines and files it does not
-recognize; a file watch and periodic refresh keep it current. Opening one shows its
+recognize; a file watch and periodic refresh keep it current. On macOS, a session that ran
+under Desktop, Documents, Downloads, `~/Library` (including iCloud Drive), Pictures, Movies,
+Music, Public or a mounted volume is matched to a project by its path text alone and marked
+**Folder not checked (protected location)**, because looking there would make macOS ask for
+permission; the folder is checked only when the person continues the conversation or adds it as a
+project. The history import and project discovery follow the same rule. Opening one shows its
 transcript with tool names; subagent work is not shown. Reading is local and nothing is
 uploaded; Settings → Privacy turns it off and deletes the index.
 
 Continue in Jackalope starts a conversation whose first attempt resumes the CLI's own
-session (`codex exec resume`, `claude --resume`) under the account directory it was saved
+session (Codex's thread by ID, `claude --resume`) under the account directory it was saved
 in, directly in the checkout or worktree it ran in, reserving that folder like in-place
 work. It is unavailable, with the reason shown, when that directory is not one of
 Jackalope's accounts for the CLI, the account or agent is turned off for the project, the
 folder is gone, the conversation started in a subfolder, or the project runs agents on a
 computer. Its changes stay in that folder: merge review and retry refuse it, and follow-ups
 continue in the conversation.
+
+### Importing Claude Code and Codex history
+
+**Import Claude and Codex history** (command search, Settings → Data & reset, and offered
+once after first setup when this computer has any) copies those conversations into
+Jackalope. The scan reads each CLI's default directory (`~/.claude`, `~/.codex`, or
+`CLAUDE_CONFIG_DIR` and `CODEX_HOME` when set) and the stores of Jackalope's accounts for
+each CLI, and lists every conversation with its first prompt, last activity and message
+count, grouped by the project it ran in or, outside a project, by its repository or folder.
+Only conversations in a project can be imported; a repository that is not one offers **Add
+project**, and folders that no longer exist are left in their CLI. Jackalope's own
+attempts are left out as above. The dialog selects new and changed conversations, and
+filters by when they were last active.
+
+The import runs in the background with progress and can be canceled; conversations already
+saved stay. Each is saved under `imported-conversations/` in the profile: a transcript of
+the person's messages (with attachments named, not copied), the replies, and each tool call
+with its command, file or pattern in one line, plus an index of where it came from. Source
+files are read in bounded streams and never changed; unreadable lines are skipped and
+counted. Importing again is idempotent: unchanged conversations are skipped, and one the CLI
+wrote to since is replaced in place. A conversation continued in Jackalope is not imported
+again, because its CLI session now also holds Jackalope's turns. Imported conversations
+leave the Outside Jackalope group and appear in an Imported group under their project.
+Opening one shows the saved transcript; when its CLI wrote to it since, **Update** imports it
+again. Continue in Jackalope works as above, with the same reasons shown when it cannot,
+and the new conversation links back to the imported messages.
 
 ## Iteration and delivery
 
@@ -298,6 +478,52 @@ merge or Finished) and never moves work that is running, blocked on a question o
 on its own. A failed read keeps the last state and says so. Fix requests are editable
 follow-ups in the task's own composer; pushing an update and merging on GitHub each need
 their own confirmation, and no state change sends, pushes or merges by itself.
+
+### Edit from here
+
+Each turn of a conversation or task offers **Edit from here** with its other actions (on hover or
+keyboard focus) when both halves of a rewind are real: Jackalope saved the files the turn
+started from, and the agent can return its own conversation to the end of the turn before.
+That means Claude Code and Codex work in a worktree Jackalope made, on this device. Other
+agents, in-place and non-code work, work on a computer and attempts saved before turn
+checkpoints existed show nothing or a disabled action with the reason; files are never
+restored under an agent that still remembers the later turns (`tasks/rewind.rs`).
+
+- Before a turn's agent starts, its worktree files (tracked and untracked, not ignored) are
+  saved as a commit under `refs/jackalope/checkpoints/<task>/<attempt>`. No branch contains
+  it, so merges, pull requests and ordinary pushes never carry it. The task branch's
+  automatic commits are a separate, project-configurable feature and are unchanged.
+- Each Claude Code turn records its session and last message ID, each Codex app-server turn
+  its thread and turn ID. Rewinding to turn K resumes Claude Code with `--resume <session>
+  --resume-session-at <message> --fork-session` on the next turn, and forks the Codex
+  thread after turn K-1 (`thread/fork` with `lastTurnId`) before confirming. Both leave the
+  original conversation intact. Rewinding to the first turn starts a new conversation. If
+  the CLI no longer has that conversation, the next turn fails instead of starting over
+  with the undone turns as context.
+- The confirmation states how many turns are undone and which files return. Rewinding is
+  refused while any turn of the task runs, while messages or follow-ups are queued, and
+  while a preview, check or task terminal uses the worktree. It runs under the coordinator
+  state, execution guard and runtime lock in that order and holds the workspace lease.
+- The current files and staged index are saved first under
+  `refs/jackalope/rewinds/<task>/<id>`, then the worktree files are set to the checkpoint.
+  The branch never moves, so restored files show as changes against it, and ignored files
+  are left alone.
+- Undone turns stay in saved history marked rewound, collapsed and greyed in the
+  transcript. The edited turn's messages (including attachment lines) are added to the
+  composer below any draft. **Undo rewind** restores the saved files (saving the replaced
+  ones the same way) and lets the next turn continue the original conversation, until the
+  next turn starts.
+- Removing a task's worktree (Clean up, cleanup after a merge or automatic cleanup) deletes
+  that task's `refs/jackalope/checkpoints/<task>/` refs, best effort and logged. Its
+  `refs/jackalope/rewinds/<task>/` safety snapshots can hold the person's own edits, so they
+  stay until Archive & remove, which saves them as `rewinds-<task>.bundle` in the archive
+  before deleting both. A task keeps its refs while any of its workspaces still exists or
+  while Undo is still offered for its rewind.
+
+`cargo test --no-default-features --lib rewind` covers planning, gating, restore, the safety
+snapshot, Undo and restart with fixture agents; `real_claude_rewind` and `real_codex_rewind`
+are ignored trials against the installed CLIs. `node scripts/verification/verify-rewind.mjs`
+is a browser fixture of the conversation view.
 
 Paused Chat sessions use the same integration controls for their latest batch after
 queued messages are run or canceled. Applied receipts block reopening or sending into

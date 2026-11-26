@@ -2,6 +2,7 @@ import { describeError } from '@jackalope/contracts/errors';
 import { Button, FormField, InlineNotice, Input } from '@jackalope/ui';
 import { type FormEvent, useCallback, useEffect, useRef, useState } from 'react';
 import { invokeNative } from '../../lib/native/transport';
+import { RequiresAccount } from '../account/RequiresAccount';
 
 interface BetaRequest {
   kind: 'join' | 'leave';
@@ -24,6 +25,14 @@ const day = (time: number) =>
  * for that and reports the request's progress.
  */
 export function BetaProgram({ onBeta }: { onBeta: boolean }) {
+  return (
+    <RequiresAccount feature="betaProgram" variant="inline">
+      <BetaRequests onBeta={onBeta} />
+    </RequiresAccount>
+  );
+}
+
+function BetaRequests({ onBeta }: { onBeta: boolean }) {
   const [request, setRequest] = useState<BetaRequest | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [email, setEmail] = useState('');

@@ -1,4 +1,11 @@
-import { Button, InlineNotice, LoadingState } from '@jackalope/ui';
+import {
+  Button,
+  InlineNotice,
+  LoadingState,
+  SettingActions,
+  SettingBody,
+  SettingGroup,
+} from '@jackalope/ui';
 import { useState } from 'react';
 import { accountGroupChoices } from '../../lib/account-groups';
 import { ORCHESTRATING_AGENTS } from '../../lib/agent-catalog';
@@ -43,13 +50,11 @@ export function ProjectAccountGroup({
     }
   };
   return (
-    <div className="settings-group p-5">
-      <h2 className="text-base font-medium">Accounts for this project</h2>
-      <p className="task-muted mt-2">
-        Use one group of accounts across agents. Choose individual accounts on each agent’s
-        Configure page.
-      </p>
-      <div className="flex flex-wrap gap-3 mt-3">
+    <SettingGroup
+      title="Accounts for this project"
+      description="Use one group of accounts across agents. Choose individual accounts on each agent’s Configure page."
+    >
+      <SettingActions>
         <Button
           variant="outline"
           disabled={busy}
@@ -66,62 +71,62 @@ export function ProjectAccountGroup({
         >
           Personal accounts
         </Button>
-      </div>
-      {busy && <LoadingState label={'Checking accounts…'} compact />}
-      {error && (
-        <InlineNotice tone="error" className="mt-3">
-          {error}
-        </InlineNotice>
+      </SettingActions>
+      {(busy || error || preview) && (
+        <SettingBody>
+          {busy && <LoadingState label={'Checking accounts…'} compact />}
+          {error && <InlineNotice tone="error">{error}</InlineNotice>}
+          {preview && (
+            <>
+              {!!Object.keys(preview.assignments).length && (
+                <p>
+                  Use {choice} accounts for {names(Object.keys(preview.assignments))}.
+                </p>
+              )}
+              {!!preview.missing.length && (
+                <p className="task-muted">
+                  No {choice} account for {names(preview.missing)}. Their current selections will be
+                  kept.
+                </p>
+              )}
+              {!!preview.ambiguous.length && (
+                <InlineNotice tone="error">
+                  Multiple {choice} accounts for {names(preview.ambiguous)}. Choose those accounts
+                  individually below.
+                </InlineNotice>
+              )}
+              <div>
+                <Button
+                  disabled={busy || !Object.keys(preview.assignments).length}
+                  onClick={async () => {
+                    if (!choice) return;
+                    setBusy(true);
+                    setError('');
+                    try {
+                      const latest = await load(choice);
+                      if (JSON.stringify(latest) !== JSON.stringify(preview)) {
+                        setPreview(latest);
+                        setError('Accounts changed. Review the updated choices and apply again.');
+                        return;
+                      }
+                      onChange({ ...value, ...latest.assignments });
+                      setPreview(undefined);
+                      setChoice(undefined);
+                    } catch {
+                      setError('Could not apply accounts. Retry when accounts are available.');
+                    } finally {
+                      setBusy(false);
+                    }
+                  }}
+                >
+                  Apply {Object.keys(preview.assignments).length} account
+                  {Object.keys(preview.assignments).length === 1 ? '' : 's'}
+                </Button>
+              </div>
+            </>
+          )}
+        </SettingBody>
       )}
-      {preview && (
-        <div className="mt-3 grid gap-3">
-          {!!Object.keys(preview.assignments).length && (
-            <p>
-              Use {choice} accounts for {names(Object.keys(preview.assignments))}.
-            </p>
-          )}
-          {!!preview.missing.length && (
-            <p className="task-muted">
-              No {choice} account for {names(preview.missing)}. Their current selections will be
-              kept.
-            </p>
-          )}
-          {!!preview.ambiguous.length && (
-            <InlineNotice tone="error">
-              Multiple {choice} accounts for {names(preview.ambiguous)}. Choose those accounts
-              individually below.
-            </InlineNotice>
-          )}
-          <div>
-            <Button
-              disabled={busy || !Object.keys(preview.assignments).length}
-              onClick={async () => {
-                if (!choice) return;
-                setBusy(true);
-                setError('');
-                try {
-                  const latest = await load(choice);
-                  if (JSON.stringify(latest) !== JSON.stringify(preview)) {
-                    setPreview(latest);
-                    setError('Accounts changed. Review the updated choices and apply again.');
-                    return;
-                  }
-                  onChange({ ...value, ...latest.assignments });
-                  setPreview(undefined);
-                  setChoice(undefined);
-                } catch {
-                  setError('Could not apply accounts. Retry when accounts are available.');
-                } finally {
-                  setBusy(false);
-                }
-              }}
-            >
-              Apply {Object.keys(preview.assignments).length} account
-              {Object.keys(preview.assignments).length === 1 ? '' : 's'}
-            </Button>
-          </div>
-        </div>
-      )}
-    </div>
+    </SettingGroup>
   );
 }

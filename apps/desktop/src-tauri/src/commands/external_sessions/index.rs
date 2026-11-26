@@ -63,14 +63,32 @@ impl Source {
     }
 
     pub(super) fn transcript(self, path: &Path) -> Option<read::Transcript> {
-        let mut transcript = read::Transcript::default();
-        for line in read::transcript_lines(path)? {
+        self.read_transcript(path, read::Transcript::default(), read::TRANSCRIPT_BYTES)
+    }
+
+    /// Reads up to `limit` decompressed bytes of a session into `transcript`.
+    pub(super) fn read_transcript(
+        self,
+        path: &Path,
+        mut transcript: read::Transcript,
+        limit: u64,
+    ) -> Option<read::Transcript> {
+        let mut lines = read::lines(path, limit)?;
+        for line in lines.by_ref() {
             match self {
                 Source::Claude => claude::transcript(&line, &mut transcript),
                 Source::Codex => codex::transcript(&line, &mut transcript),
             }
         }
+        transcript.skipped_lines = lines.skipped;
+        transcript.partial_tail = lines.partial_tail;
         Some(transcript)
+    }
+
+    pub(super) fn from_adapter(adapter: &str) -> Option<Self> {
+        Source::ALL
+            .into_iter()
+            .find(|source| source.adapter() == adapter)
     }
 }
 
@@ -85,7 +103,7 @@ pub(super) struct Entry {
     pub summary: Option<Summary>,
 }
 
-#[derive(Debug, Default, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub(super) struct Index {
     #[serde(default)]
     version: u32,

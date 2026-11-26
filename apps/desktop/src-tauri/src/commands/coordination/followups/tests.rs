@@ -23,7 +23,7 @@ fn fixture() -> (PathBuf, Coordinator) {
         serde_json::to_vec(&run).unwrap(),
     )
     .unwrap();
-    let runtime = TaskRuntime::with_test_access(history).unwrap();
+    let runtime = TaskRuntime::new(history).unwrap();
     let service = Coordinator::new(root.join("coordination"), runtime).unwrap();
     service.state().url = Some("http://127.0.0.1:1".into());
     (root, service)
@@ -35,6 +35,39 @@ fn enqueue(service: &Coordinator, text: &str) -> String {
         .enqueue_followup(id.clone(), "source-run", text.into(), None, false)
         .unwrap();
     id
+}
+
+#[test]
+fn a_chosen_effort_level_is_kept_with_the_follow_up_and_checked() {
+    let (_root, service) = fixture();
+    let id = Uuid::new_v4().to_string();
+    let queue = |effort: Option<&str>| {
+        service.enqueue_followup_with_effort(
+            id.clone(),
+            "source-run",
+            "Think harder".into(),
+            None,
+            false,
+            effort.map(str::to_string),
+        )
+    };
+    queue(Some("xhigh")).unwrap();
+    queue(Some("xhigh")).unwrap();
+    assert!(queue(Some("low")).unwrap_err().contains("different"));
+    assert!(service
+        .enqueue_followup_with_effort(
+            Uuid::new_v4().to_string(),
+            "source-run",
+            "x".into(),
+            None,
+            false,
+            Some("turbo".into()),
+        )
+        .unwrap_err()
+        .contains("Unknown effort level"));
+    let saved = service.followups("task").unwrap();
+    assert_eq!(saved.len(), 1);
+    assert_eq!(saved[0].reasoning_effort.as_deref(), Some("xhigh"));
 }
 
 #[test]
@@ -234,7 +267,7 @@ async fn installed_agent_queues_and_interrupts_followups_once_in_the_bound_sessi
             String::from_utf8_lossy(&output.stderr)
         );
     }
-    let runtime = TaskRuntime::with_test_access(root.join("history")).unwrap();
+    let runtime = TaskRuntime::new(root.join("history")).unwrap();
     let service = Coordinator::new(root.join("coordination"), runtime.clone()).unwrap();
     struct Shutdown(Coordinator);
     impl Drop for Shutdown {

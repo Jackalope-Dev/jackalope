@@ -12,6 +12,7 @@ import {
   clearAppleSigning,
   cloudConfig,
   cloudEndpoint,
+  windowsSigning,
 } from './crabnebula-config.mjs';
 
 const publicKey = Buffer.from('test public key').toString('base64');
@@ -66,7 +67,43 @@ test('rehearsals isolate installed identity and disable live updater/channel swi
   }
 });
 
-async function fixture(t, mode = 'candidate') {
+test('Azure signing wins over the unsigned opt-in, and Windows needs one of them', () => {
+  assert.equal(windowsSigning({}), null);
+  assert.equal(windowsSigning({ CLOUD_SIGNING_READY: 'false', WINDOWS_AUTHENTICODE: '' }), null);
+  assert.equal(windowsSigning({ WINDOWS_AUTHENTICODE: 'signed' }), null);
+  assert.equal(windowsSigning({ WINDOWS_AUTHENTICODE: 'unsigned' }), 'unsigned');
+  assert.equal(windowsSigning({ CLOUD_SIGNING_READY: 'true' }), 'azure');
+  assert.equal(
+    windowsSigning({ CLOUD_SIGNING_READY: 'true', WINDOWS_AUTHENTICODE: 'unsigned' }),
+    'azure',
+  );
+});
+test('unsigned Windows candidates keep the updater but drop the Authenticode hook', () => {
+  const signed = cloudConfig({
+    mode: 'candidate',
+    channel: 'stable',
+    publicKey,
+    signScript: 'C:/s.ps1',
+  });
+  assert.equal(signed.bundle.windows.signCommand.args[3], 'C:/s.ps1');
+  const unsigned = cloudConfig({
+    mode: 'candidate',
+    channel: 'stable',
+    publicKey,
+    authenticode: 'unsigned',
+  });
+  assert.equal(unsigned.bundle.windows, undefined);
+  assert.equal(unsigned.bundle.createUpdaterArtifacts, true);
+  assert.equal(unsigned.plugins.updater.pubkey, publicKey);
+  assert.deepEqual(unsigned.plugins.updater.endpoints, [cloudEndpoint('stable')]);
+  assert.throws(() => cloudConfig({ mode: 'candidate', channel: 'stable', publicKey }), /signing/);
+  assert.throws(
+    () => cloudConfig({ mode: 'candidate', channel: 'stable', publicKey, authenticode: 'none' }),
+    /signing mode/,
+  );
+});
+
+async function fixture(t, mode = 'candidate', authenticode) {
   const directory = await mkdtemp(join(tmpdir(), 'jackalope-cloud-'));
   t.after(() => rm(directory, { recursive: true, force: true }));
   const installer = `${mode === 'candidate' ? 'Jackalope' : 'Jackalope Rehearsal'}_0.1.0_x64-setup.exe`;
@@ -76,6 +113,7 @@ async function fixture(t, mode = 'candidate') {
     channel: 'beta',
     publicKey,
     signScript: 'C:/repo with spaces/sign.ps1',
+    ...(authenticode ? { authenticode } : {}),
   });
   const data = {
     [installer]: 'fixture installer',
@@ -95,6 +133,7 @@ async function fixture(t, mode = 'candidate') {
     distribution: 'nsis',
     approvalRequired: true,
     publicSigned: mode === 'candidate',
+    ...(authenticode ? { authenticode } : {}),
     files: {},
   };
   for (const [name, text] of Object.entries(data)) {
@@ -121,6 +160,83 @@ test('draft uploads reject rehearsal, dirty sources, disabled approval, wrong ta
     assert.throws(() =>
       validateCloudReceipt({ ...candidate, ...overrides }, { requireCandidate: true }),
     );
+});
+test('Windows receipts state their Authenticode mode consistently with the build configuration', async (t) => {
+  const signed = await fixture(t);
+  assert.equal((await validateCloudFiles(signed.directory)).authenticode, 'azure');
+  const unsigned = await fixture(t, 'candidate', 'unsigned');
+  const files = await validateCloudFiles(unsigned.directory, { requireCandidate: true });
+  assert.equal(files.authenticode, 'unsigned');
+  assert.equal(
+    (await validateCloudFiles((await fixture(t, 'rehearsal')).directory)).authenticode,
+    'unsigned',
+  );
+  const candidate = unsigned.receipt;
+  for (const overrides of [
+    { authenticode: 'none' },
+    { mode: 'rehearsal', publicSigned: false, authenticode: 'azure' },
+    { target: 'linux-x86_64', distribution: 'appimage', authenticode: 'unsigned' },
+  ])
+    assert.throws(() => validateCloudReceipt({ ...candidate, ...overrides }), /Windows signing/);
+  // A receipt cannot claim unsigned for a build configured with the signing hook, or the reverse.
+  await writeFile(
+    join(unsigned.directory, 'receipt.json'),
+    JSON.stringify({ ...candidate, authenticode: 'azure' }),
+  );
+  await assert.rejects(validateCloudFiles(unsigned.directory), /signing script/);
+  await writeFile(
+    join(signed.directory, 'receipt.json'),
+    JSON.stringify({ ...signed.receipt, authenticode: 'unsigned' }),
+  );
+  await assert.rejects(validateCloudFiles(signed.directory), /configuration changed/);
+});
+test('an unsigned candidate uploads only with the opt-in and skips the publisher check', async (t) => {
+  const { directory, installer, signature } = await fixture(t, 'candidate', 'unsigned');
+  let verified = 0;
+  const options = {
+    enabled: 'true',
+    key: 'test',
+    publicKey,
+    verifyPublisher: async () => {
+      verified++;
+    },
+    run: async (args) => {
+      if (args[1] === 'list') return '[]';
+      if (args[1] === 'draft') return id;
+      if (args[1] === 'upload') return '';
+      return JSON.stringify({
+        id,
+        status: 'Draft',
+        version: '0.1.0',
+        channel: 'beta',
+        assets: [
+          {
+            filename: installer,
+            signature,
+            updatePlatform: 'windows-x86_64',
+            publicPlatform: 'nsis-x86_64',
+          },
+        ],
+      });
+    },
+  };
+  await assert.rejects(uploadCandidate(directory, options), /WINDOWS_AUTHENTICODE=unsigned/);
+  assert.equal(
+    (await uploadCandidate(directory, { ...options, allowUnsignedWindows: true })).status,
+    'uploaded',
+  );
+  assert.equal(verified, 0);
+  const signed = await fixture(t);
+  await assert.rejects(
+    uploadCandidate(signed.directory, {
+      ...options,
+      allowUnsignedWindows: true,
+      verifyPublisher: async () => {
+        throw new Error('Publisher signature verification failed');
+      },
+    }),
+    /Publisher signature/,
+  );
 });
 test('changed installer bytes fail before any upload', async (t) => {
   const { directory, installer } = await fixture(t);

@@ -71,19 +71,25 @@
 .site-header .header-actions .icon-button {
   border-radius: 999px;
 }
-.site-header .github-link {
-  display: inline-grid;
-  place-items: center;
-  width: 40px;
-  height: 40px;
+.site-header .github-star {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 36px;
+  margin-inline: 2px;
+  padding: 0 13px 0 11px;
+  border: 1px solid color-mix(in srgb, var(--color-text-primary) 16%, transparent);
   border-radius: 999px;
-  color: var(--color-text-secondary);
+  color: var(--color-text-primary);
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
   transition:
-    color var(--motion-fast),
+    border-color var(--motion-fast),
     background var(--motion-fast);
 }
-.site-header .github-link:hover {
-  color: var(--color-text-primary);
+.site-header .github-star:hover {
+  border-color: color-mix(in srgb, var(--color-text-primary) 28%, transparent);
   background: var(--color-surface-hover);
 }
 .site-header .header-actions .button {
@@ -96,6 +102,20 @@
   white-space: nowrap;
 }
 
+@media (max-width: 1240px) {
+  .site-header .github-star-suffix {
+    display: none;
+  }
+}
+/* Narrow headers, and the full navigation just above its breakpoint, have no room for the label. */
+@media (max-width: 560px), (min-width: 1051px) and (max-width: 1180px) {
+  .site-header .github-star {
+    padding-inline: 9px;
+  }
+  .site-header .github-star-label {
+    display: none;
+  }
+}
 @media (max-width: 760px) {
   :root {
     --header-height: 68px;
@@ -112,7 +132,7 @@
   }
 }
 @media (max-width: 420px) {
-  .site-header :is(.github-link, .header-actions .text-link) {
+  .site-header :is(.github-star, .header-actions .text-link) {
     display: none;
   }
 }

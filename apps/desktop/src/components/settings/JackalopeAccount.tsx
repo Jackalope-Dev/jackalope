@@ -1,49 +1,13 @@
 import { Button, ExternalLinkIcon, SettingActions, SettingBody, SettingGroup } from '@jackalope/ui';
 
 import { useEffect, useRef, useState } from 'react';
-import { isTauriEnvironment } from '../../lib/native/env';
+import { ACCOUNT_BENEFITS, type AccountStatus } from '../../lib/account';
 import { invokeNative } from '../../lib/native/transport';
+import { nativeMessage, useAccountStore } from '../../stores/accountStore';
 import { useReferralStore } from '../../stores/referralStore';
 import { useSettingsSyncStore } from '../../stores/settingsSyncStore';
-import { WaitlistAccount, type WaitlistProgress } from '../account/WaitlistAccount';
+import { WaitlistAccount } from '../account/WaitlistAccount';
 import { FeedbackPreferences } from './FeedbackPreferences';
-
-export interface AccountStatus {
-  state:
-    | 'unavailable'
-    | 'disconnected'
-    | 'pending'
-    | 'waiting'
-    | 'waiting-offline'
-    | 'connected'
-    | 'offline'
-    | 'expired';
-  email: string | null;
-  userCode: string | null;
-  expiresAt: number | null;
-  waitlist?: WaitlistProgress | null;
-}
-/**
- * Native commands reject with the message the Rust side produced. Those
- * messages name the actual recovery step — reconnecting, unlocking a keychain,
- * freeing a device slot — so they must reach the user instead of being
- * replaced by generic advice that may not apply.
- */
-function nativeMessage(cause: unknown): string {
-  if (typeof cause === 'string') return cause;
-  if (cause instanceof Error) return cause.message;
-  if (cause && typeof cause === 'object') {
-    const value = cause as { message?: unknown; error?: unknown };
-    if (typeof value.message === 'string') return value.message;
-    if (typeof value.error === 'string') return value.error;
-    try {
-      return JSON.stringify(cause);
-    } catch {
-      return '';
-    }
-  }
-  return '';
-}
 
 export function JackalopeAccount({
   presentation = 'settings',
@@ -54,28 +18,18 @@ export function JackalopeAccount({
   onInvitations?: () => void;
   onStatus?: (status: AccountStatus) => void;
 }) {
-  const [account, setAccount] = useState<AccountStatus | null>(null);
+  const account = useAccountStore((state) => state.status);
+  const readError = useAccountStore((state) => state.error);
   const referrals = useReferralStore((state) => state.referrals);
-  const [error, setError] = useState('');
+  const [actionError, setError] = useState('');
+  const error = actionError || readError;
   const [busy, setBusy] = useState(false);
   const pending = useRef(false);
   const mounted = useRef(false);
   const pollInterval = account?.waitlist ? 60000 : 5000;
   useEffect(() => {
     mounted.current = true;
-    if (!isTauriEnvironment())
-      setAccount({ state: 'unavailable', email: null, userCode: null, expiresAt: null });
-    else
-      void invokeNative<AccountStatus>('app_account_status')
-        .then((value) => {
-          if (mounted.current) setAccount(value);
-        })
-        .catch((cause) => {
-          if (mounted.current)
-            setError(
-              nativeMessage(cause) || 'Could not read your account connection. Please retry.',
-            );
-        });
+    void useAccountStore.getState().load(true);
     return () => {
       mounted.current = false;
     };
@@ -92,7 +46,7 @@ export function JackalopeAccount({
           // stale message: an unlocked keychain or a freed device slot should
           // recover on its own, without them restarting the app.
           if (!canceled) {
-            setAccount(next);
+            useAccountStore.getState().update(next);
             setError('');
           }
         } catch (cause) {
@@ -119,9 +73,10 @@ export function JackalopeAccount({
     pending.current = true;
     setBusy(true);
     setError('');
+    useAccountStore.getState().setError('');
     try {
       const next = await invokeNative<AccountStatus>(command);
-      if (mounted.current && refresh) setAccount(next);
+      if (refresh) useAccountStore.getState().update(next);
     } catch (cause) {
       if (mounted.current)
         setError(nativeMessage(cause) || 'Could not complete the connection. Please retry.');
@@ -153,7 +108,7 @@ export function JackalopeAccount({
           <p role="status" className="settings-row-description">
             {account.state === 'connected'
               ? 'Signed in'
-              : 'Access could not be checked. Previously verified access lasts up to 72 hours offline, or until the connection expires. Retry when online.'}
+              : 'Could not reach Jackalope to check your account. Account features keep working for up to 72 hours offline. Local work is not affected.'}
           </p>
         </div>
       )}
@@ -196,7 +151,7 @@ export function JackalopeAccount({
           loading={busy}
           loadingLabel="Connecting…"
         >
-          Connect account
+          {welcome ? 'Create free account or sign in' : 'Connect account'}
           {welcome && !busy && <ExternalLinkIcon size={20} aria-hidden="true" />}
         </Button>
       )}
@@ -298,7 +253,14 @@ export function JackalopeAccount({
     );
   return (
     <>
-      <SettingGroup title="Your account" description="New work needs a signed-in account.">
+      <SettingGroup
+        title="Your account"
+        description={
+          account?.state === 'disconnected' || account?.state === 'expired'
+            ? `Optional. ${ACCOUNT_BENEFITS}`
+            : undefined
+        }
+      >
         <SettingBody>{status}</SettingBody>
         <SettingActions>{actions}</SettingActions>
         {failure && <SettingBody>{failure}</SettingBody>}

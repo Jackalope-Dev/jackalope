@@ -1,5 +1,8 @@
 pub(in crate::commands) mod combined_check;
+pub(in crate::commands) mod conflicts;
 pub(in crate::commands) mod dependencies;
+pub(in crate::commands) mod split;
+use super::merge_tree;
 use super::repo::{self, Identity, Policy::Snapshot, Seed, Untracked};
 use super::tasks::{TaskRun, TaskRuntime};
 use chrono::Utc;
@@ -72,6 +75,9 @@ pub struct IntegrationPlan {
     pub cleanup_requested: bool,
     #[serde(default)]
     pub cleanup_results: Vec<CleanupResult>,
+    /// The approved split of the change, oldest first; empty for one commit.
+    #[serde(default)]
+    pub commits: Vec<split::PlannedCommit>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -343,6 +349,24 @@ fn require_verification(run: &TaskRun, tree: &str) -> Result<(), String> {
     Ok(())
 }
 
+/// Refuses a commit message Git or the project's attribution would mishandle.
+fn check_message(message: &str) -> Result<(), String> {
+    if message.trim().is_empty() {
+        return Err("Every commit needs a message.".into());
+    }
+    if message.len() > 4000
+        || message.contains('\0')
+        || message.lines().any(|line| {
+            line.trim()
+                .to_ascii_lowercase()
+                .starts_with("co-authored-by:")
+        })
+    {
+        return Err("Use a commit message under 4,000 bytes without attribution trailers; project settings add those automatically.".into());
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 fn prepare(directory: &Path, runs: &[TaskRun], ids: &[String]) -> Result<IntegrationPlan, String> {
     prepare_with_message(directory, runs, ids, None)
@@ -412,16 +436,10 @@ pub(in crate::commands) fn prepare_with_message(
                 )
             }
         });
-    if message.len() > 4000
-        || message.contains('\0')
-        || message.lines().any(|line| {
-            line.trim()
-                .to_ascii_lowercase()
-                .starts_with("co-authored-by:")
-        })
-    {
-        return Err("Use a commit message under 4,000 bytes without attribution trailers; project settings add those automatically.".into());
-    }
+    check_message(&message)?;
+    // Merging finishes the selected tasks. Their terminals that ran a command marked to stop
+    // then are stopped here, before the source checks a running terminal would fail.
+    super::work_terminal::stop_when_finished(selected.iter().map(|run| run.task_id.as_str()));
     let mut agents: Vec<_> = selected
         .iter()
         .flat_map(super::project_git::contributors)
@@ -447,6 +465,7 @@ pub(in crate::commands) fn prepare_with_message(
         commit_policy: Some(policy.clone()),
         cleanup_requested: false,
         cleanup_results: vec![],
+        commits: vec![],
     };
     let mut combined = master.clone();
     let mut preview_target = master;
@@ -481,7 +500,7 @@ pub(in crate::commands) fn prepare_with_message(
                         "-n",
                         "-I",
                         "-E",
-                        "^(<<<<<<< |=======$|>>>>>>> )",
+                        "^(<<<<<<< |\\|\\|\\|\\|\\|\\|\\| |=======$|>>>>>>> )",
                         &source.tree,
                         "--",
                     ],
@@ -514,41 +533,16 @@ pub(in crate::commands) fn prepare_with_message(
             &format!("feat: integrate completed task {}", run.id),
         )?;
         plan.sources.push(source);
-        let output = repo::output(
-            &project,
-            &[
-                "merge-tree",
-                "--write-tree",
-                "--name-only",
-                &combined,
-                &source_commit,
-            ],
-            Snapshot,
-        )?;
-        if !output.status.success() && output.status.code() != Some(1) {
-            return Err(String::from_utf8_lossy(&output.stderr).trim().into());
-        }
-        let stdout = String::from_utf8_lossy(&output.stdout);
-        let mut lines = stdout.lines();
-        let tree = lines
-            .next()
-            .filter(|s| !s.is_empty())
-            .ok_or("Git did not produce an integration tree.")?;
-        preview_target = tree.to_string();
-        if !output.status.success() {
-            plan.conflicts = lines
-                .take_while(|line| !line.is_empty())
-                .map(str::to_string)
-                .collect();
-            if plan.conflicts.is_empty() {
-                plan.conflicts.push("Git reported a merge conflict.".into());
-            }
+        let merged = merge_tree::merge_tree(&project, &[], &combined, &source_commit, Snapshot)?;
+        preview_target = merged.tree.clone();
+        if !merged.conflicts.is_empty() {
+            plan.conflicts = merged.conflicts;
             plan.status = "conflicted".into();
             break;
         }
         combined = commit_tree(
             &project,
-            tree,
+            &merged.tree,
             &[&combined, &source_commit],
             &format!("merge: integrate task {}", run.id),
         )?;
@@ -1096,6 +1090,8 @@ macro_rules! tauri_commands {
             commands::integration::integration_prepare,
             commands::integration::integration_apply,
             commands::integration::integration_plans,
+            commands::integration::integration_split_propose,
+            commands::integration::integration_split_apply,
         ] $($rest)*)
     };
 }
@@ -1207,20 +1203,58 @@ pub async fn integration_plans(
     .map_err(|e| e.to_string())?
 }
 
+/// Drafts a split of a ready integration into ordered commits for the person to
+/// approve. Nothing changes until `integration_split_apply`.
+#[tauri::command]
+pub async fn integration_split_propose(
+    helper: State<'_, super::helper::Helper>,
+    state: State<'_, TaskRuntime>,
+    plan_id: String,
+) -> Result<split::SplitProposal, split::SplitError> {
+    let helper = helper.inner().clone();
+    let runtime = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || split::propose(&helper, &runtime, &plan_id))
+        .await
+        .map_err(|e| split::SplitError::from(e.to_string()))?
+}
+
+#[tauri::command]
+pub async fn integration_split_apply(
+    state: State<'_, TaskRuntime>,
+    plan_id: String,
+    integration_head: String,
+    commits: Vec<split::PlannedCommit>,
+) -> Result<IntegrationPlan, split::SplitError> {
+    let runtime = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let _guard = execution_guard()?;
+        let runs = runtime.integration_runs()?;
+        split::apply_split(
+            &runtime.integration_directory(),
+            &runs,
+            &plan_id,
+            &integration_head,
+            &commits,
+        )
+    })
+    .await
+    .map_err(|e| split::SplitError::from(e.to_string()))?
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::commands::tasks::RunStatus;
 
-    struct Fixture {
-        root: PathBuf,
-        project: PathBuf,
-        plans: PathBuf,
-        base: String,
+    pub(super) struct Fixture {
+        pub root: PathBuf,
+        pub project: PathBuf,
+        pub plans: PathBuf,
+        pub base: String,
     }
 
     impl Fixture {
-        fn new() -> Self {
+        pub fn new() -> Self {
             let root = std::env::temp_dir().join(format!("jackalope-integration-{}", unique_id()));
             let project = root.join("project");
             let plans = root.join("plans");
@@ -1251,7 +1285,7 @@ mod tests {
             }
         }
 
-        fn run(&self, number: u32, filename: &str, content: &str) -> TaskRun {
+        pub fn run(&self, number: u32, filename: &str, content: &str) -> TaskRun {
             let workspace = self.root.join(format!("task-{number}"));
             repo::git(
                 &self.project,
@@ -1917,6 +1951,42 @@ mod tests {
         assert_eq!(
             fs::read_to_string(fixture.project.join("shared.txt")).unwrap(),
             "original\n"
+        );
+    }
+
+    #[test]
+    fn concurrent_xcode_project_additions_integrate_without_conflict() {
+        let mut fixture = Fixture::new();
+        fs::write(
+            fixture.project.join("project.pbxproj"),
+            include_str!("pbxproj/fixtures/base.pbxproj"),
+        )
+        .unwrap();
+        repo::git(&fixture.project, &["add", "."], Snapshot).unwrap();
+        repo::git(&fixture.project, &["commit", "-m", "project"], Snapshot).unwrap();
+        fixture.base = repo::git(&fixture.project, &["rev-parse", "HEAD"], Snapshot).unwrap();
+        let runs = vec![
+            fixture.run(
+                1,
+                "project.pbxproj",
+                include_str!("pbxproj/fixtures/core.pbxproj"),
+            ),
+            fixture.run(
+                2,
+                "project.pbxproj",
+                include_str!("pbxproj/fixtures/network.pbxproj"),
+            ),
+        ];
+        let ids: Vec<_> = runs.iter().map(|run| run.id.clone()).collect();
+        let plan = prepare(&fixture.plans, &runs, &ids).unwrap();
+        assert_eq!(plan.status, "ready", "{:?}", plan.conflicts);
+        assert_eq!(
+            apply(&fixture.plans, &runs, &plan.id).unwrap().status,
+            "applied"
+        );
+        assert_eq!(
+            fs::read_to_string(fixture.project.join("project.pbxproj")).unwrap(),
+            include_str!("pbxproj/fixtures/core_and_network.pbxproj")
         );
     }
 

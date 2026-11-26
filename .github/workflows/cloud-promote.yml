@@ -52,6 +52,8 @@ jobs:
           CLOUD_PUBLISH_ENABLED: ${{ vars.CLOUD_PUBLISH_ENABLED }}
           CLOUD_ACCEPTED_TARGETS: ${{ vars.CLOUD_ACCEPTED_TARGETS }}
           CLOUD_BETA_TEST_TARGETS: ${{ vars.CLOUD_BETA_TEST_TARGETS }}
+          CLOUD_SIGNING_READY: ${{ vars.CLOUD_SIGNING_READY }}
+          WINDOWS_AUTHENTICODE: ${{ vars.WINDOWS_AUTHENTICODE }}
           TAURI_UPDATER_PUBLIC_KEY: ${{ vars.TAURI_UPDATER_PUBLIC_KEY }}
         run: node scripts/release/cloud-publish.mjs output/cloud-candidates publish
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
@@ -62,3 +64,40 @@ jobs:
             output/cloud-candidates/cloud-release.json
             output/cloud-candidates/cloud-notes.md
           if-no-files-found: ignore
+  # Mirrors a confirmed stable Cloud publication to a public GitHub Release with
+  # the same bytes. It has no environment secrets and only writes the release.
+  github-release:
+    needs: publish
+    if: github.ref_name == 'stable'
+    runs-on: windows-2022
+    timeout-minutes: 60
+    permissions:
+      contents: write
+      actions: read
+    env:
+      RELEASE_CHANNEL: stable
+      CLOUD_RELEASE_TARGETS: ${{ vars.CLOUD_RELEASE_TARGETS }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version-file: '.node-version'
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
+        with:
+          pattern: cloud-candidate-*
+          path: output/cloud-candidates
+          run-id: ${{ inputs.run_id }}
+          github-token: ${{ github.token }}
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
+        with:
+          pattern: cloud-publication-*
+          path: output/cloud-publication
+      - name: Mirror the stable release to GitHub Releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CLOUD_SIGNING_READY: ${{ vars.CLOUD_SIGNING_READY }}
+          WINDOWS_AUTHENTICODE: ${{ vars.WINDOWS_AUTHENTICODE }}
+          TAURI_UPDATER_PUBLIC_KEY: ${{ vars.TAURI_UPDATER_PUBLIC_KEY }}
+        run: node scripts/release/github-release.mjs output/cloud-candidates output/cloud-publication

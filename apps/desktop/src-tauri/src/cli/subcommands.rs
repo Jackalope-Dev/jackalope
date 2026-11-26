@@ -335,19 +335,31 @@ pub fn pull_request(
         .map(|title| title.trim().to_string())
         .filter(|title| !title.is_empty())
         .unwrap_or_else(|| view.title.trim().to_string());
+    // An older host does not know this request; GitHub's words are kept then.
+    let host = match connection.call(&Request::CodeHost {
+        session_id: id.clone(),
+    }) {
+        Ok(Response::CodeHost { kind }) => Some(kind),
+        _ => None,
+    };
+    let noun = protocol::change_request(host.as_deref());
     if title.is_empty() || title.contains('\n') {
-        return Err("Give the pull request a one-line title with --title.".into());
+        return Err(format!("Give the {noun} a one-line title with --title."));
     }
     let body = merge::pull_request_body(&view.result);
     let branch = view.branch.clone().unwrap_or_default();
     eprintln!(
-        "Commit any remaining changes with your commit settings, push {} and open a {} pull request:",
-        if branch.is_empty() { "the branch".to_string() } else { branch },
+        "Commit any remaining changes with your commit settings, push {} and open a {} {noun}:",
+        if branch.is_empty() {
+            "the branch".to_string()
+        } else {
+            branch
+        },
         if ready { "ready" } else { "draft" }
     );
     eprintln!("  {title}");
     if !approved(yes, "Open it?")? {
-        eprintln!("No pull request opened.");
+        eprintln!("No {noun} opened.");
         return Ok(());
     }
     match connection.call(&Request::PullRequest {

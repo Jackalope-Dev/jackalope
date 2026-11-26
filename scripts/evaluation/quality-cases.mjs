@@ -1,5 +1,9 @@
+import { hardCases } from './quality-hard.mjs';
 import { heldoutCases } from './quality-heldout.mjs';
 
+// Workspace entries an oracle compares: everything but Git and the empty, Git-excluded
+// .jackalope folder Jackalope creates in every task workspace for attachments and context.
+const LISTED = `n => n !== '.git' && !(n === '.jackalope' && fs.readdirSync(path.join(root, n)).length === 0)`;
 const prelude = `const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -39,7 +43,7 @@ export const qualityCases = [
     oracle: `${prelude}
 assert.equal(read('README.md'), '# Delivery\\n\\nCustomers receive a receipt after checkout.\\n\\nKeep the existing public API unchanged.\\n');
 assert.equal(read('app.mjs'), 'export const delivery = "email";\\n');
-assert.deepEqual(fs.readdirSync(root).filter(n => n !== '.git').sort(), ['README.md','app.mjs']);
+assert.deepEqual(fs.readdirSync(root).filter(${LISTED}).sort(), ['README.md','app.mjs']);
 `,
   },
   {
@@ -93,11 +97,11 @@ assert.deepEqual(readyTasks([{id:'x',dependsOn:['x']}],[]),[]);
   },
 ];
 
-qualityCases.push(...heldoutCases);
+qualityCases.push(...heldoutCases, ...hardCases);
 
 for (const fixture of qualityCases) {
   const protectedFiles = Object.fromEntries(
     Object.entries(fixture.files).filter(([name]) => !fixture.allowedFiles.includes(name)),
   );
-  fixture.oracle += `\nfor (const [name, content] of Object.entries(${JSON.stringify(protectedFiles)})) assert.equal(read(name), content, 'Unrelated file changed: '+name);\nassert.deepEqual(fs.readdirSync(root).filter(n=>n!=='.git').sort(), ${JSON.stringify(Object.keys(fixture.files).sort())}, 'Unexpected files');\n`;
+  fixture.oracle += `\nfor (const [name, content] of Object.entries(${JSON.stringify(protectedFiles)})) assert.equal(read(name), content, 'Unrelated file changed: '+name);\nassert.deepEqual(fs.readdirSync(root).filter(${LISTED}).sort(), ${JSON.stringify(Object.keys(fixture.files).sort())}, 'Unexpected files');\n`;
 }

@@ -55,18 +55,34 @@ pub struct ProjectRecord {
     /// The command that prepares a fresh workspace before work starts.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub prepare_command: Option<String>,
+    /// Setup and check time limits from Project settings. Absent keeps the defaults.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub time_limits: Option<super::verification::TimeLimits>,
     /// Untracked files copied into fresh workspaces.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub setup_files: Vec<String>,
+    /// Saved terminal commands marked to run in each new task worktree, in order, after the
+    /// preparation command.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub worktree_commands: Vec<WorktreeCommand>,
     /// The project's preview command, with `{port}` for the local port.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub preview_command: Option<String>,
+    /// The command that builds an iOS app for its Simulator preview and review
+    /// captures, into `$JACKALOPE_DERIVED_DATA`. Absent uses the detected
+    /// `xcodebuild build`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub simulator_preview: Option<String>,
     /// Preview paths always captured for review, such as `/`. Empty means `/`.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub review_pages: Vec<String>,
     /// `desktop` and/or `narrow`. Empty means desktop only.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub review_viewports: Vec<String>,
+    /// The Apple team ID that device builds sign with (`DEVELOPMENT_TEAM`). Absent
+    /// leaves signing to the Xcode project.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub development_team: Option<String>,
     /// User-facing features whose pages review screenshots prefer when work
     /// changes their source files. Unreadable entries are dropped on load.
     #[serde(
@@ -75,6 +91,26 @@ pub struct ProjectRecord {
         deserialize_with = "super::previews::features::lenient"
     )]
     pub feature_map: Vec<super::previews::features::Feature>,
+    /// The device type and runtime of the project's task Simulators. Absent
+    /// uses the newest iOS runtime's standard iPhone.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub simulator: Option<super::simulators::SimulatorBase>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
+pub struct WorktreeCommand {
+    pub name: String,
+    pub command: String,
+}
+
+/// The project's commands that run when a task worktree is created, with blank ones dropped.
+pub fn worktree_commands(runtime: &TaskRuntime, project_id: &str) -> Vec<WorktreeCommand> {
+    record(runtime, project_id)
+        .map(|project| project.worktree_commands)
+        .unwrap_or_default()
+        .into_iter()
+        .filter(|item| !item.command.trim().is_empty())
+        .collect()
 }
 
 #[derive(Default, Serialize, Deserialize)]
@@ -380,6 +416,18 @@ mod tests {
         assert_eq!(legacy.accent, None);
         assert_eq!(legacy.verify_command, None);
         assert!(legacy.setup_files.is_empty());
+        assert!(legacy.worktree_commands.is_empty());
+        let commands: ProjectRecord = serde_json::from_str(
+            r#"{"id":"c","name":"C","path":"/c","worktreeCommands":[{"name":"Install","command":"pnpm install"}]}"#,
+        )
+        .unwrap();
+        assert_eq!(
+            commands.worktree_commands,
+            [WorktreeCommand {
+                name: "Install".into(),
+                command: "pnpm install".into()
+            }]
+        );
         assert_eq!(legacy.settings.resolve(), ProjectSettings::default());
         assert!(legacy.settings.resolve().learn_automatically);
         assert_eq!(

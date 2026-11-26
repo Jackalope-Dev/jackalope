@@ -116,8 +116,8 @@ Project review lessons require resolved feedback and matching successful checks.
 Background learning keeps learned lessons on probation, archives unused ones, folds
 near-duplicates and records their history; its thresholds and any effect on
 corrections need real-use calibration. Opt-in account sync of learned lessons,
-optional agent reflection and export to `AGENTS.md` and a Claude Code skill are
-implemented and need installed acceptance.
+optional agent reflection, export to `AGENTS.md` and a Claude Code skill, and
+person-made tool rules on lessons are implemented and need installed acceptance.
 Chronological history comparisons and bounded offline prompt optimization have
 separate validation and held-out gates. Representative first-pass acceptance and
 actual correction counts still need measurement before making outcome claims.
@@ -148,8 +148,8 @@ exercise these contracts; installed startup, memory and responsiveness acceptanc
 
 Validate first-run setup, agent sign-in and switching, recovery, accessibility and
 large-project performance in installed builds. Validate installation, updates and
-secure storage on each platform. Required account access
-in every build, optional settings sync, feedback and delivery need their own acceptance checks.
+secure storage on each platform. Optional account connection,
+settings sync, feedback and delivery need their own acceptance checks.
 Cross-platform discovery, browser, process cleanup, credential storage and notification
 hardening are implemented for native testing, including notification activation,
 account/settings sync, Unix process guardians and tray/Dock recovery. macOS and X11
@@ -185,6 +185,12 @@ Review evidence levels with local checks, proven-findings Challenge review, judg
 comparisons with Keep and combine, plan questions limited to preferences, per-attempt decision trails, the Since you left
 catch-up, Sharpen, lesson-to-check enforcement and a feature map for review captures are
 implemented. Real-agent behavior and installed-app acceptance remain open.
+
+iOS projects on a Mac get the resolved Xcode toolchain, detected setup and checks, a
+Simulator per task with agent tools that read and drive the app, reused Swift packages and
+Pods, structured `project.pbxproj` merges, attached physical devices, TestFlight uploads the
+person confirms and Mac computers. Installed-app, physical-device and TestFlight acceptance
+remain open. See [iOS development](IOS-DEVELOPMENT.md).
 
 Cloudflare Artifacts is available as a beta bring-your-own-account option for new and
 existing projects, with pushes and expiring review snapshots. Live account and installed

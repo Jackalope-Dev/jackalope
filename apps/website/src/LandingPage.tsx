@@ -501,14 +501,15 @@ export function LandingPage({
             Start your first parallel task.
           </h2>
           <p className="lp-center lp-detail">
-            Free account, ready as soon as you confirm your email. Bring your own agents.
+            Bring your own agents. No account needed to start; a free one adds sync across
+            computers.
           </p>
           <div className="lp-final-form" id="newsletter">
             {signup}
             <a className="lp-final-download" href="/download/">
               <ArrowDownToLine size={16} aria-hidden="true" />
               <span className="lp-final-download-label">
-                Already have an account? <strong>Download for {platforms}</strong>
+                Or start without one: <strong>Download for {platforms}</strong>
               </span>
               <ArrowRight size={15} aria-hidden="true" />
             </a>

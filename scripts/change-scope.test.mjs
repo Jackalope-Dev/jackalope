@@ -7,6 +7,7 @@ test('unknown changes run every suite', () => {
     shared: true,
     native: true,
     desktop: true,
+    platform: true,
     dependencies: true,
   });
 });
@@ -65,6 +66,21 @@ test('files the native crate embeds run the native checks', () => {
   ])
     assert.equal(affected([file]).native, true, file);
   assert.equal(affected(['apps/desktop/src/lib/agent-capabilities.ts']).native, false);
+});
+
+test('frontend changes skip the Linux and macOS suites; native and platform inputs run them', () => {
+  const frontend = affected(['apps/desktop/src/App.tsx', 'packages/ui/src/index.ts']);
+  assert.equal(frontend.desktop, true);
+  assert.equal(frontend.platform, false);
+  for (const file of [
+    'apps/desktop/src-tauri/src/lib.rs',
+    'pnpm-lock.yaml',
+    'packages/knowledge/catalog.json',
+    '.github/workflows/verify.yml',
+    'scripts/verification/linux-desktop-control.sh',
+    '.node-version',
+  ])
+    assert.equal(affected(['apps/desktop/src/App.tsx', file]).platform, true, file);
 });
 
 test('Rust-only changes skip the shared half', () => {

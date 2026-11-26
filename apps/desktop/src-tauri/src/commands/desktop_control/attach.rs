@@ -61,13 +61,16 @@ pub struct Staged {
     pub resume_offered: bool,
     /// The person clicked Resume on the badge, so the next grant starts already resumed.
     pub resumed: bool,
+    /// Already used by a turn of its conversation: it stays attached for later turns until
+    /// the person detaches it or the window closes, instead of expiring.
+    pub kept: bool,
     /// The site the attach dialog named for a browser window.
     pub site: AttachSite,
     at: Instant,
 }
 
 /// The website the person allowed by attaching a browser window. Attaching was their
-/// answer to the site question for it, for that attempt only.
+/// answer to the site question for it, for each turn the window stays attached.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub enum AttachSite {
     /// Not a browser, or a window staged without the attach dialog.
@@ -97,6 +100,8 @@ pub struct AttachedWindow {
     pub control: bool,
     /// Minutes left before the window stops waiting for the agent.
     pub minutes_left: u64,
+    /// Attached for the rest of the conversation, so it never stops waiting.
+    pub kept: bool,
 }
 
 impl AttachedWindow {
@@ -109,6 +114,7 @@ impl AttachedWindow {
                 .saturating_sub(staged.at.elapsed())
                 .as_secs()
                 .div_ceil(60),
+            kept: staged.kept,
         }
     }
 }
@@ -153,7 +159,7 @@ fn staged_map() -> &'static Mutex<HashMap<String, Staged>> {
 /// Drops expired entries and closes their badges.
 fn expire(map: &mut HashMap<String, Staged>) {
     map.retain(|_, staged| {
-        let live = staged.at.elapsed() < STAGE_TTL;
+        let live = staged.kept || staged.at.elapsed() < STAGE_TTL;
         if !live {
             badge::close(&staged.id);
         }
@@ -243,8 +249,40 @@ fn insert(conversation: &str, window: Window, control: bool, agent: &str, at: In
                 provider: "auto".into(),
                 resume_offered: false,
                 resumed: false,
+                kept: false,
                 site: AttachSite::None,
                 at,
+            },
+        );
+        if let Some(previous) = previous {
+            badge::close(&previous.id);
+        }
+    }
+    id
+}
+
+/// Hands an attached window back to its conversation when the turn that used it ends, so
+/// the next turn takes it without asking. It keeps what the person allowed (control and
+/// site) and stays until detached. A grant still paused offers Resume on the badge.
+/// Returns the staged id.
+pub fn keep(conversation: &str, attached: Staged, provider: &str, paused: bool) -> String {
+    let id = uuid::Uuid::new_v4().to_string();
+    let provider = provider
+        .chars()
+        .filter(|c| c.is_ascii_alphanumeric() || *c == '-')
+        .take(40)
+        .collect();
+    if let Ok(mut map) = staged_map().lock() {
+        let previous = map.insert(
+            conversation.into(),
+            Staged {
+                id: id.clone(),
+                provider,
+                resume_offered: paused,
+                resumed: false,
+                kept: true,
+                at: Instant::now(),
+                ..attached
             },
         );
         if let Some(previous) = previous {
@@ -369,7 +407,7 @@ pub fn take_for(conversation: &str, windows: &[Window], denied: &[u32]) -> Optio
     let mut map = staged_map().lock().ok()?;
     let staged = map.remove(conversation)?;
     badge::close(&staged.id);
-    if staged.at.elapsed() >= STAGE_TTL || !eligible(&staged.window, denied) {
+    if (!staged.kept && staged.at.elapsed() >= STAGE_TTL) || !eligible(&staged.window, denied) {
         return None;
     }
     let window = windows.iter().find(|window| same(window, &staged.window))?;
@@ -841,6 +879,7 @@ mod tests {
             provider: "codex".into(),
             resume_offered: false,
             resumed: false,
+            kept: false,
             site: AttachSite::None,
             at: Instant::now(),
         };
@@ -851,5 +890,39 @@ mod tests {
         assert!(!prompt.question.contains("click"));
         assert_eq!(prompt.answer.as_deref(), Some("Budget \u{2014} excel"));
         assert_eq!(AttachedWindow::of(&staged).minutes_left, 30);
+    }
+
+    #[test]
+    fn a_kept_window_serves_every_later_turn_until_detached() {
+        let conversation = "kept-conversation";
+        let target = window("31", 43, "Draft", "zen");
+        let id = stage(conversation, target.clone(), true, "Codex");
+        let taken = take_for(conversation, std::slice::from_ref(&target), &[]).unwrap();
+        assert_eq!(taken.id, id);
+        assert!(
+            staged(conversation).is_none(),
+            "a turn holds the window while it works"
+        );
+
+        let kept = keep(conversation, taken, "codex", false);
+        // Long past the wait for a window nobody has used yet.
+        if let Ok(mut map) = staged_map().lock() {
+            let entry = map.get_mut(conversation).unwrap();
+            entry.at = Instant::now()
+                .checked_sub(STAGE_TTL * 2)
+                .unwrap_or(entry.at);
+        }
+        assert!(staged(conversation).is_some_and(|entry| entry.kept));
+        let again = take_for(conversation, std::slice::from_ref(&target), &[])
+            .expect("the next turn takes it without asking");
+        assert_eq!(again.id, kept);
+        assert!(again.kept && again.control);
+
+        keep(conversation, again, "codex", false);
+        clear(conversation);
+        assert!(
+            take_for(conversation, &[target], &[]).is_none(),
+            "detaching ends it"
+        );
     }
 }

@@ -130,6 +130,55 @@ pub fn validate_assessments(
 /// misread goal is visible before the work is done. Not a request to pause.
 pub const RESTATEMENT_CONTRACT: &str = "\nReporting contract: your first message restates, in your own words and a sentence each, the goal, the problem and the smallest change you expect to make. Record it once with restate_goal (HTTP: POST /v1/goal-restatement {goal,problem,smallestChange}), then continue without waiting for confirmation.\n";
 
+/// The same restatement made alongside the first reads instead of in a turn of its own,
+/// which costs a model round trip that rereads the whole context.
+const BATCHED_RESTATEMENT_CONTRACT: &str = "\nReporting contract: record a one-sentence restatement of the goal, the problem and the smallest change you expect to make with restate_goal (HTTP: POST /v1/goal-restatement {goal,problem,smallestChange}). Make that call in the same turn as your first reads of the task's files, not as a separate step, then continue without waiting for confirmation.\n";
+
+/// Most characters a task's own request can have for `goal-restatement=scoped` to skip the
+/// restatement.
+const SCOPED_OBJECTIVE_CHARS: usize = 800;
+
+/// The restatement contract for a `goal-restatement` mode. Every task restates, except that
+/// `scoped` skips a small, fully specified task: a short request with no requirements,
+/// workflow inputs or thorough approach already says what it is, and restating it costs a
+/// model turn that rereads the whole context.
+fn restatement_for(
+    mode: &str,
+    contract: &TaskContract,
+    thorough: bool,
+    prompt: &str,
+) -> &'static str {
+    match mode {
+        "batched" => BATCHED_RESTATEMENT_CONTRACT,
+        "scoped"
+            if contract.requirements.is_empty()
+                && contract.inputs.is_empty()
+                && !thorough
+                && crate::commands::knowledge::automatic::objective(prompt)
+                    .chars()
+                    .count()
+                    <= SCOPED_OBJECTIVE_CHARS =>
+        {
+            ""
+        }
+        _ => RESTATEMENT_CONTRACT,
+    }
+}
+
+/// The restatement contract the `goal-restatement` experiment selects for this task.
+pub fn restatement_contract(contract: &TaskContract, thorough: bool, prompt: &str) -> &'static str {
+    let mode = ["batched", "scoped"]
+        .into_iter()
+        .find(|mode| {
+            crate::commands::experiments::is(
+                crate::commands::experiments::Experiment::GoalRestatement,
+                mode,
+            )
+        })
+        .unwrap_or("separate");
+    restatement_for(mode, contract, thorough, prompt)
+}
+
 /// The agent's own restatement of the task, shown as "Understood as".
 #[derive(Clone, Debug, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -622,6 +671,44 @@ mod tests {
         let mut long = saved;
         long.output = Some("x".repeat(4001));
         assert!(validate_assessments(&[long], Some(&contract)).is_err());
+    }
+
+    #[test]
+    fn scoped_restatement_skips_only_small_fully_specified_tasks() {
+        let empty = TaskContract::default();
+        let small =
+            "### 🎯 Objective\nFix the typo in README.md.\n\n### 📐 Guidelines\n- Be brief.";
+        let long = format!("### 🎯 Objective\n{}", "word ".repeat(200));
+        assert_eq!(restatement_for("scoped", &empty, false, small), "");
+        assert_eq!(
+            restatement_for("scoped", &empty, false, &long),
+            RESTATEMENT_CONTRACT
+        );
+        assert_eq!(
+            restatement_for("scoped", &empty, true, small),
+            RESTATEMENT_CONTRACT
+        );
+        let required = TaskContract {
+            requirements: vec![Requirement {
+                id: "requirement-0".into(),
+                title: "Keep the API".into(),
+                checkpoint: false,
+                receipt: None,
+            }],
+            ..Default::default()
+        };
+        assert_eq!(
+            restatement_for("scoped", &required, false, small),
+            RESTATEMENT_CONTRACT
+        );
+        assert_eq!(
+            restatement_for("separate", &empty, false, small),
+            RESTATEMENT_CONTRACT
+        );
+        assert_eq!(
+            restatement_for("batched", &empty, false, small),
+            BATCHED_RESTATEMENT_CONTRACT
+        );
     }
 
     #[test]

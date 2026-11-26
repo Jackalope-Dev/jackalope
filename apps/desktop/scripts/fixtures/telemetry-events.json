@@ -493,5 +493,239 @@
     "id": "00000000-0000-4000-8000-000000000086",
     "name": "task_state",
     "state": "interrupted"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000087",
+    "name": "app_error",
+    "code": "ui_error",
+    "kind": "type"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000088",
+    "name": "app_error",
+    "code": "ui_error",
+    "kind": "reference"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000089",
+    "name": "app_error",
+    "code": "ui_error",
+    "kind": "range"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000090",
+    "name": "app_error",
+    "code": "ui_error",
+    "kind": "syntax"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000091",
+    "name": "app_error",
+    "code": "ui_error",
+    "kind": "network"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000092",
+    "name": "app_error",
+    "code": "ui_error",
+    "kind": "timeout"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000093",
+    "name": "app_error",
+    "code": "ui_error",
+    "kind": "permission"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000094",
+    "name": "app_error",
+    "code": "ui_error",
+    "kind": "not_found"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000095",
+    "name": "app_error",
+    "code": "ui_error",
+    "kind": "aborted"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000096",
+    "name": "app_error",
+    "code": "ui_error",
+    "kind": "other"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000097",
+    "name": "app_error",
+    "code": "operation_failed",
+    "operation": "task_start",
+    "kind": "permission"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000098",
+    "name": "work_sent",
+    "shape": "conversation",
+    "agent": "claude",
+    "attachments": "0",
+    "window": false
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000099",
+    "name": "work_sent",
+    "shape": "conversation",
+    "agent": "claude",
+    "attachments": "1",
+    "window": true
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000100",
+    "name": "work_sent",
+    "shape": "plan",
+    "agent": "claude",
+    "attachments": "2_plus",
+    "window": false
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000101",
+    "name": "work_sent",
+    "shape": "comparison",
+    "agent": "claude",
+    "attachments": "0",
+    "window": false
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000102",
+    "name": "work_sent",
+    "shape": "planned",
+    "agent": "claude",
+    "attachments": "1",
+    "window": false
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000103",
+    "name": "work_sent",
+    "shape": "conversation",
+    "attachments": "0",
+    "window": true
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000104",
+    "name": "action_used",
+    "action": "window_attached"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000105",
+    "name": "action_used",
+    "action": "voice_dictation"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000106",
+    "name": "action_used",
+    "action": "read_aloud"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000107",
+    "name": "action_used",
+    "action": "device_paired"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000108",
+    "name": "action_used",
+    "action": "computer_connected"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000109",
+    "name": "action_used",
+    "action": "cloud_machine_paired"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000110",
+    "name": "action_used",
+    "action": "bot_created"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000111",
+    "name": "setting_changed",
+    "setting": "mascot_reactions"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000112",
+    "name": "setting_changed",
+    "setting": "frosted_window"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000113",
+    "name": "setting_changed",
+    "setting": "theme_picker_in_toolbar"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000114",
+    "name": "setting_changed",
+    "setting": "notifications"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000115",
+    "name": "setting_changed",
+    "setting": "os_notifications"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000116",
+    "name": "setting_changed",
+    "setting": "interface_zoom"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000117",
+    "name": "setting_changed",
+    "setting": "terminal_font_size"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000118",
+    "name": "setting_changed",
+    "setting": "terminal_shell"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000119",
+    "name": "setting_changed",
+    "setting": "preferred_editor"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000120",
+    "name": "setting_changed",
+    "setting": "terminal_links"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000121",
+    "name": "setting_changed",
+    "setting": "retain_terminal_output"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000122",
+    "name": "setting_changed",
+    "setting": "shortcuts"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000123",
+    "name": "setting_changed",
+    "setting": "voice_model"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000124",
+    "name": "setting_changed",
+    "setting": "default_runner"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000125",
+    "name": "setting_changed",
+    "setting": "concurrency_limit"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000126",
+    "name": "setting_changed",
+    "setting": "task_timeout"
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000127",
+    "name": "setting_changed",
+    "setting": "mcp_marketplace"
   }
 ]

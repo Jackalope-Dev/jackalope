@@ -1,4 +1,11 @@
-import { Button, Disclosure, DisclosureSummary, InlineNotice, Textarea } from '@jackalope/ui';
+import {
+  Button,
+  Disclosure,
+  DisclosureSummary,
+  InlineNotice,
+  Textarea,
+  ThinkingOrb,
+} from '@jackalope/ui';
 import { Square } from 'lucide-react';
 import { lazy, Suspense, useEffect, useRef } from 'react';
 import { isTauriEnvironment, openInBrowser } from '../../lib/native/env';
@@ -99,7 +106,12 @@ export function AskJackalope({ onNavigate }: { onNavigate: () => void }) {
                   </Suspense>
                 )
               )}
-              {turn.status === 'working' && <p role="status">Working with your agent…</p>}
+              {turn.status === 'working' && (
+                <p role="status" className="ui-thinking-status">
+                  <ThinkingOrb state="working" size={20} aria-hidden="true" />
+                  Working with your agent…
+                </p>
+              )}
               {turn.status === 'interrupted' && (
                 <p role="status">
                   Interrupted when Jackalope closed. Send a follow-up to continue.

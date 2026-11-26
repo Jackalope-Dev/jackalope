@@ -184,15 +184,8 @@ pub async fn app_account_feedback(
         }
     }
     let _guard = state.operation.lock().await;
-    let (api, _) = endpoints(&app)?;
-    let mut record = state
-        .read()?
-        .ok_or("Connect your Jackalope account first.")?;
-    bound(&record, &api)?;
+    let (api, _, mut record) = state.require(&app, AccountFeature::MemberFeedback)?;
     let now = chrono::Utc::now().timestamp_millis();
-    if record.email.is_none() || record.waitlist.is_some() || record.expires_at <= now {
-        return Err("Connect your Jackalope account first.".into());
-    }
     let mut claimed = false;
     if matches!(action, Action::Activity { .. }) {
         record.feedback.activity(now, task.clone());

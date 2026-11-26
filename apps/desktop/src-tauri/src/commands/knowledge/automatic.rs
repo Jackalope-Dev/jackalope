@@ -111,6 +111,7 @@ fn candidate(
         }),
         stale: None,
         enforced: None,
+        tool_rule: None,
         source_run_id: run.map(|r| r.id.clone()),
         source_head: run.map(|r| r.base_head.clone()).filter(|s| !s.is_empty()),
         revision: 1,
@@ -141,7 +142,7 @@ fn reusable(text: &str) -> bool {
         .any(|s| lower.contains(s))
 }
 
-pub(super) fn objective(prompt: &str) -> &str {
+pub(crate) fn objective(prompt: &str) -> &str {
     prompt
         .strip_prefix("### 🎯 Objective\n")
         .map(|text| text.split("\n\n### ").next().unwrap_or(text))

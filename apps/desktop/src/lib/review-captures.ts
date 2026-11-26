@@ -4,8 +4,10 @@ import type { ScreenshotArtifact } from './run-types.ts';
 export const REVIEW_PAGE_LIMIT = 6;
 
 export interface ReviewCapture {
+  /** The preview path, or for an iOS app `First screen` or a deep link. */
   path: string;
-  viewport: 'desktop' | 'narrow';
+  /** `desktop` or `narrow`; for an iOS app `iphone-light`, `iphone-dark` or `iphone-large-text` (`ipad-…` on an iPad). */
+  viewport: string;
   width: number;
   height: number;
   /** Why the page was chosen: `configured`, `plan`, `feature` or `visited`. */
@@ -33,11 +35,28 @@ export interface ReviewCaptures {
   notes: string[];
 }
 
-/** Captures run when a preview command is saved, unless the project turned them off. */
+/**
+ * Captures run when a preview command is saved, or for an iOS app in the Simulator,
+ * unless the project turned them off.
+ */
 export function reviewCapturesOn(
   preferences: { previewCommand?: string; reviewCaptures?: boolean } | undefined,
+  iosApp = false,
 ): boolean {
-  return !!preferences?.previewCommand?.trim() && preferences.reviewCaptures !== false;
+  return (!!preferences?.previewCommand?.trim() || iosApp) && preferences?.reviewCaptures !== false;
+}
+
+/** A capture's size or device variant, as Review names it. */
+export function viewportLabel(viewport: string): string {
+  if (viewport === 'desktop') return 'Desktop';
+  if (viewport === 'narrow') return 'Narrow';
+  const match = /^(iphone|ipad)-(light|dark|large-text)$/.exec(viewport);
+  if (!match) return viewport;
+  const device = match[1] === 'ipad' ? 'iPad' : 'iPhone';
+  const variant = { light: 'Light', dark: 'Dark', 'large-text': 'Large text' }[
+    match[2] as 'light' | 'dark' | 'large-text'
+  ];
+  return `${device} · ${variant}`;
 }
 
 /** Saved review pages as the native side reads them: trimmed, nonblank paths. */

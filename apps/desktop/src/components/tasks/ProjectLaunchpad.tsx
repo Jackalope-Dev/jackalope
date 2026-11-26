@@ -14,6 +14,7 @@ import { STARTER_PROMPTS } from '../../lib/starter-prompts';
 import { useContextMemoryStore } from '../../stores/contextMemoryStore';
 import type { Project } from '../../stores/projectStore';
 import { ProjectMark } from '../projects/ProjectMark';
+import { DismissButton } from '../ui/DismissButton';
 import './project-launchpad.css';
 
 const STARTER_LOOK: Record<string, { icon: LucideIcon; hint: string }> = {
@@ -41,10 +42,13 @@ const order = (index: number) => ({ '--launchpad-index': index }) as CSSProperti
 export function ProjectLaunchpad({
   project,
   onStart,
+  onHide,
 }: {
   project: Project;
   /** Puts a starter request in the composer for editing; nothing runs until it is sent. */
   onStart: (prompt: string) => void;
+  /** Hides it from below the work list; the work list's menu brings it back. */
+  onHide?: () => void;
 }) {
   const todos = useContextMemoryStore(
     (state) =>
@@ -95,6 +99,11 @@ export function ProjectLaunchpad({
             )}
           </p>
         </div>
+        {onHide && (
+          <span className="launchpad-hide">
+            <DismissButton label="Hide starting points" onDismiss={onHide} />
+          </span>
+        )}
       </header>
       <ul className="launchpad-starts" aria-label="Starting points">
         {STARTER_PROMPTS.map((starter, index) => {

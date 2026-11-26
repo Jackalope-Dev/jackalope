@@ -8,7 +8,7 @@ import { compare, root, sha256 } from './catalog.mjs';
 import { validateCloudFiles } from './cloud-artifacts.mjs';
 import { targets } from './cloud-targets.mjs';
 import { parseDraftId } from './cloud-upload.mjs';
-import { application } from './crabnebula-config.mjs';
+import { application, windowsSigning } from './crabnebula-config.mjs';
 import { waitForSourceChecks } from './source-checks.mjs';
 
 export function releaseTargets(value) {
@@ -23,9 +23,19 @@ export function releaseTargets(value) {
   return [...result].sort();
 }
 
+/**
+ * Windows installers whose Authenticode signature publication verifies before
+ * anything is uploaded: every one except an installer collected under the
+ * explicit unsigned opt-in.
+ */
+export const authenticodeInstallers = (assets) =>
+  assets.filter(
+    (asset) => asset.publicPlatform === 'nsis-x86_64' && asset.authenticode !== 'unsigned',
+  );
+
 export async function collectCandidates(
   directory,
-  { expectedTargets, source, channel, publicKey },
+  { expectedTargets, source, channel, publicKey, allowUnsignedWindows = false },
 ) {
   if (!/^[a-f0-9]{40}$/.test(source) || !isReleaseChannel(channel) || !publicKey)
     throw new Error('Expected source, channel and updater key are required');
@@ -49,7 +59,11 @@ export async function collectCandidates(
   for (const candidate of packages.sort((a, b) =>
     a.receipt.target.localeCompare(b.receipt.target),
   )) {
-    const { receipt, directory: path, config } = candidate;
+    const { receipt, directory: path, config, authenticode } = candidate;
+    if (authenticode === 'unsigned' && !allowUnsignedWindows)
+      throw new Error(
+        'The Windows candidate has no Authenticode signature; set WINDOWS_AUTHENTICODE=unsigned to publish it',
+      );
     if (
       receipt.source !== source ||
       receipt.channel !== channel ||
@@ -63,6 +77,7 @@ export async function collectCandidates(
         ...asset,
         path: resolve(path, asset.name),
         sha256: receipt.files[asset.name],
+        ...(authenticode ? { authenticode } : {}),
         ...(asset.updatePlatform
           ? {
               signature: (await readFile(resolve(path, `${asset.name}.sig`), 'utf8')).trim(),
@@ -267,8 +282,9 @@ if (import.meta.main) {
     source: process.env.EXPECTED_SOURCE ?? process.env.GITHUB_SHA,
     channel: process.env.RELEASE_CHANNEL,
     publicKey: process.env.TAURI_UPDATER_PUBLIC_KEY,
+    allowUnsignedWindows: windowsSigning(process.env) === 'unsigned',
   });
-  for (const asset of plan.assets.filter((item) => item.publicPlatform === 'nsis-x86_64'))
+  for (const asset of authenticodeInstallers(plan.assets))
     execFileSync(
       'pwsh',
       [

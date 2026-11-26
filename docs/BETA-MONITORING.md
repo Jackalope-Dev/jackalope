@@ -57,7 +57,7 @@ and task/Chat workflow; older reports retain unknown dimensions.
 Operation results cover task launch/retry/stop, verification, outcome review,
 previews, recovery, Chat, queues, integration, schedules, knowledge, MCP connections,
 worktrees, agent setup and Ask Jackalope. The closed command inventory lives in
-`apps/desktop/src/lib/telemetry.ts`; `operation-telemetry.ts` maps explicit commands
+`packages/contracts/src/telemetry.ts`; `operation-telemetry.ts` maps explicit commands
 and semantic results. Polling and draft autosaves are excluded. Accepted means a
 native acknowledgement. A queued message or accepted launch has not necessarily
 finished execution. Failed checks/probes, blocked integration, canceled recovery
@@ -67,9 +67,30 @@ Error categories distinguish history read/write, discovery, checkpoint,
 verification execution, failed checks, updates, task failures, page rendering,
 unhandled JavaScript errors/rejections and failed operations. Operation errors carry
 the fixed operation name; caught page-rendering errors carry the fixed page category.
-These are triage signals, not exception traces or evidence that every failed task
+Unhandled errors, rejections and failed operations also carry a broad kind (type,
+reference, range, syntax, network, timeout, permission, not found, aborted or other),
+chosen on the device from the error's type, code or message; the message itself never
+leaves the device. These are triage signals, not exception traces or evidence that every failed task
 is an application bug. One failure can contribute to both task/error and operation
 counts; do not sum them as independent incidents.
+
+Feature counts cover the rest of the product. `work_sent` records each successful Send
+from the new-work composer as conversation, plan (interview), comparison or planned work,
+with the lead agent's allowlisted type, an attached-file bucket (`0`, `1`, `2_plus`) and
+whether a window was attached. `action_used` counts attaching a window, starting
+dictation, reading a reply aloud, a device newly paired to this computer, connecting to
+another computer, pairing a cloud machine and creating a bot. `setting_changed` names an
+allowlisted preference whose value changed; paths, addresses, model names and the values
+themselves are never sent. All three follow the usage choice. Settings → Privacy → See
+what's sent lists this session's reports exactly as queued, with whether each was sent;
+the list stays in memory on the device.
+
+The admin Usage & releases page summarises the daily counts over 7, 14 or 30 days:
+opens, work sent, finished runs and errors with their change between the window's
+halves, daily activity, version adoption, feature, work and platform breakdowns, run
+outcomes per agent, error groups with the versions and first and last days they were
+seen, and a list of operations, agents, pages and error groups whose failures stand out.
+Every figure is an event count, and the page says so.
 
 Use operation results to compare activity and failures among participating clients.
 Use view visits to identify discoverability, and task states to distinguish agents

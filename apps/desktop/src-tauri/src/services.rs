@@ -5,7 +5,7 @@ use crate::commands::{
     coordination::Coordinator, desktop_integration::DesktopIntegration,
     external_sessions::ExternalSessions, helper::Helper, live_sessions::LiveSessions,
     notifications::Notifications, previews, remote, remote::RemoteAccess, schedules::Scheduler,
-    tasks::TaskRuntime, work_terminal,
+    simulator, simulators, tasks::TaskRuntime, work_terminal,
 };
 use tauri::{AppHandle, Manager};
 
@@ -28,12 +28,20 @@ fn close_browsers(_: &AppHandle) {
     browser::close_all();
 }
 
+fn close_simulator_drivers(_: &AppHandle) {
+    simulator::close_all();
+}
+
 fn close_previews(_: &AppHandle) {
     previews::close_all();
 }
 
 fn close_terminals(_: &AppHandle) {
     work_terminal::close_all();
+}
+
+fn stop_simulators(_: &AppHandle) {
+    simulators::shutdown_all();
 }
 
 fn stop_computers(app: &AppHandle) {
@@ -44,7 +52,7 @@ fn stop_computers(app: &AppHandle) {
 
 /// Entry points that accept new work stop first. The coordinator stops before
 /// the runtime it drives (lock order: coordinator, execution guard, runtime),
-/// and computers stop once no run can use them.
+/// and computers and task Simulators stop once no run can use them.
 const SHUTDOWN: &[fn(&AppHandle)] = &[
     stop::<CliHost>,
     stop::<DesktopIntegration>,
@@ -57,11 +65,13 @@ const SHUTDOWN: &[fn(&AppHandle)] = &[
     stop::<Notifications>,
     stop::<LiveSessions>,
     close_browsers,
+    close_simulator_drivers,
     close_previews,
     close_terminals,
     stop::<Coordinator>,
     stop::<TaskRuntime>,
     stop_computers,
+    stop_simulators,
     stop::<SignInService>,
 ];
 

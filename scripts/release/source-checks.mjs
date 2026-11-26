@@ -1,4 +1,5 @@
 export const requiredChecks = [
+  'shared',
   'verify',
   'dependencies',
   'secrets',

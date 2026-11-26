@@ -19,6 +19,7 @@ import {
   type PlanSettings,
   planCommands,
 } from '../../lib/plan-mode';
+import { type AdvisorSettings, defaultAdvisorSettings } from '../../lib/turn-advisor';
 import { useExecutionStore } from '../../stores/executionStore';
 import { ActionError } from '../ui/ActionError';
 
@@ -26,6 +27,8 @@ const QUESTION_LIMITS = Array.from({ length: 13 }, (_, limit) => limit);
 const ROUND_LIMITS = [1, 2, 3, 5, 8, 12, 20];
 const ORCHESTRATOR_LIMITS = [1, 2, 3, 4];
 const DECISION_LIMITS = [10, 25, 50, 100, 200];
+const ADVISOR_NOTE_LIMITS = [1, 2, 3, 4, 5];
+const ADVISOR_REVIEW_LIMITS = [3, 5, 10, 20, 50];
 /** What always reaches the person, whatever these settings or a committed policy say. */
 const ALWAYS_YOURS = [
   'Signing in, two-factor codes and OAuth approvals',
@@ -40,7 +43,7 @@ const ALWAYS_YOURS = [
 const TASK_AGENT = 'task';
 const AGENT_DEFAULT = 'default';
 
-/** Plan mode settings for one project: the interview limit, swarm rounds, planning agent and model, where Save to repo writes, and what agents may decide. */
+/** Plan mode settings for one project: the interview limit, swarm rounds, planning agent and model, where Save to repo writes, what agents may decide, and the turn advisor. */
 export function ProjectPlanningSettings({
   projectId,
   onSaved,
@@ -95,6 +98,9 @@ export function ProjectPlanningSettings({
   const decide: DecideSettings = { ...defaultDecideSettings, ...settings.decide };
   const setDecide = (change: Partial<DecideSettings>) =>
     void save({ ...settings, decide: { ...decide, ...change } });
+  const advisor: AdvisorSettings = { ...defaultAdvisorSettings, ...settings.advisor };
+  const setAdvisor = (change: Partial<AdvisorSettings>) =>
+    void save({ ...settings, advisor: { ...advisor, ...change } });
   return (
     <>
       <SettingGroup
@@ -360,6 +366,65 @@ export function ProjectPlanningSettings({
             ))}
           </ul>
         </SettingBody>
+      </SettingGroup>
+      <SettingGroup
+        title="Turn advisor"
+        description="Another agent reads each task turn that ends with a result and leaves a few notes. It uses that agent account's quota and skips turns when quota is low or every execution slot is busy."
+      >
+        <SettingRow
+          title="Advise finished turns"
+          description="An installed agent, from another model family when one is available, reads the request, reply, changes and checks without tools. Concerns and blockers go back to the working agent, which may disagree; asides are shown only to you."
+          descriptionId={`${id}-advisor-description`}
+        >
+          <Switch
+            label="Advise finished turns"
+            aria-describedby={`${id}-advisor-description`}
+            checked={advisor.enabled}
+            onCheckedChange={(enabled) => setAdvisor({ enabled })}
+          />
+        </SettingRow>
+        {advisor.enabled && (
+          <>
+            <SettingRow
+              title="Most notes per turn"
+              description="The advisor leaves only what matters, most serious first."
+              descriptionId={`${id}-advisor-notes-description`}
+            >
+              <Select
+                aria-label="Most notes per turn"
+                aria-describedby={`${id}-advisor-notes-description`}
+                value={String(advisor.maxNotes)}
+                onValueChange={(value) => setAdvisor({ maxNotes: Number(value) })}
+              >
+                {ADVISOR_NOTE_LIMITS.map((limit) => (
+                  <SelectItem key={limit} value={String(limit)}>
+                    {limit === 1 ? '1 note' : `${limit} notes`}
+                  </SelectItem>
+                ))}
+              </Select>
+            </SettingRow>
+            <SettingRow
+              title="Most reviews per task"
+              description="After this many, the task's later turns are not advised."
+              descriptionId={`${id}-advisor-reviews-description`}
+            >
+              <Select
+                aria-label="Most reviews per task"
+                aria-describedby={`${id}-advisor-reviews-description`}
+                value={String(advisor.maxReviews)}
+                onValueChange={(value) => setAdvisor({ maxReviews: Number(value) })}
+              >
+                {[...new Set([...ADVISOR_REVIEW_LIMITS, advisor.maxReviews])]
+                  .sort((a, b) => a - b)
+                  .map((limit) => (
+                    <SelectItem key={limit} value={String(limit)}>
+                      {limit === 1 ? '1 review' : `${limit} reviews`}
+                    </SelectItem>
+                  ))}
+              </Select>
+            </SettingRow>
+          </>
+        )}
       </SettingGroup>
     </>
   );

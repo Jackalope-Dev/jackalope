@@ -224,7 +224,7 @@ explicitly truncated 2,000-character preview and partial array paths. The full
 original stays queryable through its handle; previews never establish all matching
 records. Errors and non-text content remain intact, and explicit selections take
 precedence. Both experiments are off by default and require end-to-end evaluation.
-Lean HTTP tasks receive compact help with full browser, desktop and coordination
+Lean HTTP tasks receive compact help with full browser, desktop, device and coordination
 contracts available through `GET /v1/help?full=true`.
 
 `JACKALOPE_INITIAL_TOOLS=small` can provide a complete small catalog and its handles

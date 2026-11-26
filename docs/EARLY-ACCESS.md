@@ -49,9 +49,9 @@ inbox acceptance.
   Owners see their invitees' emails and acceptance status; recipients see that
   disclosure before accepting through a shared link.
 - The gate covers the member hub and member download links, which record the
-  first download. Every desktop build requires approved account access for new
-  native work. Standalone agent CLI use remains independent of Jackalope sign-in; see
-  [DESKTOP-ACCOUNT.md](DESKTOP-ACCOUNT.md) and [STORE-RELEASE.md](STORE-RELEASE.md).
+  first download. The desktop runs local work without an account; connecting one
+  adds the account features in [DESKTOP-ACCOUNT.md](DESKTOP-ACCOUNT.md). See also
+  [STORE-RELEASE.md](STORE-RELEASE.md).
 
 ## Configuration
 

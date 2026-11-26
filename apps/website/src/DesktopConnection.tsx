@@ -273,11 +273,17 @@ export function DesktopConnection({
   );
 }
 
+/** Connections on one computer, by the service's computer label; older services, without
+ *  it, group by name and platform. */
 function groupDevices(devices: ConnectedDevice[]) {
   const groups = new Map<string, ConnectedDevice[]>();
   for (const device of devices) {
     const name = device.name?.trim().toLowerCase();
-    const key = name ? JSON.stringify([name, device.platform || null]) : device.id;
+    const key = device.computer
+      ? `computer:${device.computer}`
+      : name
+        ? JSON.stringify([name, device.platform || null])
+        : device.id;
     const group = groups.get(key);
     if (group) group.push(device);
     else groups.set(key, [device]);
@@ -295,7 +301,7 @@ function DesktopGroup({ devices, children }: { devices: ConnectedDevice[]; child
             <Monitor size={18} /> {devices[0].name}
           </strong>
           <span className="desktop-device-group-count">
-            {devices.length} connections with this name
+            {devices.length} connections on this computer
           </span>
         </span>
       </DisclosureSummary>
@@ -372,7 +378,7 @@ export function ConnectedDesktops({ waiting = false }: { waiting?: boolean }) {
       <p className="connected-desktops-description">
         {waiting
           ? 'These desktops can view your waitlist progress. Running tasks and syncing settings require approved access.'
-          : 'Each app profile has its own connection. Development and test profiles can appear with the same computer name. Settings sync carries appearance and notification preferences; projects and task history stay in the local profile.'}
+          : 'Each app profile on a computer has its own connection, grouped under that computer. When a computer connects again, its connections unused for two weeks are replaced. Settings sync carries appearance and notification preferences; projects and task history stay in the local profile.'}
       </p>
       {devices?.length === 0 && <p>No desktops connected.</p>}
       {devices === null && !error && <p role="status">Reading connected desktops…</p>}

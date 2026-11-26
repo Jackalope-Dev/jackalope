@@ -1,7 +1,10 @@
 # Cloud signing and release setup
 
-Windows releases use [Microsoft Store](STORE-RELEASE.md); Azure signing is needed
-only when separately enabling direct EXE distribution. Cloud handles macOS/Linux.
+Windows releases use [Microsoft Store](STORE-RELEASE.md). Cloud handles macOS/Linux,
+and the direct Windows EXE when `windows-x86_64` is added to the Cloud targets.
+That EXE is Authenticode-signed through Azure when `CLOUD_SIGNING_READY=true`, or
+ships without Authenticode under the explicit
+[unsigned opt-in](#unsigned-direct-windows-installer).
 
 Use [release automation](RELEASE-AUTOMATION.md) for branches, versions, workflow
 selection, publication and recovery. This guide covers the external signing inputs
@@ -38,6 +41,44 @@ publisher name. Certificate rotation does not require pinning a new thumbprint.
 
 [Azure setup](https://learn.microsoft.com/en-us/azure/artifact-signing/quickstart),
 [OIDC setup](https://github.com/Azure/artifact-signing-action/blob/main/docs/OIDC.md).
+
+## Unsigned direct Windows installer
+
+Setting the repository variable `WINDOWS_AUTHENTICODE=unsigned` lets the direct
+Windows installer ship without an Authenticode signature while
+`CLOUD_SIGNING_READY` is not `true`. It is the only accepted value; any other
+non-empty value fails planning when Windows is selected. With it:
+
+- Planning accepts `windows-x86_64` without Azure signing, records
+  `windows_signing=unsigned` and adds a workflow warning.
+- The Windows candidate job skips the .NET, Artifact Signing client and Azure login
+  steps and builds the NSIS installer without the Tauri signing hook. It still
+  requires `TAURI_SIGNING_PRIVATE_KEY` and `TAURI_UPDATER_PUBLIC_KEY`, produces the
+  updater `.sig`, and checks that the installer and app executable carry no
+  Authenticode signature. Its receipt records `"authenticode": "unsigned"`.
+- Cloud publication and the GitHub Releases mirror accept that installer only while
+  the opt-in is still in effect. Digests, the updater public key, the `.sig` and the
+  published update feed are checked as for any other platform; only
+  `azure-sign.ps1 -VerifyOnly` is skipped.
+- The GitHub Release labels the installer "not code-signed" and tells readers that
+  SmartScreen may warn ("More info", then "Run anyway") and to compare the download
+  with `SHA256SUMS`.
+
+Without the variable, or with `CLOUD_SIGNING_READY=true` (which wins over it), every
+Windows candidate goes through the Azure path above and fails closed without a
+valid Jackalope Digital LLC signature. A candidate built unsigned cannot be published
+after signing becomes ready; build a new one.
+
+To switch to signing later, configure a signing provider, confirm a signed candidate,
+then delete `WINDOWS_AUTHENTICODE`:
+
+- Azure Artifact Signing: complete the section above and set `CLOUD_SIGNING_READY=true`.
+- SignPath (for example through the SignPath Foundation's open source program):
+  the release scripts do not integrate it yet. It has to sign both the app
+  executable and the installer, which the Azure path does through the Tauri
+  `signCommand` in `crabnebula-config.mjs`. `azure-sign.ps1 -VerifyOnly` requires
+  the Jackalope Digital LLC publisher name, so a certificate issued to another
+  subject also needs that check updated.
 
 ## macOS signing and notarization
 
@@ -82,8 +123,8 @@ or chat. Preserve the existing updater key and keep a private recovery backup.
 | `CN_API_KEY` | Both Cloud environment secrets | Draft/upload/publication access |
 
 Linux AppImage needs the updater key but no additional publisher-signing subscription.
-Candidates include both trusted Cloud channel endpoints, retain approved native
-account access and use the existing task-aware update installation safeguards.
+Candidates include both trusted Cloud channel endpoints, keep the optional account
+connection and use the existing task-aware update installation safeguards.
 Signing credentials and live deployment state never belong in tracked configuration.
 
 Publication uses CN CLI 0.13.4; Windows signing uses
@@ -126,7 +167,8 @@ as described in [release automation](RELEASE-AUTOMATION.md#enablement-and-first-
    install it in a disposable OS user/profile, and verify its version, publisher,
    architecture and installation path.
 2. Connect an approved account, create saved work in a disposable repository, execute
-   a real task, quit and reopen, and confirm data persists.
+   a real task, quit and reopen, and confirm data persists. Also run a task in a
+   second profile that continued without an account.
 3. Prepare and build the newer version. Check the draft's notes, platform artifacts,
    signatures and receipts. Use **Publish Cloud candidate** to publish the exact
    tested run. Beta assets are accessible by public URLs even if not advertised.

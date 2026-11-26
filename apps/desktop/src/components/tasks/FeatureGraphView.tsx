@@ -1,6 +1,6 @@
 import { graphlib, layout } from '@dagrejs/dagre';
 import { isActive, isDone, isRetryable } from '@jackalope/contracts/runs';
-import { Badge, Button, EmptyState, Select, SelectItem } from '@jackalope/ui';
+import { Badge, Button, EmptyState, Select, SelectItem, ThinkingOrb } from '@jackalope/ui';
 import {
   Background,
   Controls,
@@ -275,8 +275,7 @@ export function FeatureGraphView({
         <div className="flex items-center gap-2 text-xs">
           {stats.active > 0 && (
             <Badge variant="accent">
-              <Loader2 size={11} className="animate-spin" aria-hidden="true" /> {stats.active}{' '}
-              active
+              <ThinkingOrb state="working" size={20} aria-hidden="true" /> {stats.active} active
             </Badge>
           )}
           {stats.review > 0 && <Badge variant="warning">{stats.review} in review</Badge>}

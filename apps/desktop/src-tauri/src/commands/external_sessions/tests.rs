@@ -328,7 +328,16 @@ fn codex_rollouts_are_listed_by_thread_including_compressed_ones() {
     let entries: Vec<_> = transcript
         .entries
         .iter()
-        .map(|e| (e.role, e.text.as_str(), e.tools.clone()))
+        .map(|e| {
+            (
+                e.role.as_str(),
+                e.text.as_str(),
+                e.tools
+                    .iter()
+                    .map(|tool| tool.name.clone())
+                    .collect::<Vec<_>>(),
+            )
+        })
         .collect();
     assert_eq!(
         entries,
@@ -385,7 +394,16 @@ fn claude_sessions_skip_generated_turns_and_subagent_lines() {
     let entries: Vec<_> = transcript
         .entries
         .iter()
-        .map(|e| (e.role, e.text.as_str(), e.tools.clone()))
+        .map(|e| {
+            (
+                e.role.as_str(),
+                e.text.as_str(),
+                e.tools
+                    .iter()
+                    .map(|tool| tool.name.clone())
+                    .collect::<Vec<_>>(),
+            )
+        })
         .collect();
     assert_eq!(
         entries,
@@ -678,4 +696,106 @@ fn titles_are_one_trimmed_line() {
     ));
     assert!(read::generated("<command-name>/clear</command-name>"));
     assert!(!read::generated("<div> is misaligned, fix it"));
+}
+
+/// Only macOS guards these folders; elsewhere a session there is checked like any other.
+#[cfg(target_os = "macos")]
+#[test]
+fn sessions_in_protected_locations_are_listed_without_looking_at_their_folder() {
+    let fixture = Fixture::new();
+    let home = super::super::platform::home_dir().expect("a home directory");
+    // Paths that do not exist: had the listing looked, they would read as gone.
+    let guarded = home.join("Documents/jackalope-fixture-never-created");
+    let icloud = home.join("Library/Mobile Documents/com~apple~CloudDocs/jackalope-fixture");
+    for (n, cwd) in [(1, &guarded), (2, &icloud)] {
+        let id = format!("9d4e5f60-0000-4000-8000-{n:012}");
+        fixture.write(
+            &format!("claude/projects/-p{n}/{id}.jsonl"),
+            &claude_lines(&id, cwd, "main", &format!("Prompt {n}")),
+        );
+    }
+    let mut index = Index::default();
+    index.refresh(&[(Source::Claude, fixture.path("claude"))]);
+    let projects = vec![
+        ProjectFolder::new("documents", guarded.to_str().unwrap()),
+        ProjectFolder::new("icloud", icloud.to_str().unwrap()),
+    ];
+    let mut sessions = listed(&index, &projects, &[], &fixture.path("data"));
+    sessions.sort_by(|left, right| left.title.cmp(&right.title));
+    let shown: Vec<_> = sessions
+        .iter()
+        .map(|s| {
+            (
+                s.title.as_str(),
+                s.project_id.as_str(),
+                s.protected_folder,
+                s.unavailable.clone(),
+            )
+        })
+        .collect();
+    assert_eq!(
+        shown,
+        vec![
+            ("Prompt 1", "documents", true, None),
+            ("Prompt 2", "icloud", true, None),
+        ]
+    );
+    assert!(Location::of_session(&guarded).protected);
+    assert_eq!(Location::of_session(&guarded).canonical, None);
+    assert!(!Location::of_session(&fixture.path("repo")).protected);
+}
+
+#[test]
+fn protected_locations_are_judged_from_the_path_text() {
+    use super::super::platform::{absolute_fixture, macos_guarded_in, protected_location_in};
+    let home = absolute_fixture("/Users/someone");
+    // Guarded only on macOS, which asks for permission there; elsewhere they are ordinary.
+    for path in [
+        "/Users/someone/Desktop",
+        "/Users/someone/Documents/repo",
+        "/Users/someone/downloads/x",
+        "/users/SOMEONE/Documents/repo",
+        "/Users/someone/Library/Mobile Documents/com~apple~CloudDocs/repo",
+        "/Users/someone/Pictures/a",
+        "/Users/someone/Movies",
+        "/Users/someone/Music/b",
+        "/Users/someone/Public/c",
+        "/Users/other/Library/Mobile Documents/x",
+    ] {
+        let path = absolute_fixture(path);
+        assert!(macos_guarded_in(&path, &home), "{}", path.display());
+        assert_eq!(
+            protected_location_in(&path, &home),
+            cfg!(target_os = "macos"),
+            "{}",
+            path.display()
+        );
+    }
+    // macOS volumes and system folders. Without a drive they are relative on Windows, so
+    // protected there too.
+    for path in ["/Volumes/USB/repo", "/System/Volumes/Data"] {
+        let path = Path::new(path);
+        assert!(macos_guarded_in(path, &home), "{}", path.display());
+        assert_eq!(
+            protected_location_in(path, &home),
+            cfg!(target_os = "macos") || !path.is_absolute(),
+            "{}",
+            path.display()
+        );
+    }
+    // A folder written without a drive, and a relative path: protected everywhere.
+    for path in [r"\Users\someone\Code\repo", "relative/path"] {
+        assert!(protected_location_in(Path::new(path), &home), "{path}");
+    }
+    for path in [
+        "/Users/someone/Code/repo",
+        "/Users/someone/DocumentsArchive/repo",
+        "/Users/someone",
+        "/opt/src/repo",
+        "/private/tmp/repo",
+    ] {
+        let path = absolute_fixture(path);
+        assert!(!macos_guarded_in(&path, &home), "{}", path.display());
+        assert!(!protected_location_in(&path, &home), "{}", path.display());
+    }
 }

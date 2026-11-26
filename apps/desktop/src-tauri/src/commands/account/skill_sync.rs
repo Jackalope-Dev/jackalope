@@ -537,7 +537,7 @@ pub async fn app_skill_sync(
         _ => {
             return match action {
                 Action::Status => page(&runtime, view).await,
-                _ => Err("Sign in to Jackalope to sync skills.".into()),
+                _ => Err(AccountFeature::SkillSync.connect_message()),
             }
         }
     };
@@ -547,8 +547,14 @@ pub async fn app_skill_sync(
             _ => Err("Skill sync is not available in this build.".into()),
         };
     };
-    bound(&record, &api)?;
-    let owner = account_key(&record).ok_or("Sign in to Jackalope to sync skills.")?;
+    // Status also lists this computer's skills for the Skills page and the
+    // composer, so an expired or unverified account only hides sync.
+    let record = match state.admit(Some(record), &api, AccountFeature::SkillSync) {
+        Ok(record) => record,
+        Err(_) if matches!(action, Action::Status) => return page(&runtime, view).await,
+        Err(error) => return Err(error),
+    };
+    let owner = account_key(&record).ok_or_else(|| AccountFeature::SkillSync.connect_message())?;
     let path = store::state_path(&runtime);
     let mut sync = store::load(&path);
     view.available = true;

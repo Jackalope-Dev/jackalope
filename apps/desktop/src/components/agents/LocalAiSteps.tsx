@@ -281,7 +281,6 @@ export function LocalAiSteps({
             <p className="local-ai-notice">
               <ShieldCheck size={19} />
               Model requests stay on this computer. Agent tools may still access the internet.
-              Jackalope account access is separate.
             </p>
             <Button
               variant="ghost"

@@ -7,12 +7,14 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
-# A new push to a pull request or to master cancels the older run; only the newest
-# master commit matters and releases verify their own commit. Release branches, merge
-# groups and manual runs get their own group and always run to completion.
+# A new push to a pull request cancels its older run. Master runs one push at a time and
+# never cancels a run in progress, so busy days still finish runs; a newer push replaces
+# only a run that has not started, and the next run covers its commits because master is
+# compared with its last green commit. Release branches, merge groups and manual runs get
+# their own group and always run to completion.
 concurrency:
   group: verify-${{ github.event_name }}-${{ (github.event_name == 'pull_request' || (github.event_name == 'push' && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main'))) && github.ref || github.sha }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' || (github.event_name == 'push' && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main')) }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 jobs:
   workflows:
     runs-on: ubuntu-latest
@@ -28,15 +30,24 @@ jobs:
           echo "8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8  $RUNNER_TEMP/actionlint.tar.gz" | sha256sum --check
           tar -xzf "$RUNNER_TEMP/actionlint.tar.gz" -C "$RUNNER_TEMP" actionlint
           "$RUNNER_TEMP/actionlint" -shellcheck= -pyflakes=
-  # Decides once which suites a pull request or merge group can affect; pushes and
-  # manual runs always run everything. The merge queue squashes, so a merge group's
-  # HEAD^1 is the queue entry before it and the diff is that pull request alone.
-  # If this job fails, its outputs are empty and the platform jobs run everything.
+  # Decides once which suites a change can affect. A pull request or merge group is
+  # compared with HEAD^1: the merge queue squashes, so a merge group's HEAD^1 is the queue
+  # entry before it and the diff is that pull request alone. A master push is compared
+  # with master's last commit whose Verify passed, so commits whose runs were replaced or
+  # failed are always covered. Release branches and manual runs, or a master without a
+  # green run, run everything. If this job fails, its outputs are empty and the platform
+  # jobs run everything.
   changes:
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read
     outputs:
-      desktop: ${{ steps.scope.outputs.desktop }}
+      # Linux and macOS build and test only native code; a change no native or platform
+      # input reads (such as the desktop frontend) reports their checks from a quick job,
+      # and Windows runs only the shared half.
+      platform: ${{ steps.scope.outputs.platform }}
       lock: ${{ steps.scope.outputs.lock }}
       # Release branches, pull requests into them and manual runs also build trial
       # packages and run Intel macOS.
@@ -52,21 +63,28 @@ jobs:
       # only when its lockfile changes. Cargo still rebuilds whatever the change touched.
       - name: Decide which suites the change affects
         id: scope
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT: ${{ github.event_name }}
+          BRANCH: ${{ github.ref_name }}
+          RELEASE: ${{ github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/beta' || github.ref == 'refs/heads/stable' || github.base_ref == 'beta' || github.base_ref == 'stable' }}
         run: |
-          node scripts/change-scope.mjs ${{ (github.event_name == 'pull_request' || github.event_name == 'merge_group') && 'HEAD^1' || '' }}
-          echo "release=${{ github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/beta' || github.ref == 'refs/heads/stable' || github.base_ref == 'beta' || github.base_ref == 'stable' }}" >> "$GITHUB_OUTPUT"
+          base=''
+          if [ "$EVENT" = pull_request ] || [ "$EVENT" = merge_group ]; then
+            base=HEAD^1
+          elif [ "$EVENT" = push ] && [ "$RELEASE" != true ]; then
+            green=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow verify.yml --branch "$BRANCH" --event push --status success --limit 1 --json headSha --jq '.[0].headSha // empty' || true)
+            if [ -n "$green" ] && git fetch --quiet --no-tags --depth=1 origin "$green"; then base=$green; fi
+          fi
+          node scripts/change-scope.mjs $base
+          echo "release=$RELEASE" >> "$GITHUB_OUTPUT"
           echo "lock=$(git rev-parse ${{ (github.event_name == 'pull_request' || github.event_name == 'merge_group') && 'HEAD^1' || 'HEAD' }}:apps/desktop/src-tauri/Cargo.lock)" >> "$GITHUB_OUTPUT"
-  verify:
-    needs: changes
-    if: ${{ !cancelled() }}
-    runs-on: windows-latest
-    timeout-minutes: 40
-    env:
-      RUST_TEST_THREADS: '2'
-      # Each run builds from a clean checkout, so incremental data only enlarges the cache.
-      CARGO_INCREMENTAL: '0'
-      # Test the configuration Windows ships when it is distributed through the Store.
-      JACKALOPE_VERIFY_FEATURES: ${{ vars.RELEASE_DISTRIBUTION == 'store' && 'store' || '' }}
+  # Everything in `pnpm verify` that no platform changes: lint, types, documentation,
+  # server, website, UI and mobile builds, the Worker dry run and the desktop JavaScript
+  # tests. It runs once, on Linux, in parallel with the platform jobs.
+  shared:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -77,13 +95,46 @@ jobs:
           node-version-file: '.node-version'
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - run: pnpm verify --shared-only
+  # Windows native checks: the desktop JavaScript tests and Rust formatting and unit tests,
+  # with the Store build's features when that is how Windows ships. When the change cannot
+  # affect them, the check still reports, from a quick Linux job.
+  verify:
+    needs: changes
+    if: ${{ !cancelled() }}
+    runs-on: ${{ needs.changes.outputs.platform == 'false' && 'ubuntu-latest' || 'windows-latest' }}
+    timeout-minutes: 40
+    env:
+      SUITES: ${{ needs.changes.outputs.platform == 'false' && 'skip' || 'run' }}
+      RUST_TEST_THREADS: '2'
+      # Each run builds from a clean checkout, so incremental data only enlarges the cache.
+      CARGO_INCREMENTAL: '0'
+      # Test the configuration Windows ships when it is distributed through the Store.
+      JACKALOPE_VERIFY_FEATURES: ${{ vars.RELEASE_DISTRIBUTION == 'store' && 'store' || '' }}
+    steps:
+      - name: Note skipped Windows suites
+        if: env.SUITES == 'skip'
+        run: echo "Nothing in this change is read by the native build; the Windows suites are skipped."
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        if: env.SUITES == 'run'
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413
+        if: env.SUITES == 'run'
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        if: env.SUITES == 'run'
+        with:
+          node-version-file: '.node-version'
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+        if: env.SUITES == 'run'
       - run: rustup toolchain install 1.98.1 --profile minimal --component rustfmt
-        if: needs.changes.outputs.desktop != 'false'
+        if: env.SUITES == 'run'
       - run: rustup override set 1.98.1
-        if: needs.changes.outputs.desktop != 'false'
+        if: env.SUITES == 'run'
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
         id: rust-cache
-        if: needs.changes.outputs.desktop != 'false'
+        if: env.SUITES == 'run'
         with:
           path: |
             ~/.cargo/registry
@@ -91,21 +142,19 @@ jobs:
             apps/desktop/src-tauri/target
           key: rust-windows-1.98.1-${{ needs.changes.outputs.lock }}
           restore-keys: rust-windows-1.98.1-
-      - run: pnpm verify
-        if: needs.changes.outputs.desktop != 'false'
-      - run: pnpm verify --shared-only
-        if: needs.changes.outputs.desktop == 'false'
+      - run: pnpm verify --native-only
+        if: env.SUITES == 'run'
       - run: pnpm tauri build --bundles nsis
-        if: needs.changes.outputs.desktop != 'false' && needs.changes.outputs.release != 'false' && vars.RELEASE_DISTRIBUTION != 'store'
+        if: env.SUITES == 'run' && needs.changes.outputs.release != 'false' && vars.RELEASE_DISTRIBUTION != 'store'
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
-        if: needs.changes.outputs.desktop != 'false' && needs.changes.outputs.release != 'false' && vars.RELEASE_DISTRIBUTION != 'store'
+        if: env.SUITES == 'run' && needs.changes.outputs.release != 'false' && vars.RELEASE_DISTRIBUTION != 'store'
         with:
           name: windows-trial-installer
           path: apps/desktop/src-tauri/target/release/bundle/nsis/*.exe
           if-no-files-found: error
           retention-days: 14
       - name: Keep only dependency builds in the Rust cache
-        if: needs.changes.outputs.desktop != 'false' && steps.rust-cache.outputs.cache-hit != 'true'
+        if: env.SUITES == 'run' && steps.rust-cache.outputs.cache-hit != 'true'
         shell: bash
         run: |
           cd apps/desktop/src-tauri/target
@@ -121,16 +170,20 @@ jobs:
         os: [ubuntu-22.04, ubuntu-24.04, macos-15, macos-15-intel]
     needs: changes
     if: ${{ !cancelled() }}
-    # When the change cannot affect the desktop suites, each platform's check
-    # still reports, but from a quick Linux job instead of waiting for a macOS
-    # runner. Skipping a matrix job at job level would not report the
-    # per-platform check names that branch protection requires.
-    # Intel macOS runs only for release branches and manual runs; its check still
-    # reports from the quick job otherwise. Trial packages are built on the same runs.
-    runs-on: ${{ (needs.changes.outputs.desktop == 'false' || (matrix.os == 'macos-15-intel' && needs.changes.outputs.release == 'false')) && 'ubuntu-latest' || matrix.os }}
-    timeout-minutes: 60
+    # These jobs build and test only native code and the platform trials. When the change
+    # cannot affect them, such as a desktop frontend or documentation change, each
+    # platform's check still reports, but from a quick Linux job instead of waiting for a
+    # macOS runner; the shared job still runs the JavaScript checks. Skipping a
+    # matrix job at job level would not report the per-platform check names that branch
+    # protection requires. Intel macOS runs only for release branches and manual runs; its
+    # check still reports from the quick job otherwise. Trial packages are built on the
+    # same runs.
+    runs-on: ${{ (needs.changes.outputs.platform == 'false' || (matrix.os == 'macos-15-intel' && needs.changes.outputs.release == 'false')) && 'ubuntu-latest' || matrix.os }}
+    # Intel macOS builds the trial bundle on the slowest runners; release publication waits
+    # for this check, so a timeout there would stall a release.
+    timeout-minutes: ${{ matrix.os == 'macos-15-intel' && 90 || 60 }}
     env:
-      SUITES: ${{ (needs.changes.outputs.desktop == 'false' || (matrix.os == 'macos-15-intel' && needs.changes.outputs.release == 'false')) && 'skip' || 'run' }}
+      SUITES: ${{ (needs.changes.outputs.platform == 'false' || (matrix.os == 'macos-15-intel' && needs.changes.outputs.release == 'false')) && 'skip' || 'run' }}
       TRIAL: ${{ needs.changes.outputs.release != 'false' && 'build' || 'skip' }}
       RUST_TEST_THREADS: '2'
       # Each run builds from a clean checkout, so incremental data only enlarges the cache.
@@ -138,7 +191,7 @@ jobs:
     steps:
       - name: Note skipped desktop suites
         if: env.SUITES == 'skip'
-        run: echo "Nothing in this change is read by the desktop app, or ${{ matrix.os }} runs only for release branches; its suites are skipped."
+        run: echo "Nothing in this change is read by the native build or the platform trials, or ${{ matrix.os }} runs only for release branches; its suites are skipped."
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         if: env.SUITES == 'run'
         with:

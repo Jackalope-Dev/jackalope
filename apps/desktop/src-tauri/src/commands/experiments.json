@@ -41,6 +41,11 @@
       "default": "scoped",
       "environment": null
     },
+    "goal-restatement": {
+      "values": ["separate", "batched", "scoped"],
+      "default": "scoped",
+      "environment": "JACKALOPE_GOAL_RESTATEMENT"
+    },
     "tool-surface": {
       "values": ["full", "available", "deferred"],
       "default": "available",
@@ -100,6 +105,11 @@
       "values": ["oneshot", "persistent"],
       "default": "persistent",
       "environment": "JACKALOPE_CLAUDE_SESSION"
+    },
+    "codex-transport": {
+      "values": ["exec", "app-server"],
+      "default": "app-server",
+      "environment": "JACKALOPE_CODEX_TRANSPORT"
     },
     "claude-isolation": {
       "values": ["off", "on"],

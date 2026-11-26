@@ -1,15 +1,15 @@
 import { EchoMark } from '@jackalope/brand/echo';
 import { Button, Disclosure, DisclosureSummary, DiscordIcon, Switch } from '@jackalope/ui';
-import { ArrowRight, FolderOpen, ShieldCheck } from 'lucide-react';
+import { ShieldCheck } from 'lucide-react';
 import { useReducedMotion } from 'motion/react';
-import { createContext, type ReactNode, useContext, useEffect, useRef, useState } from 'react';
+import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
+import { type AccountStatus, accountAccess } from '../../lib/account';
 import { DISCORD_URL } from '../../lib/community';
-import { isTauriEnvironment, openExternalUrl } from '../../lib/native/env';
-import { invokeNative } from '../../lib/native/transport';
+import { openExternalUrl } from '../../lib/native/env';
 import { WindowGlass } from '../../lib/window-glass';
+import { useAccountPromptStore, useAccountStore } from '../../stores/accountStore';
 import { useCommunityStore } from '../../stores/communityStore';
 import { useOnboardingStore } from '../../stores/onboardingStore';
-import { useProjectStore } from '../../stores/projectStore';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { useUpdateStore } from '../../stores/updateStore';
 import { ResizeHandles } from '../layout/ResizeHandles';
@@ -17,137 +17,89 @@ import { TitleBar } from '../layout/TitleBar';
 import { JackalopeAccount } from '../settings/JackalopeAccount';
 import { PrivacySettings } from '../settings/PrivacySettings';
 import { ArcColorPicker } from '../theme/ArcColorPicker';
+import { AccountSuggestion } from './AccountPrompts';
 import './access.css';
 
-const AccessNoticeContext = createContext<ReactNode>(null);
-
-/** Renders the reconnect notice inside the workspace, below its title bar. */
+/** The workspace's slot below its title bar, for the one account suggestion. */
 export function AccessNoticeSlot() {
-  return useContext(AccessNoticeContext);
+  return <AccountSuggestion />;
 }
 
-interface AccessStatus {
-  required: boolean;
-  allowed: boolean;
-  validUntil: number | null;
-}
+const today = () => new Date().toLocaleDateString('en-CA');
+const connected = (status: AccountStatus | null) => accountAccess(status) === 'approved';
 
+/**
+ * First-run welcome. Connecting an account is the primary path; continuing
+ * without one goes straight to project setup, since local work never needs an
+ * account. Returning people, connected or not, go straight to their work.
+ */
 export function AccessBoundary({ children }: { children: ReactNode }) {
   const onboarding = useOnboardingStore((state) => state.status);
-  const hasProjects = useProjectStore((state) => state.projects.length > 0);
+  const skipped = useAccountPromptStore((state) => state.skippedAt !== null);
+  const account = useAccountStore((state) => state.status);
   const settings = useSettingsStore();
   const version = useUpdateStore((state) => state.release?.currentVersion);
   const loadRelease = useUpdateStore((state) => state.load);
   const reducedMotion = useReducedMotion();
-  const [access, setAccess] = useState<AccessStatus | null>(null);
-  const [error, setError] = useState('');
-  const [reviewing, setReviewing] = useState(false);
-  const [connecting, setConnecting] = useState(false);
-  const [verified, setVerified] = useState(false);
-  const [admitted, setAdmitted] = useState(false);
-  const entered = useRef(false);
-  // Set once access was missing during this launch, so a new connection is celebrated.
-  const wasDenied = useRef(false);
-  const successHeading = useRef<HTMLHeadingElement>(null);
   const needsSetup = onboarding === 'new' || onboarding === 'active';
+  const [phase, setPhase] = useState<'welcome' | 'verified' | 'admitted'>(() =>
+    needsSetup && !skipped ? 'welcome' : 'admitted',
+  );
+  const [error, setError] = useState('');
+  const [entering, setEntering] = useState(false);
+  const successHeading = useRef<HTMLHeadingElement>(null);
   useEffect(() => {
     void loadRelease();
   }, [loadRelease]);
   useEffect(() => {
-    let canceled = false;
-    let timer: ReturnType<typeof setTimeout>;
-    const refresh = async () => {
-      try {
-        const value = isTauriEnvironment()
-          ? await invokeNative<AccessStatus>('app_execution_access')
-          : { required: true, allowed: false, validUntil: null };
-        if (!canceled) {
-          if (!value.allowed) wasDenied.current = true;
-          setAccess(value);
-        }
-      } catch {
-        if (!canceled) {
-          setAccess(null);
-          setError('We couldn’t check your access. Reconnect or retry shortly.');
-        }
-      }
-      if (!canceled) timer = setTimeout(refresh, 2000);
-    };
-    void refresh();
-    return () => {
-      canceled = true;
-      clearTimeout(timer);
-    };
+    useAccountPromptStore.getState().visit(today());
+    void useAccountStore.getState().load(true);
+  }, []);
+  /** Saves the privacy defaults reviewed here; a failure keeps the person on this screen. */
+  const enter = useCallback(async () => {
+    // applyDefaults skips while an earlier failure is recorded, so clear it to retry.
+    useCommunityStore.setState({ error: null });
+    await useCommunityStore.getState().applyDefaults();
+    const privacy = useCommunityStore.getState();
+    if (privacy.error) {
+      setError(privacy.error);
+      return false;
+    }
+    setError('');
+    return true;
   }, []);
   useEffect(() => {
-    if (!access?.allowed || (entered.current && !connecting) || verified) return;
+    // Setup can turn out to be finished once saved projects load.
+    if (phase === 'welcome' && !needsSetup) setPhase('admitted');
+    if (phase === 'admitted') void useCommunityStore.getState().applyDefaults();
+  }, [phase, needsSetup]);
+  useEffect(() => {
+    if (phase !== 'welcome' || !connected(account)) return;
     let canceled = false;
-    void useCommunityStore
-      .getState()
-      .applyDefaults()
-      .then(() => {
-        const privacy = useCommunityStore.getState();
-        if (canceled) return;
-        if (privacy.error) {
-          setError(privacy.error);
-          return;
-        }
-        if (privacy.busy || (isTauriEnvironment() && !privacy.settings?.reviewed)) return;
-        setError('');
-        // Returning users with valid access go straight to their work.
-        if (!needsSetup && !connecting && !wasDenied.current) {
-          entered.current = true;
-          setAdmitted(true);
-        } else setVerified(true);
-      });
+    void enter().then((ok) => {
+      if (ok && !canceled) setPhase('verified');
+    });
     return () => {
       canceled = true;
     };
-  }, [access, connecting, verified, needsSetup]);
+  }, [phase, account, enter]);
   useEffect(() => {
-    if (!verified) return;
-    if (!access?.allowed) {
-      setVerified(false);
-      return;
-    }
+    if (phase !== 'verified') return;
     successHeading.current?.focus();
-    const timer = setTimeout(
-      () => {
-        entered.current = true;
-        setAdmitted(true);
-        setConnecting(false);
-        setVerified(false);
-      },
-      reducedMotion ? 450 : 1450,
-    );
+    const timer = setTimeout(() => setPhase('admitted'), reducedMotion ? 450 : 1450);
     return () => clearTimeout(timer);
-  }, [verified, access?.allowed, reducedMotion]);
-  if (admitted) entered.current = true;
-  if (!connecting && (admitted || reviewing))
-    return (
-      <AccessNoticeContext.Provider
-        value={
-          access?.allowed ? null : (
-            <div className="access-notice">
-              <p role="status">
-                Sign in to start new work. Saved work and running tasks remain available.
-              </p>
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setVerified(false);
-                  setConnecting(true);
-                }}
-              >
-                Connect account
-              </Button>
-            </div>
-          )
-        }
-      >
-        {children}
-      </AccessNoticeContext.Provider>
-    );
+  }, [phase, reducedMotion]);
+  if (phase === 'admitted') return children;
+  const continueWithout = async () => {
+    if (entering) return;
+    setEntering(true);
+    const ok = await enter();
+    setEntering(false);
+    if (!ok) return;
+    useAccountPromptStore.getState().skip();
+    setPhase('admitted');
+  };
+  const access = accountAccess(account);
   return (
     <div className="access-frame">
       <WindowGlass />
@@ -160,7 +112,7 @@ export function AccessBoundary({ children }: { children: ReactNode }) {
           </div>
         )}
         <div className="access-atmosphere" aria-hidden="true" />
-        {verified ? (
+        {phase === 'verified' ? (
           <section
             className="access-welcome access-verified"
             aria-labelledby="access-verified-heading"
@@ -175,14 +127,14 @@ export function AccessBoundary({ children }: { children: ReactNode }) {
             <h1 id="access-verified-heading" ref={successHeading} tabIndex={-1}>
               You’re in.
             </h1>
-            <p role="status">{needsSetup ? 'Let’s set up your project.' : 'Welcome back.'}</p>
+            <p role="status">Let’s set up your project.</p>
           </section>
         ) : (
           <section className="access-welcome" aria-labelledby="access-heading">
             <header className="access-intro">
               <EchoMark animated={false} className="access-mark" />
               <h1 id="access-heading">Welcome to Jackalope.</h1>
-              <p>Sign in or create a free account to get started.</p>
+              <p>Create a free account or sign in, or start right away and connect later.</p>
             </header>
             <Disclosure className="access-privacy">
               <DisclosureSummary>
@@ -217,13 +169,23 @@ export function AccessBoundary({ children }: { children: ReactNode }) {
               </div>
             </Disclosure>
             <div className="access-connection">
-              {!access && !error ? (
-                <p className="access-checking" role="status">
-                  Checking access…
+              <JackalopeAccount presentation="welcome" />
+              <div className="access-skip">
+                <Button
+                  variant="outline"
+                  loading={entering}
+                  loadingLabel="Opening Jackalope…"
+                  onClick={() => void continueWithout()}
+                >
+                  {access === 'pending' || access === 'waitlist'
+                    ? 'Continue to Jackalope'
+                    : 'Continue without an account'}
+                </Button>
+                <p>
+                  Tasks, conversations and terminals run with your own agents either way. An account
+                  adds sync across your computers, invitations and the Microsoft Store beta.
                 </p>
-              ) : (
-                <JackalopeAccount presentation="welcome" />
-              )}
+              </div>
               {error && (
                 <p className="access-error" role="alert">
                   {error}
@@ -249,20 +211,6 @@ export function AccessBoundary({ children }: { children: ReactNode }) {
                   Join Discord
                 </Button>
               </div>
-              {hasProjects && (
-                <Button
-                  variant="ghost"
-                  onClick={() => {
-                    useOnboardingStore.getState().finish();
-                    setReviewing(true);
-                    setConnecting(false);
-                  }}
-                >
-                  <FolderOpen size={16} />
-                  Open saved work
-                  <ArrowRight size={14} />
-                </Button>
-              )}
             </footer>
           </section>
         )}

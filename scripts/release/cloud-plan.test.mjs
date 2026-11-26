@@ -41,6 +41,7 @@ test('workflow planning maps release branches, isolates rehearsals and fails bef
           GITHUB_OUTPUT: output,
           CLOUD_RELEASE_ENABLED: 'false',
           CLOUD_SIGNING_READY: 'false',
+          WINDOWS_AUTHENTICODE: '',
           APPLE_SIGNING_READY: 'false',
           CLOUD_RELEASE_TARGETS: '["windows-x86_64","darwin-aarch64"]',
           ...env,
@@ -72,20 +73,54 @@ test('workflow planning maps release branches, isolates rehearsals and fails bef
     { CLOUD_SIGNING_READY: 'true' },
   );
   assert.match(mac.stderr, /Complete Apple setup/);
-  const store = await execute(
-    { mode: 'candidate', targets: 'configured' },
-    {
-      RELEASE_DISTRIBUTION: 'store',
-      APPLE_SIGNING_READY: 'true',
-    },
-  );
+  const storeEnv = {
+    RELEASE_DISTRIBUTION: 'store',
+    APPLE_SIGNING_READY: 'true',
+    CLOUD_RELEASE_TARGETS: '["darwin-aarch64"]',
+  };
+  const store = await execute({ mode: 'candidate', targets: 'configured' }, storeEnv);
   assert.equal(store.status, 0, store.stderr);
   assert.match(store.outputs, /targets=\["darwin-aarch64"\]/);
-  const direct = await execute(
-    { mode: 'candidate', targets: 'windows' },
-    { RELEASE_DISTRIBUTION: 'store' },
-  );
+  const direct = await execute({ mode: 'candidate', targets: 'windows' }, storeEnv);
   assert.match(direct.stderr, /Windows releases use Microsoft Store/);
+  // Listing Windows in the Cloud targets opts the installer into Cloud alongside
+  // the Store build; it still needs Azure signing or the unsigned opt-in.
+  const withWindows = { ...storeEnv, CLOUD_RELEASE_TARGETS: '["windows-x86_64","darwin-aarch64"]' };
+  const unsigned = await execute({ mode: 'candidate', targets: 'configured' }, withWindows);
+  assert.match(unsigned.stderr, /Complete Azure setup/);
+  const signed = await execute(
+    { mode: 'candidate', targets: 'configured' },
+    { ...withWindows, CLOUD_SIGNING_READY: 'true' },
+  );
+  assert.equal(signed.status, 0, signed.stderr);
+  assert.match(signed.outputs, /targets=\["darwin-aarch64","windows-x86_64"\]/);
+  assert.match(signed.outputs, /windows_signing=azure/);
+  const macOnly = await execute({ mode: 'candidate', targets: 'configured' }, storeEnv);
+  assert.match(macOnly.outputs, /windows_signing=\n/);
+  // WINDOWS_AUTHENTICODE=unsigned lets Windows build without Azure; signing wins when ready.
+  const optIn = { ...withWindows, WINDOWS_AUTHENTICODE: 'unsigned' };
+  const unsignedPlan = await execute({ mode: 'candidate', targets: 'configured' }, optIn);
+  assert.equal(unsignedPlan.status, 0, unsignedPlan.stderr);
+  assert.match(unsignedPlan.outputs, /targets=\["darwin-aarch64","windows-x86_64"\]/);
+  assert.match(unsignedPlan.outputs, /windows_signing=unsigned/);
+  assert.match(unsignedPlan.stdout, /::warning::.*without Authenticode/);
+  const preferSigned = await execute(
+    { mode: 'candidate', targets: 'configured' },
+    { ...optIn, CLOUD_SIGNING_READY: 'true' },
+  );
+  assert.equal(preferSigned.status, 0, preferSigned.stderr);
+  assert.match(preferSigned.outputs, /windows_signing=azure/);
+  const typo = await execute(
+    { mode: 'candidate', targets: 'configured' },
+    { ...withWindows, WINDOWS_AUTHENTICODE: 'none' },
+  );
+  assert.match(typo.stderr, /WINDOWS_AUTHENTICODE must be unset or "unsigned"/);
+  const windowsTrial = await execute(
+    { mode: 'candidate', targets: 'windows' },
+    { ...withWindows, CLOUD_SIGNING_READY: 'true' },
+  );
+  assert.equal(windowsTrial.status, 0, windowsTrial.stderr);
+  assert.match(windowsTrial.outputs, /targets=\["windows-x86_64"\]/);
   const disabled = await execute({}, { GITHUB_EVENT_NAME: 'push' });
   assert.equal(disabled.status, 0, disabled.stderr);
   assert.match(disabled.outputs, /enabled=false/);

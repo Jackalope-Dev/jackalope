@@ -18,7 +18,7 @@ async fn installed_agents_share_live_work_and_split_off_subtasks() {
     let agents = std::env::var("JACKALOPE_SWARM_TRIAL_AGENTS").unwrap_or("claude,codex".into());
     let agents: Vec<&str> = agents.split(',').collect();
     assert_eq!(agents.len(), 2, "Name two agents, such as claude,codex");
-    let runtime = TaskRuntime::with_test_access(profile.join("history")).unwrap();
+    let runtime = TaskRuntime::new(profile.join("history")).unwrap();
     let coordinator = Coordinator::new(profile.join("coordination"), runtime.clone()).unwrap();
     coordinator.launch();
     for _ in 0..100 {

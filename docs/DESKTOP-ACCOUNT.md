@@ -1,21 +1,55 @@
 # Desktop account connection
 
-The welcome screen and Settings → Jackalope account connect a Jackalope account to
-this desktop; in waitlist mode, verified waitlist members can also connect to follow
-their progress. All builds, including local development builds, require an approved
-account for new native tasks and terminals, with a bounded 72-hour offline lease.
-With open signup, the production setting, confirming the signup email approves the
-account.
-Saved work and running tasks remain accessible. There is no development bypass.
-See [STORE-RELEASE.md](STORE-RELEASE.md) for enforcement and distribution.
+A Jackalope account is optional. Local tasks, conversations, terminals, previews,
+checks, swarms, MCP, bots, device pairing and the `jackalope` command run with the
+person's own agent CLIs whether or not an account is connected, expired or revoked.
+The welcome screen and Settings → Jackalope account connect an account to this
+desktop; in waitlist mode, verified waitlist members can also connect to follow
+their progress. With open signup, the production setting, confirming the signup
+email approves the account.
+
+Connecting adds the features that call the Jackalope service, and only these:
+
+| Feature | Why it needs the account |
+| --- | --- |
+| Settings sync | Preferences are stored on the account for other desktops ([settings sync](SETTINGS-SYNC.md)) |
+| Lesson sync | Learned lessons are stored on the account, on top of settings sync |
+| Skill sync | Chosen skills are stored on the account, on top of settings sync |
+| Invitations and Instant Access Passes | The share link, passes and their progress belong to the member |
+| Member feedback invitations | The service coordinates cooldowns per member ([feedback invitations](FEEDBACK-INVITATIONS.md)) |
+| Microsoft Store beta program | Flight requests are tied to the member for the operator |
+
+Native `AccountFeature` in `commands/account.rs` lists them, and `AccountService::admit`
+is their one gate: without an approved, unexpired account whose lease is current it
+returns a "Connect your Jackalope account to …" error before any request, so nothing
+reaches the service for someone who has not connected. The renderer mirrors the list
+in `lib/account.ts`; `RequiresAccount` shows an explanation and a Connect button in
+place of a gated view, and `AccountRequiredNotice` sits beside local controls such as
+the settings-sync switch. Anonymous usage counts, written feedback and update checks
+are separate services that do not use the account.
+
+An approved account keeps its account features for at most 72 hours offline after the
+last successful check, and never past the device credential's expiry. Expiry or
+revocation turns account features off; local work is unaffected.
+See [STORE-RELEASE.md](STORE-RELEASE.md) for distribution.
 Account connection does not sync projects, enable remote execution or change
-Microsoft Store audience membership. Optional settings sync, and opt-in sync of
-learned lessons on top of it, are described in [settings sync](SETTINGS-SYNC.md).
+Microsoft Store audience membership.
 Connection and optional settings sync are enabled on Windows, macOS and Linux;
 macOS/Linux do not report unavailable solely because of the platform. Their
 installed connection, expiry and revocation flows still require acceptance.
 
 ## User flow
+
+The first-run welcome screen leads with **Create free account or sign in**.
+**Continue without an account** applies the reviewed privacy defaults and goes
+straight to project setup; the choice is remembered and the welcome screen does not
+return. People who already finished setup go straight to their work, connected or
+not. A quiet **Connect account** entry sits above Settings in the sidebar while no
+account is connected. After the first finished task or on a second day of use, the
+workspace shows one dismissible suggestion to connect. **Not now** brings it back
+once a week later; closing it, a second **Not now** or connecting retires it. An
+unanswered suggestion stays only for the launch it appeared in. These choices are
+stored in the renderer's `jackalope-account-prompts-v1`.
 
 Approval and direct-invitation emails open the website download page. The recipient
 explicitly confirms the email link before an account session is created. The page
@@ -51,9 +85,9 @@ The welcome screen also links to the website and app tour before sign-in.
 Waitlist connections check for approval every minute and support manual refresh.
 An approved membership with previously verified email can continue without pairing
 again. Settings sync honors the saved preference after approval; waitlist connections
-cannot sync settings, submit member feedback, or use Instant Access Passes. Native
-execution still requires the approved account lease. Users can disconnect in the
-app or revoke their devices from the website's waitlist page.
+cannot sync settings, submit member feedback, or use Instant Access Passes, and can
+use local work like anyone else. Users can disconnect in the app or revoke their
+devices from the website's waitlist page.
 
 ## Trust and storage
 
@@ -73,8 +107,10 @@ app or revoke their devices from the website's waitlist page.
   API capabilities require approved membership and a previously verified email.
 - Server storage contains credential hashes, member association, random device ID,
   connection/expiry timestamps and short-lived pairing state. A member can have ten
-  active devices. Device credentials expire after 90 days; pairing expires after ten
-  minutes. The existing scheduled cleanup removes expired records.
+  active devices. Device credentials expire 90 days after they were last extended: a
+  desktop's account check extends its connection to 90 days once it has fewer than 30
+  left, so a desktop in use never has to reconnect. Pairing expires after ten minutes.
+  The existing scheduled cleanup removes expired records.
 - Revocation deletes both the device and any exchange receipt. Changing membership
   away from approved removes pending approvals and devices, preventing reactivation
   by simply restoring membership. Member deletion cascades to device records.
@@ -93,12 +129,13 @@ app or revoke their devices from the website's waitlist page.
 
 ## Deployment and acceptance
 
-Connected desktops represents profile connections, not unique physical computers.
-Isolated tests have independent credentials and local projects, so the same computer
-name can appear more than once. Restarting a profile reuses its saved connection.
-The access page groups connections with matching computer names and reported platforms
-in an expandable list, preserving each profile's details and disconnect action.
-Matching names do not establish physical device identity; unnamed connections stay separate.
+Connected desktops lists profile connections grouped by computer. Isolated tests have
+independent credentials and local projects, so one computer can hold several
+connections. Restarting a profile reuses its saved connection. The service labels the
+connections that share a machine key with the same per-response `computer` value (never
+the key itself), and the access page groups them in an expandable list, preserving each
+profile's details and disconnect action. Against an older service without the label, it
+groups by matching name and platform; unnamed connections stay separate.
 The access page distinguishes connections by a short ID, platform, app version,
 development/release build and default/isolated profile. Account checks run while
 the app is open; their timestamp does not establish human activity or task execution.
@@ -109,8 +146,17 @@ Apply `0017_device_machine.sql` before expecting one computer to share a device
 slot. Desktop connections send an opaque machine key: a hash of the platform
 machine identifier, scoped to Jackalope. The raw identifier stays on the machine.
 The ten-device limit counts distinct keys, so extra profiles, reinstalls and data
-resets on one computer share a slot. Older clients omit the key, and each of those
+resets on one computer share a slot. When a computer connects again, the exchange
+deletes that member's connections with the same key that have gone unseen for 14 days
+(an old profile, a reset, a lapsed sign-in), with their pairing receipts and skill
+holdings; live profiles keep their own. `0022_dedupe_machine_devices.sql` clears the
+duplicates already stored the same way. Older clients omit the key, and each of those
 connections still counts as its own machine.
+
+The desktop names its connection after the computer: the Computer Name from macOS
+Sharing settings, the Windows host name in its own case rather than the upper-case
+NetBIOS name, or the Linux host name. It sends no name when only `localhost` is set,
+and the app and website then show the platform instead.
 
 Apply `0015_desktop_metadata.sql` before deploying the matching Worker and website.
 Older records show unreported metadata until a compatible desktop checks in. The
@@ -127,7 +173,13 @@ invalid requests and device revocation, including a 375px layout. Fixtures send 
 emails and create no real native account sessions. Worker/D1 tests cover native
 possession, concurrent exchange/retry, origin and membership boundaries, expiry,
 polling limits, cancellation and revocation. Native tests cover DPAPI round-trip,
-tamper rejection, service binding and renderer credential exclusion.
+tamper rejection, service binding and renderer credential exclusion, that every
+account feature refuses without a current approved account, and that a local task,
+its terminal, a conversation (the `jackalope` command's path) and scheduled work run
+with no account, an expired credential, a lapsed lease or a revoked lease.
+`scripts/verification/verify-optional-account.mjs` covers the welcome actions, the
+gated Invitations view, the sidebar entry, suggestion snooze and retirement, waitlist
+progress, themes, keyboard focus and narrow layouts in a browser fixture.
 
 Apply `0004_desktop_accounts.sql` before deploying the server, then deploy the
 website and ship a reviewed desktop build. Existing accounts/sessions are preserved;
@@ -144,5 +196,6 @@ Before release, record a real invited-user trial: sign in in a separate browser
 tab, compare codes, approve, restart the desktop, verify identity, cancel an unused
 request, expire one, disconnect locally and revoke another connection on the website.
 Also exercise waitlist pairing, restart, live referral progress, clipboard failure,
-approval without re-pairing, offline recovery and revoked membership. Local D1/HTTP fixtures and native
+approval without re-pairing, offline recovery and revoked membership, and run a real
+task in a profile that continued without an account. Local D1/HTTP fixtures and native
 DPAPI tests are narrower than this deployed/installed acceptance.

@@ -61,6 +61,9 @@ saved tool permission rules remain in force. A repeated request containing the s
 denied permission name and pattern stops the attempt without asking again, including
 requests from owned child sessions. Eight denied requests also stop the attempt.
 This guard compares provider-reported scopes, not semantic equivalence between commands.
+A request a project [tool rule](PROJECT-KNOWLEDGE.md#tool-rules) blocks is rejected
+with the rule's message, which OpenCode returns to the model, and counts toward the
+eight denials.
 Unanswered and unrecognized responses stop the attempt after rejecting the action.
 Structured questions retain their choices and descriptions. Stop terminates the
 owned server/process tree. Continuation requires the original idle session and
@@ -161,6 +164,11 @@ only; it does not copy or relocate the CLI's credentials. A completed sign-in ca
 be selected for new tasks without rebinding existing attempts. Interactive
 two-account acceptance remains required before claiming provider login coverage.
 
+Local Codex turns run in a warm `codex app-server` session per live conversation and fall
+back to `codex exec` when the app-server cannot run the turn; Codex asks before leaving its
+sandbox, and those requests follow the project's permission settings (see
+[Codex app-server sessions](AGENT-QUALITY.md#codex-app-server-sessions)).
+
 Codex uses `CODEX_HOME`, Claude uses `CLAUDE_CONFIG_DIR`, and Grok uses `GROK_HOME`.
 OpenCode uses `XDG_DATA_HOME` for credentials and session data. Named OpenCode
 profiles also redirect XDG config, cache and state directories; the
@@ -230,7 +238,7 @@ give Jackalope control of the model's conversation history or built-in tools.
 | Task instructions, selected context, workspace ownership and final saved checks | Shared task runtime across native adapters. Required user/repository checks still apply. |
 | Model reasoning effort | Native flags for Codex and Claude Code, clamped to the levels measured for the selected model and omitted for models the CLI runs without effort. OpenCode requests only enabled low/medium/high variants advertised for the selected provider/model; DeepSeek Balanced requests high. Unsupported variants and absent effort preserve provider defaults. Requested effort is not proof of provider behavior. |
 | Exact result selection and recovery | Shared broker for selected on-demand connections. Codex, Claude, OpenCode and Kimi use native MCP; Grok, Antigravity and Gemini use the HTTP bridge. Explicit selections retain the captured original. These do not intercept the agent's own shell or file tools. |
-| Optional browser, desktop and coordination schemas loaded during execution | Opt-in lean OpenCode discovery, using MCP list-changed notifications. Other adapters retain existing catalogs until client refresh and permission behavior are verified. |
+| Optional browser, desktop, device, simulator and coordination schemas loaded during execution | Opt-in lean OpenCode discovery, using MCP list-changed notifications. Other adapters retain existing catalogs until client refresh and permission behavior are verified. |
 | Source-range reads | Experimental native MCP tool for Codex, Claude, OpenCode and Kimi; no equivalent new HTTP endpoints are supplied. |
 | Claude Code sessions and hooks | Claude Code streams partial text by default. Warm per-conversation processes, overload fallback, shared prompt caching, and SDK hooks for edit checks, stop-time saved checks, context delivery, permission decisions and tool timing are evaluation settings ([agent quality](AGENT-QUALITY.md#claude-code-sessions-and-hooks)). A project can turn off **Use my Claude Code setup** to skip personal settings, plugins, hooks and global MCP servers. |
 | Native test-output filtering | OpenCode shell results can omit recognized passing-test detail after saving the complete original. Failed, truncated or unsupported output remains unchanged. Native file reads and tool permissions remain intact. |

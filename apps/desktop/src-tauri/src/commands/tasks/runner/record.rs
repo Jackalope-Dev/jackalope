@@ -24,9 +24,9 @@ use std::{
 pub(in crate::commands) enum ToolEvent {
     /// The task browser opened a page.
     Visited(String),
-    /// A browser capture, saved in the workspace where the tool ran.
+    /// A browser or simulator capture, saved in the workspace where the tool ran.
     Screenshot(ScreenshotArtifact),
-    /// A browser interaction. `label` keeps each bridge route's wording.
+    /// A browser or simulator interaction. `label` keeps each bridge route's wording.
     Interaction {
         label: &'static str,
         summary: String,
@@ -58,8 +58,13 @@ pub(in crate::commands) fn record(
         ToolEvent::Screenshot(artifact) => match host {
             None => runtime.update(run_id, |run| {
                 run.screenshots.push(artifact.clone());
+                let source = if artifact.url.starts_with("simulator://") {
+                    "simulator"
+                } else {
+                    "browser"
+                };
                 run.activity
-                    .push(format!("Captured browser screenshot: {}", artifact.name));
+                    .push(format!("Captured {source} screenshot: {}", artifact.name));
             }),
             Some(computer) => {
                 runtime.update(run_id, |run| {
@@ -208,7 +213,7 @@ mod tests {
         let folder =
             std::env::temp_dir().join(format!("jackalope-record-{}", uuid::Uuid::new_v4()));
         std::fs::create_dir_all(&folder).unwrap();
-        let runtime = TaskRuntime::with_test_access(folder.join("history")).unwrap();
+        let runtime = TaskRuntime::new(folder.join("history")).unwrap();
         let shot = uuid::Uuid::new_v4().to_string();
         let relative = format!(".jackalope/artifacts/screenshots/{shot}.png");
         let mut recorded = Vec::new();

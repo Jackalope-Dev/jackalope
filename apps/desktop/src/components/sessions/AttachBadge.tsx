@@ -247,6 +247,8 @@ export function AttachBadge() {
                 'Sent to Jackalope.'
               ) : sent?.kind === 'drafted' ? (
                 'Added to your draft in Jackalope.'
+              ) : state.kept ? (
+                'Attached to this conversation'
               ) : (
                 `Waits ${state.minutesLeft} more min`
               )}

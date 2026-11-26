@@ -258,6 +258,12 @@ impl TaskRuntime {
             // project without a computer does.
             (None, None) => return Ok(None),
         };
+        // A computer that cannot build the project's Xcode targets refuses
+        // the attempt rather than running it where nothing builds.
+        let xcode = computer
+            .as_ref()
+            .filter(|_| crate::commands::agents::runs_on_computers(adapter))
+            .and_then(|computer| self.xcode_refusal(computer, req));
         let computer = match computer {
             Some(computer)
                 if !crate::commands::agents::runs_on_computers(adapter)
@@ -270,6 +276,14 @@ impl TaskRuntime {
                     computer.name,
                     computers_only_fix()
                 );
+                if current.as_ref().map(|old| &old.id) != Some(&host.id) {
+                    self.record_host(id, host);
+                }
+                self.update(id, |run| activity(run, &format!("Placement: {reason}")));
+                return Err(reason);
+            }
+            Some(_) if xcode.is_some() => {
+                let reason = xcode.unwrap_or_default();
                 if current.as_ref().map(|old| &old.id) != Some(&host.id) {
                     self.record_host(id, host);
                 }
@@ -289,6 +303,15 @@ impl TaskRuntime {
             self.record_host(id, host);
         }
         Ok(computer)
+    }
+
+    /// Why `computer` cannot take an attempt of a project that builds with
+    /// Xcode, when it is not a Mac with Xcode.
+    fn xcode_refusal(&self, computer: &Computer, req: &RunRequest) -> Option<String> {
+        let why = computers::platform::xcode_need(Path::new(&req.project_path))?;
+        let platform = computers::platform::of(&self.computers_root(), computer);
+        (!platform.builds_xcode())
+            .then(|| computers::platform::xcode_refusal(&computer.name, &platform, &why))
     }
 
     /// Saves where the attempt runs and says why in its activity.

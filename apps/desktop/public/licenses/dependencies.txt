@@ -749,6 +749,33 @@ limitations under the License.
 
 ============================================================
 
+@tanstack/react-virtual 3.14.28 (LICENSE)
+@tanstack/virtual-core 3.19.13 (LICENSE)
+
+MIT License
+
+Copyright (c) 2021-present Tanner Linsley
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+============================================================
+
 @tauri-apps/api 2.12.4 (LICENSE-APACHE-2.0)
 fdeflate 0.3.7 (LICENSE-APACHE)
 field-offset 0.3.6 (LICENSE-APACHE)
@@ -1897,8 +1924,11 @@ byteorder 1.5.0 (COPYING)
 globset 0.4.20 (COPYING)
 ignore 0.4.34 (COPYING)
 jiff 0.2.35 (COPYING)
+jiff 1.0.3 (COPYING)
 jiff-core 0.1.0 (COPYING)
+jiff-core 1.0.2 (COPYING)
 jiff-static 0.2.35 (COPYING)
+jiff-static 1.0.3 (COPYING)
 jiff-tzdb 0.1.8 (COPYING)
 jiff-tzdb-platform 0.1.3 (COPYING)
 memchr 2.8.3 (COPYING)
@@ -1918,8 +1948,11 @@ byteorder-lite 0.1.0 (LICENSE-MIT)
 globset 0.4.20 (LICENSE-MIT)
 ignore 0.4.34 (LICENSE-MIT)
 jiff 0.2.35 (LICENSE-MIT)
+jiff 1.0.3 (LICENSE-MIT)
 jiff-core 0.1.0 (LICENSE-MIT)
+jiff-core 1.0.2 (LICENSE-MIT)
 jiff-static 0.2.35 (LICENSE-MIT)
+jiff-static 1.0.3 (LICENSE-MIT)
 jiff-tzdb 0.1.8 (LICENSE-MIT)
 jiff-tzdb-platform 0.1.3 (LICENSE-MIT)
 memchr 2.8.3 (LICENSE-MIT)
@@ -1956,8 +1989,11 @@ byteorder-lite 0.1.0 (UNLICENSE)
 globset 0.4.20 (UNLICENSE)
 ignore 0.4.34 (UNLICENSE)
 jiff 0.2.35 (UNLICENSE)
+jiff 1.0.3 (UNLICENSE)
 jiff-core 0.1.0 (UNLICENSE)
+jiff-core 1.0.2 (UNLICENSE)
 jiff-static 0.2.35 (UNLICENSE)
+jiff-static 1.0.3 (UNLICENSE)
 jiff-tzdb 0.1.8 (UNLICENSE)
 jiff-tzdb-platform 0.1.3 (UNLICENSE)
 memchr 2.8.3 (UNLICENSE)
@@ -2747,7 +2783,7 @@ fixedbitset 0.4.2 (LICENSE-APACHE)
 fixedbitset 0.5.7 (LICENSE-APACHE)
 flate2 1.1.10 (LICENSE-APACHE)
 fnv 1.0.7 (LICENSE-APACHE)
-form_urlencoded 1.2.2 (LICENSE-APACHE)
+form_urlencoded 1.2.3 (LICENSE-APACHE)
 futures-lite 2.6.1 (LICENSE-APACHE)
 glob 0.3.4 (LICENSE-APACHE)
 hashbrown 0.12.3 (LICENSE-APACHE)
@@ -2846,7 +2882,7 @@ unicode-normalization 0.1.25 (LICENSE-APACHE)
 unicode-segmentation 1.13.3 (LICENSE-APACHE)
 unicode-truncate 2.0.1 (LICENSE-APACHE)
 unicode-width 0.2.3 (LICENSE-APACHE)
-url 2.5.8 (LICENSE-APACHE)
+url 2.5.9 (LICENSE-APACHE)
 uuid 1.26.1 (LICENSE-APACHE)
 version_check 0.9.5 (LICENSE-APACHE)
 wasi 0.11.1+wasi-snapshot-preview1 (LICENSE-APACHE)
@@ -6360,7 +6396,7 @@ SOFTWARE.
 
 ============================================================
 
-cookie 0.18.2 (LICENSE-APACHE)
+cookie 0.18.3 (LICENSE-APACHE)
 
 Apache License
                         Version 2.0, January 2004
@@ -6567,7 +6603,7 @@ limitations under the License.
 
 ============================================================
 
-cookie 0.18.2 (LICENSE-MIT)
+cookie 0.18.3 (LICENSE-MIT)
 
 Copyright (c) 2017 Sergio Benitez
 Copyright (c) 2014 Alex Crichton
@@ -10689,7 +10725,7 @@ SOFTWARE.
 
 ============================================================
 
-form_urlencoded 1.2.2 (LICENSE-MIT)
+form_urlencoded 1.2.3 (LICENSE-MIT)
 
 Copyright (c) 2013-2016 The rust-url developers
 
@@ -12621,7 +12657,7 @@ SOFTWARE.
 
 idna 1.1.0 (LICENSE-MIT)
 percent-encoding 2.3.2 (LICENSE-MIT)
-url 2.5.8 (LICENSE-MIT)
+url 2.5.9 (LICENSE-MIT)
 
 Copyright (c) 2013-2025 The rust-url developers
 
@@ -22883,6 +22919,32 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 ============================================================
 
+thinking-orbs 0.3.2 (LICENSE)
+
+MIT License
+
+Copyright (c) 2026 Jakub Antalik
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+============================================================
+
 time 0.3.55 (LICENSE-MIT)
 time-core 0.1.9 (LICENSE-MIT)
 time-macros 0.2.32 (LICENSE-MIT)
@@ -23547,6 +23609,27 @@ CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
 OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
 IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
+
+============================================================
+
+trash 5.4.0 (LICENSE.txt)
+
+Copyright 2019 Artúr Barnabás Kovács
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and
+associated documentation files (the "Software"), to deal in the Software without restriction,
+including without limitation the rights to use, copy, modify, merge, publish, distribute,
+sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all copies or
+substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT
+NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT
+OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 ============================================================
 
@@ -24290,6 +24373,31 @@ untrusted 0.9.0 (LICENSE.txt)
 // WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
 // ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 // OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+
+============================================================
+
+urlencoding 2.1.3 (LICENSE)
+
+© 2016 Bertram Truong
+© 2021 Kornel Lesiński
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
 
 ============================================================
 

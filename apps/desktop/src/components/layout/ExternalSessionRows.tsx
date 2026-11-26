@@ -1,5 +1,4 @@
 import { useId, useState } from 'react';
-import type { ExternalSession } from '../../lib/external-sessions';
 import { ProviderMark } from '../agents/ProviderMark';
 
 /** Rows a project shows before "Show more". */
@@ -7,15 +6,28 @@ const COLLAPSED = 3;
 /** The most a project lists; older ones stay in their CLI. */
 const EXPANDED = 25;
 
-/** A project's conversations from outside Jackalope: a quiet, read-only group under its work. */
-export function ExternalSessionRows({
+interface SessionRow {
+  key: string;
+  agent: string;
+  agentName: string;
+  title: string;
+  branch?: string | null;
+}
+
+/**
+ * A project's Claude Code and Codex conversations that are read-only until continued, in
+ * a quiet group under its work: those outside Jackalope, or those imported into it.
+ */
+export function ExternalSessionRows<Row extends SessionRow>({
+  heading,
   sessions,
   selectedKey,
   onOpen,
 }: {
-  sessions: ExternalSession[];
+  heading: string;
+  sessions: Row[];
   selectedKey: string | null;
-  onOpen: (session: ExternalSession) => void;
+  onOpen: (session: Row) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
   const headingId = useId();
@@ -25,7 +37,7 @@ export function ExternalSessionRows({
   return (
     <div className="external-sessions">
       <p id={headingId} className="external-sessions-heading">
-        Outside Jackalope
+        {heading}
       </p>
       <ul className="project-tree-items" aria-labelledby={headingId}>
         {shown.map((session) => (

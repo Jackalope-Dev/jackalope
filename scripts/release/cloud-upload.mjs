@@ -3,7 +3,7 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { compare, root, sha256 } from './catalog.mjs';
 import { validateCloudFiles } from './cloud-artifacts.mjs';
-import { application } from './crabnebula-config.mjs';
+import { application, windowsSigning } from './crabnebula-config.mjs';
 
 const releaseId = (value) => typeof value === 'string' && /^[0-9A-HJKMNP-TV-Z]{26}$/.test(value);
 export function parseDraftId(output) {
@@ -20,18 +20,24 @@ export function parseDraftId(output) {
 
 export async function uploadCandidate(
   directory,
-  { run, verifyPublisher, key, enabled, publicKey },
+  { run, verifyPublisher, key, enabled, publicKey, allowUnsignedWindows = false },
 ) {
   if (enabled !== 'true' || !key)
     throw new Error('Configure CN_API_KEY and CLOUD_DRAFT_UPLOAD_ENABLED before uploading');
-  const { receipt, installer, signature, config } = await validateCloudFiles(directory, {
-    requireCandidate: true,
-  });
+  const { receipt, installer, signature, config, authenticode } = await validateCloudFiles(
+    directory,
+    { requireCandidate: true },
+  );
   if (receipt.target !== 'windows-x86_64')
     throw new Error('Use cloud-publish.mjs for multi-platform drafts');
   if (!publicKey || config.plugins.updater.pubkey !== publicKey)
     throw new Error('Candidate updater key does not match the configured release key');
-  await verifyPublisher(resolve(directory, installer));
+  if (authenticode === 'unsigned') {
+    if (!allowUnsignedWindows)
+      throw new Error(
+        'The candidate has no Authenticode signature; set WINDOWS_AUTHENTICODE=unsigned to upload it',
+      );
+  } else await verifyPublisher(resolve(directory, installer));
   const checkpointPath = resolve(directory, 'cloud-draft.json');
   const receiptHash = sha256(await readFile(resolve(directory, 'receipt.json')));
   let checkpoint;
@@ -138,6 +144,7 @@ if (import.meta.main) {
     key: process.env.CN_API_KEY,
     enabled: process.env.CLOUD_DRAFT_UPLOAD_ENABLED,
     publicKey: process.env.TAURI_UPDATER_PUBLIC_KEY,
+    allowUnsignedWindows: windowsSigning(process.env) === 'unsigned',
     verifyPublisher: (file) =>
       execFileSync(
         'pwsh',

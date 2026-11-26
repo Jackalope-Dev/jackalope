@@ -122,7 +122,6 @@ pub async fn evaluate(
     if policy.mode != DecisionMode::Jev {
         return Ok(None);
     }
-    runtime.access.ensure()?;
     jev::check_request_size(payload)?;
     let decision_options = super::options::options(runtime, project)?;
     if matches!(

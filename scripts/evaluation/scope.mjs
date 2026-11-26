@@ -18,6 +18,14 @@ export async function checkScope(fixture, workspace) {
         const relative = prefix + name;
         const target = path.join(directory, name);
         const stat = await lstat(target);
+        // Jackalope creates this Git-excluded folder, empty, in every task workspace.
+        if (
+          !prefix &&
+          name === '.jackalope' &&
+          stat.isDirectory() &&
+          !(await readdir(target)).length
+        )
+          continue;
         if (stat.isSymbolicLink()) errors.push(`Unexpected symbolic link: ${relative}`);
         else if (stat.isDirectory()) {
           if (![...allowed].some((file) => file.startsWith(`${relative}/`)))

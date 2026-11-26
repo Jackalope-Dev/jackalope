@@ -73,6 +73,9 @@ tool-only measurements; these omit worker execution and cannot establish task sa
 - Bridged tasks carry a one-line reporting contract: the first message restates the goal,
   problem and smallest expected change through `restate_goal`, then work continues without
   waiting. It is reporting, not working-style advice; review shows it as "Understood as".
+  Small, fully specified tasks skip it (`goal-restatement=scoped`, the default): a request
+  of up to 800 characters with no requirements, workflow inputs or thorough approach. Its
+  extra turn made those tasks measurably slower without changing their outcomes.
 - Managed workers batch independent reads/searches where supported, reuse established
   context and keep progress concise. Repository-required checks remain mandatory;
   changes, failures and unresolved concerns justify additional verification.
@@ -357,7 +360,10 @@ The quality runner accepts per-variant `--after-task-approach=scoped`,
 captured MCP responses; `--after-result-preview=on` also bounds large
 unselected responses while keeping the complete source recoverable. Preview
 requires result queries. `--after-initial-tools=small` measures eager delivery of
-a complete bounded catalog. Keep these controls explicit in saved comparisons.
+a complete bounded catalog. `--after-goal-restatement=separate` restates every task;
+`batched` asks for the restatement in the same turn as the first file reads instead of a
+turn of its own; `scoped`, the default, skips it for small, fully specified tasks.
+Keep these controls explicit in saved comparisons.
 Authored multi-source join cases can be generated with
 `node scripts/evaluation/pipeline-cases.mjs <suite.json>`. The name identifies the
 fixture family, not an available agent tool. Both sizes are screening fixtures.
@@ -663,6 +669,7 @@ user setting or proof of a faster workflow.
 | `JACKALOPE_INITIAL_TOOLS=small` | Attempts discovery for up to three seconds before launch. Supplies a complete catalog only when it has at most four tools and 6 KB of metadata; other catalogs retain on-demand discovery. Initialization time and broker searches remain in the measurements. |
 | `JACKALOPE_CONTEXT_READ=on` | Exposes bounded source ranges and ranked symbol locations. Previously read block hashes can omit unchanged text; callers must retain that text in context. Explicitly requested blocks are not reranked away. |
 | `JACKALOPE_JEV_ASSISTANCE=shadow` | Records configured relevance/review assessments without changing selected context or suppressing monitors. Source candidate ranking is shadow-only. Existing Jev settings and credentials are required. |
+| `JACKALOPE_CODEX_TRANSPORT=exec` | Runs every Codex turn as `codex exec --json` with `approval_policy="never"`. `app-server` (default) runs local Codex turns in one warm `codex app-server` per live conversation; see [Codex app-server sessions](#codex-app-server-sessions). Agents on a computer always use `exec`. |
 | `JACKALOPE_CLAUDE_SESSION=oneshot` | Starts a Claude Code process per message and continues with `--resume`. `persistent` (default) runs Claude Code over the stream-json control protocol and keeps one warm process per live conversation; see [Claude Code sessions and hooks](#claude-code-sessions-and-hooks). |
 | `JACKALOPE_CLAUDE_ISOLATION=on` | Adds `--strict-mcp-config --setting-sources project,local` to Claude Code tasks, so personal settings, plugins, hooks and global MCP servers do not load. A project's **Use my Claude Code setup** choice overrides this default either way. |
 | `JACKALOPE_CLAUDE_PARTIALS=off` | Disables the default `--include-partial-messages`. Streamed text is held in memory for the terminal view and records `firstTokenMs`; saved results and activity are unchanged. |
@@ -698,7 +705,11 @@ when the process started remain registered for later turns, which answer with no
 decision when a check does not apply. Edit checks run the project's `editCheck`
 command (`{file}` becomes the quoted workspace path; paths needing more escaping skip
 the check) for up to 60 seconds; set it as **Check after each edit** in the
-project's checks settings. On bridged tasks an always-registered `PostToolUse` callback
+project's checks settings. A `PreToolUse` callback for Bash, PowerShell, Write, Edit,
+MultiEdit and NotebookEdit is always registered and checks the project's
+[tool rules](PROJECT-KNOWLEDGE.md#tool-rules): a block answers `permissionDecision:
+"deny"`, a warning returns `additionalContext` with no decision, and a call no rule
+matches gets `{}`. On bridged tasks an always-registered `PostToolUse` callback
 delivers answers to questions that returned pending, once, as `additionalContext`; an
 answer `user_response` already returned is not repeated.
 
@@ -729,6 +740,53 @@ Compare one control at a time, for example `--before-claude-stop-check=off`, so
 both arms share the persistent transport, and turn off `claude-fallback` when
 comparing models. Fixture tests use a protocol stand-in and do not establish
 installed Claude Code behavior.
+
+### Codex app-server sessions
+
+A local Codex turn starts `codex app-server --listen stdio://` with the same program,
+environment and `-c` overrides `codex exec` would get, except the settings a turn passes
+through the protocol: `initialize`, then `thread/start` (or `thread/resume` with the saved
+thread ID, which is the ID `codex exec` reports) with the workspace, sandbox
+(`workspace-write`, or `read-only` for plan sessions) and approval policy (`on-request`,
+or `never` for plan sessions), then `turn/start` with the turn's model, reasoning effort
+and service tier. Standard speed sends the `default` tier; Fast keeps
+`features.fast_mode=true` on the process. Notifications of the turn are translated into
+the `codex exec --json` events the transcript already reads (agent, command, file change,
+MCP, web search and reasoning items, `turn.completed` usage summed from the turn's
+`thread/tokenUsage/updated` notifications, `error` and `turn.failed` with Codex's error
+kind as `code`); agent message deltas stream like Claude's partial messages.
+
+Approval requests (`item/commandExecution/requestApproval`,
+`item/fileChange/requestApproval`, `item/permissions/requestApproval` and confirmation-only
+`mcpServer/elicitation/request`) go through the project's saved permission rules, its
+auto-approval setting and then a question on the attempt. A command is assessed as the
+script inside Codex's shell wrapper; a file change by the paths its item reported. Plan
+sessions deny every request, and forms Jackalope cannot fill are declined. A question
+Codex settles itself (`serverRequest/resolved`) closes without an answer, and a declined
+command shows as declined, with Codex's reason when it gave one. Each model call's input
+tokens and Codex's `modelContextWindow` are recorded as the run's `context`.
+
+Processes are parked like Claude Code's: keyed by thread ID and a fingerprint of the
+command, environment, plan mode and which of model, effort and tier the turn sets (Codex
+keeps those for later turns of a loaded thread). A stop sends `turn/interrupt` and ends the
+process tree if the turn has not settled within five seconds; a cleanly interrupted
+process stays warm. Quitting kills it at once. While a turn runs, `TaskRun.steerable` is
+set and a live conversation's **Send now** adds the message with `turn/steer`; when the
+turn cannot take it the message is sent after stopping the turn, as before. Rolling back or
+forking a thread reserves it and its workspace under the runtime lock, so no turn can
+start there until the change finishes. A fork shuts its app-server down by closing its
+input, because Codex 0.156.1 keeps a thread it loaded locked against other app-servers
+("already has an active writer") for minutes after the process is killed; the rewind's
+next turn then opens the forked thread in a new process.
+
+A turn that cannot start in the app-server (a process that exits, an `initialize`,
+`thread/start` or `turn/start` error, or an `unknown variant` for a method an older Codex
+lacks) runs as `codex exec` and says why in activity; `efficiency.codexTransport` is then
+`exec`, otherwise `started`, `resumed` or `reused`. `thread/resume` refusing an unknown
+thread (`no rollout found`) starts the conversation over once, as other refusals do.
+Protocol details were recorded from Codex 0.156.1 (`codex app-server generate-json-schema
+--out <dir>` prints the schema of the installed version); the tests replay those
+recordings and a stand-in process, which do not establish installed-app behavior.
 
 `node scripts/evaluation/assistance.mjs receipts.json labels.json report.json`
 compares retained decision receipts with independent labels containing `recordId`,

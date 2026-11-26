@@ -23,9 +23,12 @@ mod browser;
 pub(crate) mod credentials;
 pub(crate) mod docker;
 pub(crate) mod image;
+pub(crate) mod mac;
+pub(crate) mod platform;
 pub(crate) mod policy;
 pub(crate) mod pool;
 pub(crate) mod protocol;
+pub(crate) mod provider_proxy;
 pub(crate) mod relay;
 pub(crate) mod remote;
 pub(crate) mod runner;
@@ -946,6 +949,7 @@ macro_rules! tauri_commands {
             commands::computers::computer_machine_add,
             commands::computers::computer_machine_test,
             commands::computers::computer_machine_remove,
+            commands::computers::computer_mac_setup,
             commands::computers::computer_agent_credentials,
             commands::computers::computer_set_agent_credential,
             commands::computers::computer_agent37,
@@ -1252,7 +1256,23 @@ pub async fn computer_machine_test(
         }
     })
     .await?;
-    Ok(remote::health(&machine.url, &token).await)
+    let health = remote::health(&machine.url, &token).await;
+    if let Some(platform) = health.platform.clone() {
+        blocking(move || remote::learn(&root, &machine.id, &platform)).await?;
+    }
+    Ok(health)
+}
+
+/// Writes the setup script for a Mac with this version's agent and returns
+/// its path, for the person to copy to the Mac.
+#[tauri::command]
+pub async fn computer_mac_setup(state: tauri::State<'_, TaskRuntime>) -> Result<String, String> {
+    let root = state.computers_root();
+    blocking(move || {
+        let path = mac::write(&root, &image_directory()?)?;
+        Ok(path.to_string_lossy().into_owned())
+    })
+    .await
 }
 
 #[tauri::command]
