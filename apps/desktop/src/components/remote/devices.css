@@ -250,16 +250,21 @@
   font-size: var(--text-lg);
   font-weight: 600;
 }
+/* The dot sits inline with the first word, so wrapped status text stays centred with it. */
 .devices-hub-status {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
+  display: block;
+  max-width: 100%;
+  text-align: center;
+  text-wrap: balance;
   color: var(--color-text-secondary);
   font-size: var(--text-xs);
 }
 .devices-hub-dot {
+  display: inline-block;
   width: 8px;
   height: 8px;
+  margin-right: 6px;
+  vertical-align: 0.05em;
   border-radius: var(--radius-full);
   background: var(--color-text-muted);
 }
