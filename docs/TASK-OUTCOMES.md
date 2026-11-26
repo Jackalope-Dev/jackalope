@@ -53,13 +53,15 @@ latest one as "Safe because".
 ### Goal restatement
 
 Every bridged task launch carries a one-line reporting contract
-(`outcomes::RESTATEMENT_CONTRACT`): the agent's first message restates the goal, the
+(`outcomes::RESTATEMENT_CONTRACT`) unless the task is small and fully specified (a
+request of up to 800 characters with no requirements, workflow inputs or Thorough
+effort), where the request already says what it is: the agent's first message restates the goal, the
 problem and the smallest change it expects to make, records it once with `restate_goal`
 (HTTP `POST /v1/goal-restatement` with `goal`, `problem`, `smallestChange`), then
 continues without waiting for confirmation. Each field is whitespace-collapsed and
 limited to 400 bytes; a later call replaces the earlier one. The task page shows it as
 "Understood as" so a misread is visible while work runs. Tasks without a restatement,
-including all earlier history, show nothing.
+including small, fully specified tasks and all earlier history, show nothing.
 
 ## Read the decision trail
 

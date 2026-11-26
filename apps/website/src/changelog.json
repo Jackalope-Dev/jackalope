@@ -1,5 +1,14 @@
 [
   {
+    "id": "small-tasks-finish-sooner",
+    "date": "2026-11-25",
+    "title": "Small tasks finish sooner.",
+    "description": "Short, fully specified requests now skip the agent's opening restatement turn, so they finish faster with the same results.",
+    "items": [
+      "Bigger or open-ended tasks still show Understood as, the agent's restatement of the goal, while work runs."
+    ]
+  },
+  {
     "id": "long-conversations-stay-fast",
     "date": "2026-11-25",
     "title": "Long conversations stay fast.",
