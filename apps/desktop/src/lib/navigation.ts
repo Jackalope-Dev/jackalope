@@ -115,11 +115,11 @@ export const WORKSPACE_VIEWS = [
   {
     id: 'remote-hosts',
     label: 'Devices',
-    description: 'Use other computers from here, or let a phone or another computer use this one.',
+    description: 'Pair your phone and other computers, and the cloud machines bots and tasks use.',
     icon: MonitorSmartphone,
     group: 'hosts',
     feature: 'connections',
-    keywords: 'hosts remote access phone companion pair pairing SSH Tailscale',
+    keywords: 'hosts remote access phone companion pair pairing SSH Tailscale cloud machine',
   },
   {
     id: 'project-overview',

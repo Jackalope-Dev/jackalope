@@ -1,0 +1,332 @@
+/* The Devices map: this computer as a hub, paired devices as rows of fixed height on either
+   side, joined by a bus line per group and a spoke into the hub. Links are solid accent
+   when the connection is set up and dashed when it isn't; no line implies a device is online. */
+.devices-map-frame {
+  container-type: inline-size;
+}
+.devices-map {
+  --devices-row: 52px;
+  --devices-stub: 18px;
+  --devices-spoke: 36px;
+  --devices-line: color-mix(in oklab, var(--color-accent) 70%, transparent);
+  --devices-line-off: color-mix(in srgb, var(--color-text-muted) 45%, transparent);
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(200px, 240px) minmax(0, 1fr);
+  column-gap: var(--devices-spoke);
+  align-items: center;
+  padding: 28px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-2xl);
+  background:
+    radial-gradient(60% 80% at 50% 50%, var(--color-accent-subtle), transparent 70%),
+    var(--color-surface-sunken);
+  overflow: hidden;
+}
+.devices-map-side {
+  display: grid;
+  gap: 20px;
+}
+.devices-map-group {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+.devices-map-heading {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.devices-map-list {
+  position: relative;
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+/* Rows step in from the bus so their stubs have room. */
+.devices-map-group[data-side="in"] .devices-map-list {
+  padding-inline-end: var(--devices-stub);
+}
+.devices-map-group[data-side="out"] .devices-map-list {
+  padding-inline-start: var(--devices-stub);
+}
+/* The bus: a vertical line through the middle of the first and last rows. */
+.devices-map-list::before {
+  content: "";
+  position: absolute;
+  top: calc(var(--devices-row) / 2);
+  bottom: calc(var(--devices-row) / 2);
+  width: 0;
+  border-inline-start: 2px solid var(--devices-line);
+}
+.devices-map-group[data-side="in"] .devices-map-list::before {
+  right: 0;
+}
+.devices-map-group[data-side="out"] .devices-map-list::before {
+  left: 0;
+}
+/* The spoke from the bus into the hub. */
+.devices-map-list::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  width: var(--devices-spoke);
+  height: 0;
+  border-top: 2px solid var(--devices-line);
+}
+.devices-map-group[data-side="in"] .devices-map-list::after {
+  left: 100%;
+}
+.devices-map-group[data-side="out"] .devices-map-list::after {
+  right: 100%;
+}
+
+.devices-node {
+  position: relative;
+  min-width: 0;
+}
+/* Each row's stub to the bus. */
+.devices-node::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  width: var(--devices-stub);
+  height: 0;
+  border-top: 2px solid var(--devices-line);
+}
+.devices-map-group[data-side="in"] .devices-node::after {
+  left: 100%;
+}
+.devices-map-group[data-side="out"] .devices-node::after {
+  right: 100%;
+}
+.devices-map-group[data-link="off"] .devices-map-list::before,
+.devices-map-group[data-link="off"] .devices-map-list::after,
+.devices-map-group[data-link="off"] .devices-node::after {
+  border-style: dashed;
+  border-color: var(--devices-line-off);
+}
+.devices-node-card {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  height: var(--devices-row);
+  padding: 0 12px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-elevated);
+  box-shadow: var(--shadow-surface);
+  color: var(--color-text-primary);
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+  transition:
+    border-color var(--motion-fast) var(--ease-out),
+    translate var(--motion-base) var(--ease-out);
+}
+.devices-node-card:hover {
+  border-color: color-mix(in oklab, var(--color-accent) 45%, var(--color-border));
+}
+.devices-map-group[data-side="in"] .devices-node-card:hover {
+  translate: 2px 0;
+}
+.devices-map-group[data-side="out"] .devices-node-card:hover {
+  translate: -2px 0;
+}
+.devices-node-card:focus-visible {
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: 2px;
+}
+.devices-node-icon {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: var(--radius-full);
+  background: var(--color-accent-subtle);
+  color: var(--color-accent-ink);
+}
+.devices-node-text {
+  display: grid;
+  min-width: 0;
+}
+.devices-node-title,
+.devices-node-detail {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.devices-node-title {
+  font-size: var(--text-sm);
+  font-weight: 500;
+}
+.devices-node-detail {
+  color: var(--color-text-secondary);
+  font-size: var(--text-xs);
+}
+/* The place for the next device: dashed until something is arriving. */
+.devices-slot {
+  border-style: dashed;
+  border-color: color-mix(in oklab, var(--color-accent) 35%, var(--color-border));
+  background: color-mix(in oklab, var(--color-surface-elevated) 60%, transparent);
+  box-shadow: none;
+  color: var(--color-text-secondary);
+}
+.devices-slot .devices-node-icon {
+  background: transparent;
+  border: 1px dashed color-mix(in oklab, var(--color-accent) 45%, transparent);
+}
+.devices-slot[data-busy] {
+  border-style: solid;
+  color: var(--color-text-primary);
+}
+.devices-slot[data-busy] .devices-node-icon {
+  border-color: transparent;
+}
+.devices-slot:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+.devices-more {
+  height: 28px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: var(--color-accent-ink);
+  font: inherit;
+  font-size: var(--text-xs);
+  font-weight: 500;
+  cursor: pointer;
+}
+.devices-more:hover {
+  background: var(--color-accent-subtle);
+}
+/* Rows of the "more" link are shorter, so they keep no stub. */
+.devices-node:has(.devices-more)::after {
+  display: none;
+}
+
+.devices-hub {
+  position: relative;
+  z-index: 0;
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  padding: 24px 16px 20px;
+  border: 1px solid color-mix(in oklab, var(--color-accent) 30%, var(--color-border-subtle));
+  border-radius: var(--radius-2xl);
+  background: var(--color-surface-elevated);
+  box-shadow: var(--shadow-surface);
+  text-align: center;
+  isolation: isolate;
+}
+.devices-hub-glow {
+  position: absolute;
+  inset: -40%;
+  z-index: -1;
+  background: radial-gradient(closest-side, var(--color-accent-glow), transparent);
+  opacity: 0.5;
+  pointer-events: none;
+}
+.devices-hub[data-state="off"] .devices-hub-glow {
+  opacity: 0.2;
+}
+.devices-hub-mark {
+  display: block;
+  width: 88px;
+  height: 88px;
+  color: var(--color-accent);
+}
+.devices-hub-title {
+  font-size: var(--text-lg);
+  font-weight: 600;
+}
+.devices-hub-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--color-text-secondary);
+  font-size: var(--text-xs);
+}
+.devices-hub-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-full);
+  background: var(--color-text-muted);
+}
+.devices-hub[data-state="on"] .devices-hub-dot {
+  background: var(--color-success);
+}
+.devices-hub[data-state="error"] .devices-hub-dot {
+  background: var(--color-danger);
+}
+.devices-hub-error {
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  color: var(--color-text-secondary);
+  font-size: var(--text-xs);
+  overflow-wrap: anywhere;
+}
+.devices-map-note {
+  grid-column: 1 / -1;
+  display: inline-flex;
+  align-items: center;
+  justify-self: center;
+  gap: 6px;
+  margin: 20px 0 0;
+  color: var(--color-text-secondary);
+  font-size: var(--text-xs);
+}
+.devices-panels {
+  scroll-margin-top: 16px;
+}
+.devices-empty {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+}
+.devices-connect-form {
+  position: relative;
+  border-radius: var(--radius-xl);
+}
+
+/* Narrow panes stack the hub above its groups and drop the drawn links. */
+@container (max-width: 720px) {
+  .devices-map {
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: 20px;
+  }
+  .devices-hub {
+    order: -1;
+  }
+  .devices-map-list::before,
+  .devices-map-list::after,
+  .devices-node::after {
+    display: none;
+  }
+  .devices-map-group[data-side] .devices-map-list {
+    padding-inline: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .devices-node-card {
+    transition: none;
+  }
+  .devices-node-card:hover {
+    translate: none;
+  }
+}

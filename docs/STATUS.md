@@ -919,6 +919,8 @@ Which product scopes Connect Cloudflare grants, and provisioning against a live 
 not yet accepted.
 
 Trusted hosts and a responsive phone companion are implemented for native validation.
+Devices opens on a map of this computer with the phones and computers paired to use it, the
+computers it uses and its cloud machines, each leading to its setup below.
 Devices → Let devices use this one scopes paired devices to selected projects. Before it is on, every
 project starts selected and Pair a phone turns access on and creates the code in one step. A separate loopback
 API supports task status, questions, follow-ups, new isolated sessions and change review.

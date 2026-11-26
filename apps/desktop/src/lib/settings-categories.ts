@@ -192,8 +192,8 @@ export const SETTINGS_CATEGORIES = [
     group: 'Account & devices',
     icon: MonitorSmartphone,
     page: 'remote-hosts',
-    summary: 'Use other computers from here, or let a phone or another computer use this one.',
-    keywords: 'remote access hosts phone companion SSH pairing pair Tailscale device',
+    summary: 'Pair your phone and other computers, and the cloud machines bots and tasks use.',
+    keywords: 'remote access hosts phone companion SSH pairing pair Tailscale device cloud machine',
   },
   {
     id: 'Privacy',
