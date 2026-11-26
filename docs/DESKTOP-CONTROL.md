@@ -108,8 +108,10 @@ action (one window's geometry, for the badge and edge) run without a grant, like
 
 Dropping or choosing asks whether the agent may see the window or see and control it.
 Confirming stages that window for the conversation for 30 minutes. The conversation's
-next window-scope `request_access` takes it once instead of asking, if the handle,
-process and process start time still match; app and desktop requests ignore it. A run
+next window-scope `request_access` takes it instead of asking, if the handle, process and
+process start time still match; app and desktop requests ignore it. When that turn ends
+the window goes back to the conversation with the same control and site, and from then on
+it stays attached for every later turn until the person detaches it or the window closes. A run
 outside a conversation looks for a window staged under its task id. The grant then
 starts at once through the same path as an answered question, with the visible bar, pause and
 cancel behavior and site checks above, and is recorded as an answered "Desktop control"

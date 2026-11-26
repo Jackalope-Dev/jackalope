@@ -957,8 +957,8 @@ does not pause control there, and wlroots desktops without RemoteDesktop remain
 unavailable. The portal client compiles only in Linux CI and has no real-portal
 fixture. XWayland alone is insufficient. A person can attach a window to a conversation, or
 to new work before Send, by dragging its agent onto it (Windows and macOS) or picking it
-from a list, choosing see-only or see-and-control; the agent's next window request uses it
-without asking. On Windows and macOS the window wears a badge and edge while it waits, and a
+from a list, choosing see-only or see-and-control; the agent's window requests use it without asking
+for the rest of the conversation, until it is detached. On Windows and macOS the window wears a badge and edge while it waits, and a
 turn that ends while its grant is paused leaves a Resume button there that continues the
 conversation. Pointer and keyboard input reach a granted window in the background on
 Windows and macOS, except Safari, Firefox-family and UWP/WinUI windows and, on Windows,

@@ -556,7 +556,7 @@ export function WindowGlob({
           <button
             type="button"
             className="window-glob-attached-name"
-            title={`${attached.title} · waits ${attached.minutesLeft} more min. Click to show it.`}
+            title={`${attached.title} · ${attached.kept ? 'attached to this conversation' : `waits ${attached.minutesLeft} more min`}. Click to show it.`}
             onClick={() => {
               globLog(`revealing the attached ${attached.app} window`);
               void revealAttached(conversation).catch(() => undefined);

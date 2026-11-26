@@ -190,6 +190,9 @@ struct Access {
     /// An attached browser window whose address couldn't be read when it was attached:
     /// the first site seen in it is the one the person attached.
     unread_site: Option<Window>,
+    /// The attachment this attempt's grant came from, handed back to the conversation
+    /// when the attempt ends.
+    attached: Option<attach::Staged>,
 }
 
 /// A failed desktop call. `Ended` also closes the attempt's desktop session:
@@ -327,9 +330,10 @@ fn start_janitor() {
     });
 }
 
-/// Ends an attempt's desktop access. A window grant still waiting for Resume in a
-/// conversation is left on the window as an attachment whose badge offers Resume, so the
-/// person can pick up from there instead of typing that they will.
+/// Ends an attempt's desktop access. A window the person attached goes back to its
+/// conversation for the next turn, and stays attached until they detach it. A window grant
+/// still waiting for Resume in a conversation is left on the window as an attachment whose
+/// badge offers Resume, so the person can pick up from there instead of typing that they will.
 pub fn attempt_ended(id: &str) {
     let session = sessions()
         .lock()
@@ -348,8 +352,33 @@ pub fn attempt_ended(id: &str) {
                 });
             waiting.then_some((window, !grant.read_only))
         });
+        let attached = session
+            .access
+            .try_lock()
+            .ok()
+            .and_then(|access| access.attached.clone());
         let origin = session.origin.lock().ok().and_then(|origin| origin.clone());
-        if let (Some((window, control)), Some((conversation, provider))) = (paused, origin) {
+        let kept = match (attached, &origin) {
+            (Some(attached), Some((conversation, provider))) => Some(attach::keep(
+                conversation,
+                attached,
+                provider,
+                paused.is_some(),
+            )),
+            _ => None,
+        };
+        if let Some(staged) = kept {
+            attach::overlay::trace(format_args!(
+                "kept the attached window for the conversation"
+            ));
+            if let Some(app) = indicator::app() {
+                std::thread::spawn(move || {
+                    if attach::badge::supported() {
+                        attach::badge::open(&app, &staged);
+                    }
+                });
+            }
+        } else if let (Some((window, control)), Some((conversation, provider))) = (paused, origin) {
             let staged = attach::offer_resume(&conversation, window, control, &provider);
             attach::overlay::trace(format_args!("left a paused grant for Resume on the window"));
             if let Some(app) = indicator::app() {
@@ -719,6 +748,7 @@ impl Call<'_> {
             &staged,
         ))?;
         let title: String = staged.window.title.chars().take(80).collect();
+        self.access.attached = Some(staged.clone());
         // Attaching the window, and choosing what the agent may do with it, was the person's
         // answer, so control begins at once rather than waiting for Resume on the bar.
         self.activate(Choice::Window(staged.window), None, true)?;
@@ -855,6 +885,9 @@ impl Call<'_> {
                     && target.started == window.started
             });
             if same {
+                if let Some(attached) = self.access.attached.as_mut() {
+                    attached.site = attach::AttachSite::Host(host.clone());
+                }
                 self.allow_attached_site(&host)?;
             }
         }
