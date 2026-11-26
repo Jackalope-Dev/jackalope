@@ -322,8 +322,9 @@
 .live-composer-actions > [aria-label="Attach files"] {
   margin-right: auto;
 }
-:where(.live-session-detached) .live-composer-actions > button {
-  flex: 1;
+/* In the narrow pop-out window, long text actions such as "Stop and send" may wrap; icons,
+   the effort picker and Send keep their own size. */
+:where(.live-session-detached) .live-composer-actions > .ui-button[data-variant="outline"] {
   min-width: 0;
   white-space: normal;
   padding-inline: 8px;
