@@ -1,5 +1,5 @@
 {
-  "date": "2026-09-17",
+  "date": "2026-11-25",
   "environment": {
     "system": "Windows 11 Home 10.0.26200",
     "processor": "AMD Ryzen 5 9600X (6 cores)",
@@ -8,10 +8,84 @@
     "cli": "codex-cli 0.155.0-alpha.2.6",
     "effort": "medium (Balanced)",
     "requestedSpeed": "Inherited CLI default; delivered service tier not independently established",
-    "scope": "One local machine; provider caches and remote service load not controlled"
+    "scope": "One local machine; provider caches and remote service load not controlled",
+    "November rerun": "macOS 27.2.1, Apple M5 Pro (15 cores), Node 26.10.0, codex-cli 0.156.1, GPT-6 Astra, medium (Balanced)"
   },
-  "agentTrials": 160,
+  "agentTrials": 178,
   "comparisons": [
+    {
+      "id": "november-rerun",
+      "title": "November rerun with the current default",
+      "detail": "The final verification workflow comparison, rerun on 2026-11-25 with the current default, which skips the goal restatement for small, fully specified tasks. Same three fixtures, three repetitions each, matched model, effort and limits. Measured on a Mac with a newer Codex CLI than the September runs below, which stay as published; the native CLI changed too. The 95% intervals for both changes in the downloadable data include zero: a narrower gap on this suite, not a general speed or cost claim.",
+      "report": {
+        "model": "gpt-6-astra",
+        "cliVersion": "codex-cli 0.156.1",
+        "baseline": "direct",
+        "candidate": "after",
+        "totals": {
+          "direct": {
+            "trials": 9,
+            "oraclePassed": 9,
+            "totalTokens": 725319,
+            "inputTokens": 721562,
+            "outputTokens": 3757,
+            "cachedInputTokens": 622976,
+            "elapsedMs": 282328,
+            "promptBytes": 3609,
+            "medianElapsedMs": 30224,
+            "measuredTokenTrials": 9,
+            "mcpReceivedBytes": null,
+            "mcpDeliveredBytes": null,
+            "expansionReads": null
+          },
+          "after": {
+            "trials": 9,
+            "oraclePassed": 9,
+            "totalTokens": 788649,
+            "inputTokens": 782989,
+            "outputTokens": 5660,
+            "cachedInputTokens": 682368,
+            "elapsedMs": 290704,
+            "promptBytes": 49329,
+            "medianElapsedMs": 28725,
+            "measuredTokenTrials": 9,
+            "mcpReceivedBytes": null,
+            "mcpDeliveredBytes": null,
+            "expansionReads": null
+          }
+        },
+        "cases": ["csv-cell", "design-tokens", "scheduler-fix"],
+        "metrics": {
+          "totalTokens": {
+            "reductionPercent": -8.731330628316636,
+            "interval": {
+              "low": -20.426568186683802,
+              "high": 12.411732286176846,
+              "method": "95% case-cluster bootstrap, 2000 deterministic resamples; descriptive for this suite only"
+            },
+            "eligibleForPilotSignal": false,
+            "eligibleForScopedClaim": false
+          },
+          "elapsedMs": {
+            "reductionPercent": -2.96676206398232,
+            "interval": {
+              "low": -25.786889643027912,
+              "high": 14.241749174917494,
+              "method": "95% case-cluster bootstrap, 2000 deterministic resamples; descriptive for this suite only"
+            },
+            "eligibleForPilotSignal": false,
+            "eligibleForScopedClaim": false
+          }
+        },
+        "blockers": [],
+        "toolPayload": {
+          "reductionPercent": null,
+          "eligibleForPilotSignal": false,
+          "eligibleForScopedClaim": false,
+          "scope": "Serialized MCP result bytes received versus returned inside Jackalope, including expansion reads. Excludes schemas, discovery, prompts, coordination and provider truncation. Not an end-to-end token or cost reduction."
+        }
+      }
+    },
     {
       "id": "initial-baseline",
       "title": "Initial coordinator baseline",
