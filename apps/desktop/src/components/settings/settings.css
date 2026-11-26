@@ -165,21 +165,25 @@
   overscroll-behavior: contain;
   overflow-wrap: anywhere;
 }
-/* Toggle groups marked data-settings-tile sit two to a row on wide panes, so short cards use
-   the width instead of stacking into one long column; anything unmarked spans the row. The
-   grid gap replaces the stacked margins. */
+/* Groups marked data-settings-tile flow into two columns on wide panes, each card stacking
+   straight under the one above, so cards of different heights leave no gaps; anything
+   unmarked spans both columns. Reading and focus order run down the first column, then the
+   second. */
 @container (min-width: 52rem) {
   .settings-section:has(> [data-settings-tile]) {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 16px;
-    align-items: start;
-  }
-  .settings-section:has(> [data-settings-tile]) > :not([data-settings-tile]) {
-    grid-column: 1 / -1;
+    columns: 2;
+    column-gap: 16px;
   }
   .settings-section:has(> [data-settings-tile]) > * {
     margin-top: 0;
+    margin-bottom: 16px;
+    break-inside: avoid;
+  }
+  .settings-section:has(> [data-settings-tile]) > :not([data-settings-tile]) {
+    column-span: all;
+  }
+  .settings-section:has(> [data-settings-tile]) > :last-child {
+    margin-bottom: 0;
   }
 }
 .settings-input {

@@ -20,17 +20,51 @@
   .ui-search-field .ui-search-input {
     width: 100%;
     padding-left: 40px;
-    padding-right: 48px;
+    padding-right: 40px;
   }
   .ui-search-input::-webkit-search-cancel-button {
     appearance: none;
   }
-  .ui-search-clear {
+  /* A small round mark inside the field rather than a second button beside it. The button
+     keeps the app's minimum hit area; only the 24px circle behind the icon shows. */
+  .ui-search-field .ui-search-clear {
     position: absolute;
-    right: 0;
+    right: 2px;
     top: 50%;
     transform: translateY(-50%);
-    color: var(--color-text-secondary);
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    border: 0;
+    border-radius: var(--radius-full, 999px);
+    background: transparent;
+    background-image: none;
+    box-shadow: none;
+    color: var(--color-text-muted);
+    isolation: isolate;
+  }
+  .ui-search-field .ui-search-clear::before {
+    content: "";
+    position: absolute;
+    inset: 50% auto auto 50%;
+    width: 24px;
+    height: 24px;
+    translate: -50% -50%;
+    border-radius: var(--radius-full, 999px);
+    background: transparent;
+    z-index: -1;
+    transition: background-color var(--motion-fast, 120ms);
+  }
+  .ui-search-field .ui-search-clear:hover {
+    background: transparent;
+    color: var(--color-text-primary);
+  }
+  .ui-search-field .ui-search-clear:hover::before {
+    background: var(--color-surface-hover);
+  }
+  .ui-search-field .ui-search-clear svg {
+    width: 14px;
+    height: 14px;
   }
   .ui-search-clear:active {
     transform: translateY(-50%);
