@@ -16,6 +16,12 @@ export interface LibraryFile {
 
 export type LibraryKind = 'screenshots' | 'images' | 'files';
 
+/** What `library_files_trash` moved, and why the first file that stayed could not go. */
+export interface TrashResult {
+  trashed: string[];
+  error: string | null;
+}
+
 /** Where an item came from, as its tile names it. */
 type Origin = 'screenshot' | 'desktop' | 'review' | 'output' | 'attachment' | 'changed';
 
@@ -49,6 +55,9 @@ export const OPENABLE = new Set([
   ...IMAGE_EXTENSIONS,
   ...['pdf', 'txt', 'md', 'json', 'csv', 'log', 'html', 'htm'],
 ]);
+
+/** Files a task changed in the repository belong to the project, so only Jackalope's own go. */
+export const canTrash = (item: LibraryItem) => item.origin !== 'changed';
 
 export function extension(name: string) {
   const dot = name.lastIndexOf('.');

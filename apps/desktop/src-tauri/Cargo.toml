@@ -89,6 +89,8 @@ crossterm = "0.29.0"
 # Already in the graph through ratatui; the CLI measures input columns with it.
 unicode-width = "0.2.2"
 qrcode = { version = "0.14", default-features = false }
+# The Library moves files Jackalope saved to the system Trash, never deleting outright.
+trash = "5.4.0"
 # Local voice to text with whisper.cpp; builds it from source, so cmake and a C++
 # compiler are required. macOS adds Metal below.
 whisper-rs = "0.16"

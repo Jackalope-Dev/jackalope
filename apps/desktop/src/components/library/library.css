@@ -43,6 +43,64 @@
   outline: 2px solid var(--color-border-focus);
   outline-offset: 2px;
 }
+/* Choosing items to move to the Trash: a check in the corner, and a tinted fill once chosen.
+   Files a task changed stay with the project, so they dim and take no check. */
+.library-tile[data-choosing] {
+  position: relative;
+}
+.library-tile[data-chosen] {
+  border-color: var(--color-border);
+  background: var(--color-accent-subtle);
+}
+.library-tile[aria-disabled="true"] {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.library-tile-check {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border: 1.5px solid var(--color-border);
+  border-radius: var(--radius-full);
+  background: var(--color-surface-elevated);
+  color: var(--color-on-action);
+  box-shadow: var(--shadow-flat);
+}
+.library-tile[data-chosen] .library-tile-check {
+  border-color: var(--color-action);
+  background: var(--color-action);
+}
+.library-selection {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: var(--workspace-section-heading-gap, 16px);
+  padding: 8px 8px 8px 14px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-elevated);
+}
+.library-selection-count {
+  font-size: var(--text-sm);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+.library-selection-actions {
+  display: flex;
+  gap: 8px;
+  margin-left: auto;
+}
+/* Destructive, but not the dialog's main action, so it sits apart on the left. */
+.library-dialog .library-trash {
+  margin-right: auto;
+  color: var(--color-danger);
+}
 @media (prefers-reduced-motion: no-preference) {
   .library-tile {
     transition:
@@ -50,7 +108,7 @@
       box-shadow 160ms var(--ease-out),
       border-color 160ms var(--ease-out);
   }
-  .library-tile:hover {
+  .library-tile:not([aria-disabled="true"]):hover {
     transform: translateY(-2px);
   }
   .library-preview img {

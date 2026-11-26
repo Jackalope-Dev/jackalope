@@ -38,7 +38,9 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   recent results. Library
   shows task screenshots, files agents saved under `.jackalope/artifacts`, pasted
   attachments and images or PDFs a task's latest workspace changed, filtered by project
-  and kind. The title bar holds command search; the bottom bar shows the focused project,
+  and kind. Items Jackalope saved can be moved to the system Trash one at a time or
+  selected in bulk; images and PDFs a task changed stay with the repository.
+  The title bar holds command search; the bottom bar shows the focused project,
   branch, local activity and visual account allowances with freshness and reset times.
   The branch menu switches the project checkout to a local or remote branch or creates
   one at the current commit; switching needs a clean checkout and waits for tasks working

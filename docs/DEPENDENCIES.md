@@ -688,8 +688,11 @@ keep their own copyright files inside it; see [BOT-COMPUTERS.md](BOT-COMPUTERS.m
 | javascriptcore-rs | 1.1.2 | MIT |
 | javascriptcore-rs-sys | 1.1.1 | MIT |
 | jiff | 0.2.35 | Unlicense OR MIT |
+| jiff | 1.0.3 | Unlicense OR MIT |
 | jiff-core | 0.1.0 | Unlicense OR MIT |
+| jiff-core | 1.0.2 | Unlicense OR MIT |
 | jiff-static | 0.2.35 | Unlicense OR MIT |
+| jiff-static | 1.0.3 | Unlicense OR MIT |
 | jiff-tzdb | 0.1.8 | Unlicense OR MIT |
 | jiff-tzdb-platform | 0.1.3 | Unlicense OR MIT |
 | jni | 0.21.1 | MIT/Apache-2.0 |
@@ -1024,6 +1027,7 @@ keep their own copyright files inside it; see [BOT-COMPUTERS.md](BOT-COMPUTERS.m
 | tracing | 0.1.44 | MIT |
 | tracing-attributes | 0.1.31 | MIT |
 | tracing-core | 0.1.36 | MIT |
+| trash | 5.4.0 | MIT |
 | tray-icon | 0.25.1 | MIT OR Apache-2.0 |
 | tree-sitter | 0.27.1 | MIT |
 | tree-sitter-javascript | 0.25.0 | MIT |
@@ -1043,6 +1047,7 @@ keep their own copyright files inside it; see [BOT-COMPUTERS.md](BOT-COMPUTERS.m
 | unicode-width | 0.2.3 | MIT OR Apache-2.0 |
 | untrusted | 0.9.0 | ISC |
 | url | 2.5.9 | MIT OR Apache-2.0 |
+| urlencoding | 2.1.3 | MIT |
 | urlpattern | 0.6.0 | MIT |
 | utf8_iter | 1.0.4 | Apache-2.0 OR MIT |
 | utf8parse | 0.2.2 | Apache-2.0 OR MIT |
