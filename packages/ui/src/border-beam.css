@@ -60,13 +60,13 @@
     opacity: var(--beam-strength, 1);
     animation: ui-beam-in 600ms var(--ease-out, ease-out) backwards;
   }
-  /* Travel settles in after whatever started the work, rides three laps and lets go; the
+  /* Travel settles in after whatever started the work, rides two laps and lets go; the
      work's own status keeps showing that it continues. */
   .ui-beam[data-variant="travel"][data-state="in"] {
     animation:
       ui-beam-in 1400ms var(--ease-out, ease-out) 500ms backwards,
-      ui-beam-orbit 6s linear 3,
-      ui-beam-out 1s var(--ease-in, ease-in) 17s forwards;
+      ui-beam-orbit 6s linear 2,
+      ui-beam-out 1s var(--ease-in, ease-in) 11s forwards;
   }
   /* Pulse breathes three times, then fades. */
   .ui-beam[data-variant="pulse"][data-state="in"] {
