@@ -2,6 +2,7 @@ import { applyD1Migrations } from 'cloudflare:test';
 import { env } from 'cloudflare:workers';
 import { beforeAll, beforeEach, expect, it } from 'vitest';
 import { randomToken, tokenHash } from '../src/access/crypto';
+import { skillDevices } from '../src/access/skills';
 import worker from '../src/index';
 
 const bindings: Env = {
@@ -253,6 +254,67 @@ it('reports which devices hold each synced skill', async () => {
   );
   const after = await ahead.json<{ holdings: { device: string }[] }>();
   expect(after.holdings.filter((item) => item.device === here)).toEqual([]);
+});
+
+it('shows one entry per computer and drops connections that never synced', () => {
+  const now = Date.now();
+  const old = now - 60 * 86400000;
+  const row = (id: string, machineKey: string | null, seen: number, settingsSync = 1) => ({
+    id,
+    name: null,
+    platform: 'macos',
+    machineKey,
+    seen,
+    settingsSync,
+  });
+  const view = skillDevices(
+    [
+      row('laptop-new', 'laptop', now),
+      row('here', 'desk', now - 1000),
+      row('laptop-old', 'laptop', old),
+      row('desk-dev', 'desk', now - 2000),
+      { ...row('roaming', 'roaming', old, 0), name: 'ROAMING', platform: 'windows' },
+      row('legacy-holder', null, old, 0),
+    ],
+    [
+      { skill: 's', device: 'laptop-old', revision: 2 },
+      { skill: 's', device: 'laptop-new', revision: 1 },
+      { skill: 's', device: 'legacy-holder', revision: 2 },
+      { skill: 's', device: 'desk-dev', revision: 2 },
+    ],
+    'here',
+    now,
+  );
+  expect(view.devices).toEqual([
+    { id: 'here', name: null, platform: 'macos', here: true },
+    { id: 'laptop-new', name: null, platform: 'macos', here: false },
+    { id: 'legacy-holder', name: null, platform: 'macos', here: false },
+  ]);
+  expect(view.holdings).toEqual(
+    expect.arrayContaining([
+      { skill: 's', device: 'laptop-new', revision: 2 },
+      { skill: 's', device: 'legacy-holder', revision: 2 },
+      { skill: 's', device: 'here', revision: 2 },
+    ]),
+  );
+  expect(view.holdings).toHaveLength(3);
+});
+
+it('keeps the strict device shape shipped desktops parse', async () => {
+  const owner = await member();
+  const a = await device(owner);
+  await device(owner, false);
+  const old = Date.now() - 60 * 86400000;
+  await env.DB.prepare(
+    'UPDATE access_devices SET created_at=?,last_seen_at=? WHERE member_id=? AND settings_sync=0',
+  )
+    .bind(old, old, owner.id)
+    .run();
+  const view = await (
+    await call('/v1/desktop/skills/have', 'POST', { epoch: 1, have: [] }, a)
+  ).json<{ devices: Record<string, unknown>[] }>();
+  expect(view.devices).toHaveLength(1);
+  expect(Object.keys(view.devices[0]).sort()).toEqual(['here', 'id', 'name', 'platform']);
 });
 
 it('deleting synced skills starts a new epoch that stops stale devices', async () => {

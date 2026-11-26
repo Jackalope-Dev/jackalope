@@ -14,14 +14,34 @@ import { skillsRoute } from './skills';
 import { openSignup, waitlistProgress } from './waitlist';
 
 const lifetime = 90 * 86400000;
-export async function connectedDevices(env: Env, memberId: string) {
-  return (
+/** A same-computer connection unseen this long is replaced when that computer connects again. */
+const STALE_CONNECTION = 14 * 86400000;
+/** An active desktop's connection is extended once it is this close to expiring. */
+const RENEW_WITHIN = 30 * 86400000;
+
+/**
+ * Labels each row with the computer it belongs to: rows sharing a machine key get the same
+ * label, and rows without one are their own computer. Labels are positions in this list, so
+ * the machine key itself never leaves the server.
+ */
+function computerLabels<T extends { id: string; machineKey: string | null }>(rows: T[]) {
+  const labels = new Map<string, string>();
+  return rows.map(({ machineKey, ...row }) => {
+    const key = machineKey ?? `device:${row.id}`;
+    if (!labels.has(key)) labels.set(key, `c${labels.size + 1}`);
+    return { ...row, computer: labels.get(key) as string };
+  });
+}
+
+export async function connectedDevices(env: Env, memberId: string): Promise<ConnectedDevice[]> {
+  const rows = (
     await env.DB.prepare(
-      'SELECT id,name,created_at AS createdAt,expires_at AS expiresAt,app_version AS appVersion,platform,build_kind AS buildKind,profile_kind AS profileKind,last_seen_at AS lastSeenAt,settings_checked_at AS settingsCheckedAt,settings_sync AS settingsSync FROM access_devices WHERE member_id=? AND expires_at>? ORDER BY coalesce(last_seen_at,created_at) DESC,id LIMIT 10',
+      'SELECT id,name,created_at AS createdAt,expires_at AS expiresAt,app_version AS appVersion,platform,build_kind AS buildKind,profile_kind AS profileKind,last_seen_at AS lastSeenAt,settings_checked_at AS settingsCheckedAt,settings_sync AS settingsSync,machine_key AS machineKey FROM access_devices WHERE member_id=? AND expires_at>? ORDER BY coalesce(last_seen_at,created_at) DESC,id LIMIT 20',
     )
       .bind(memberId, Date.now())
-      .all<ConnectedDevice>()
+      .all<ConnectedDevice & { machineKey: string | null }>()
   ).results;
+  return computerLabels(rows);
 }
 async function deviceMember(env: Env, hash: string, now = Date.now()) {
   return accountDevice(env, hash, now, false);
@@ -262,8 +282,12 @@ export async function deviceRoutes(
     if (request.method === 'GET' && url.pathname === '/v1/desktop/me') {
       const member = await accountDevice(env, hash, now);
       if (!member) throw new ServiceError(401, 'device_sign_in_required');
-      await env.DB.prepare('UPDATE access_devices SET last_seen_at=? WHERE id=? AND member_id=?')
-        .bind(now, member.id, member.memberId)
+      // An active desktop keeps its connection: one close to expiring is extended, so it never
+      // has to reconnect (and mint a new device) every ninety days.
+      await env.DB.prepare(
+        'UPDATE access_devices SET last_seen_at=?,expires_at=CASE WHEN expires_at<? THEN ? ELSE expires_at END WHERE id=? AND member_id=?',
+      )
+        .bind(now, now + RENEW_WITHIN, now + lifetime, member.id, member.memberId)
         .run();
       return json(await accountView(env, member));
     }
@@ -311,6 +335,15 @@ export async function deviceRoutes(
       env.DB.prepare(
         'UPDATE access_device_links SET used_at=? WHERE hash=? AND EXISTS(SELECT 1 FROM access_devices WHERE hash=?)',
       ).bind(now, hash, hash),
+      // The same computer connecting again replaces its own connections that have gone
+      // unseen for two weeks (an old profile, a reset, an expired sign-in). Live profiles on
+      // that computer keep theirs.
+      env.DB.prepare(
+        'DELETE FROM access_device_links WHERE hash IN (SELECT hash FROM access_devices d WHERE d.hash<>? AND d.machine_key IS NOT NULL AND coalesce(d.last_seen_at,d.created_at)<? AND EXISTS(SELECT 1 FROM access_devices n WHERE n.hash=? AND n.member_id=d.member_id AND n.machine_key=d.machine_key))',
+      ).bind(hash, now - STALE_CONNECTION, hash),
+      env.DB.prepare(
+        'DELETE FROM access_devices WHERE hash IN (SELECT hash FROM access_devices d WHERE d.hash<>? AND d.machine_key IS NOT NULL AND coalesce(d.last_seen_at,d.created_at)<? AND EXISTS(SELECT 1 FROM access_devices n WHERE n.hash=? AND n.member_id=d.member_id AND n.machine_key=d.machine_key))',
+      ).bind(hash, now - STALE_CONNECTION, hash),
     ]);
     const connected = await accountDevice(env, hash, now);
     if (!connected) throw new ServiceError(410, 'device_link_expired');

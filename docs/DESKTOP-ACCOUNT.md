@@ -107,8 +107,10 @@ devices from the website's waitlist page.
   API capabilities require approved membership and a previously verified email.
 - Server storage contains credential hashes, member association, random device ID,
   connection/expiry timestamps and short-lived pairing state. A member can have ten
-  active devices. Device credentials expire after 90 days; pairing expires after ten
-  minutes. The existing scheduled cleanup removes expired records.
+  active devices. Device credentials expire 90 days after they were last extended: a
+  desktop's account check extends its connection to 90 days once it has fewer than 30
+  left, so a desktop in use never has to reconnect. Pairing expires after ten minutes.
+  The existing scheduled cleanup removes expired records.
 - Revocation deletes both the device and any exchange receipt. Changing membership
   away from approved removes pending approvals and devices, preventing reactivation
   by simply restoring membership. Member deletion cascades to device records.
@@ -127,12 +129,13 @@ devices from the website's waitlist page.
 
 ## Deployment and acceptance
 
-Connected desktops represents profile connections, not unique physical computers.
-Isolated tests have independent credentials and local projects, so the same computer
-name can appear more than once. Restarting a profile reuses its saved connection.
-The access page groups connections with matching computer names and reported platforms
-in an expandable list, preserving each profile's details and disconnect action.
-Matching names do not establish physical device identity; unnamed connections stay separate.
+Connected desktops lists profile connections grouped by computer. Isolated tests have
+independent credentials and local projects, so one computer can hold several
+connections. Restarting a profile reuses its saved connection. The service labels the
+connections that share a machine key with the same per-response `computer` value (never
+the key itself), and the access page groups them in an expandable list, preserving each
+profile's details and disconnect action. Against an older service without the label, it
+groups by matching name and platform; unnamed connections stay separate.
 The access page distinguishes connections by a short ID, platform, app version,
 development/release build and default/isolated profile. Account checks run while
 the app is open; their timestamp does not establish human activity or task execution.
@@ -143,8 +146,17 @@ Apply `0017_device_machine.sql` before expecting one computer to share a device
 slot. Desktop connections send an opaque machine key: a hash of the platform
 machine identifier, scoped to Jackalope. The raw identifier stays on the machine.
 The ten-device limit counts distinct keys, so extra profiles, reinstalls and data
-resets on one computer share a slot. Older clients omit the key, and each of those
+resets on one computer share a slot. When a computer connects again, the exchange
+deletes that member's connections with the same key that have gone unseen for 14 days
+(an old profile, a reset, a lapsed sign-in), with their pairing receipts and skill
+holdings; live profiles keep their own. `0022_dedupe_machine_devices.sql` clears the
+duplicates already stored the same way. Older clients omit the key, and each of those
 connections still counts as its own machine.
+
+The desktop names its connection after the computer: the Computer Name from macOS
+Sharing settings, the Windows host name in its own case rather than the upper-case
+NetBIOS name, or the Linux host name. It sends no name when only `localhost` is set,
+and the app and website then show the platform instead.
 
 Apply `0015_desktop_metadata.sql` before deploying the matching Worker and website.
 Older records show unreported metadata until a compatible desktop checks in. The

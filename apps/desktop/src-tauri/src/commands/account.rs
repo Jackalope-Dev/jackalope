@@ -444,13 +444,11 @@ async fn sync_device_name(api: &reqwest::Url, secret: &str, data: &serde_json::V
     if data.get("deviceName").is_none() {
         return;
     }
-    let name: String = super::system::device_name()
-        .trim()
-        .chars()
-        .filter(|character| !character.is_control())
-        .take(120)
-        .collect();
-    if name.is_empty() || data["deviceName"].as_str() == Some(name.as_str()) {
+    // Nothing sensible to send: the website and the app fall back to the platform's name.
+    let Some(name) = super::system::computer_name() else {
+        return;
+    };
+    if data["deviceName"].as_str() == Some(name.as_str()) {
         return;
     }
     let _ = request(
