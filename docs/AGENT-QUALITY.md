@@ -73,6 +73,9 @@ tool-only measurements; these omit worker execution and cannot establish task sa
 - Bridged tasks carry a one-line reporting contract: the first message restates the goal,
   problem and smallest expected change through `restate_goal`, then work continues without
   waiting. It is reporting, not working-style advice; review shows it as "Understood as".
+  Small, fully specified tasks skip it (`goal-restatement=scoped`, the default): a request
+  of up to 800 characters with no requirements, workflow inputs or thorough approach. Its
+  extra turn made those tasks measurably slower without changing their outcomes.
 - Managed workers batch independent reads/searches where supported, reuse established
   context and keep progress concise. Repository-required checks remain mandatory;
   changes, failures and unresolved concerns justify additional verification.
@@ -357,8 +360,9 @@ The quality runner accepts per-variant `--after-task-approach=scoped`,
 captured MCP responses; `--after-result-preview=on` also bounds large
 unselected responses while keeping the complete source recoverable. Preview
 requires result queries. `--after-initial-tools=small` measures eager delivery of
-a complete bounded catalog. `--after-goal-restatement=batched` asks for the goal
-restatement in the same turn as the first file reads instead of a turn of its own.
+a complete bounded catalog. `--after-goal-restatement=separate` restates every task;
+`batched` asks for the restatement in the same turn as the first file reads instead of a
+turn of its own; `scoped`, the default, skips it for small, fully specified tasks.
 Keep these controls explicit in saved comparisons.
 Authored multi-source join cases can be generated with
 `node scripts/evaluation/pipeline-cases.mjs <suite.json>`. The name identifies the

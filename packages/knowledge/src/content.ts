@@ -1551,7 +1551,7 @@ export const knowledgeGuides: KnowledgeGuide[] = [
         steps: [
           'Choose the project and confirm the target branch or workspace. Choose Work in a copy when other work is in progress.',
           'Pick an effort level and review Customize task for agent, account, context, and tools. Include a reachable preview URL when you expect browser checks.',
-          'Start the task and check Understood as, the agent’s own short restatement of the goal and the smallest change it plans. If it misread the request, stop or send a correction early. Respond if it asks for missing information. Read the result and actual checks, then merge into the target branch and remove the workspace.',
+          'Start the task and check Understood as, the agent’s own short restatement of the goal and the smallest change it plans (short, fully specified requests skip it). If it misread the request, stop or send a correction early. Respond if it asks for missing information. Read the result and actual checks, then merge into the target branch and remove the workspace.',
         ],
       },
       {

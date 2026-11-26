@@ -248,7 +248,8 @@ separate acceptance; smaller responses do not establish general cost or speed ga
 - Requirement assessments and an optional safety fact carry an evidence level (stated,
   cited, reasoned, ran, reproduced) that Jackalope checks locally and lowers when cited
   files, command output or captures are missing; Review shows each checked level and the
-  weakest. Bridged tasks report a short goal restatement, shown as Understood as.
+  weakest. Bridged tasks report a short goal restatement, shown as Understood as, except
+  small, fully specified requests.
 - Review's **Challenge this change** runs one or two reviewers, preferring a different
   model family, in worktrees at a snapshot of the result. Only findings proven by a
   command count; Checks shows each command, its output, the expected output and dropped

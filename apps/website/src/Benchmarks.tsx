@@ -110,10 +110,10 @@ export function BenchmarksPage() {
       <section className="benchmark-section" aria-labelledby="results-title">
         <h2 id="results-title">Results, including the overhead</h2>
         <p>
-          These are authored, disposable fixtures on one Windows machine. They are a reproducible
-          starting point, not a representative sample of software engineering or proof of equivalent
-          quality on real projects. Passing means satisfying the prewritten task check; human
-          acceptance and correction time are not measured.
+          These are authored, disposable fixtures on one Windows machine, and the November rerun on
+          one Mac. They are a reproducible starting point, not a representative sample of software
+          engineering or proof of equivalent quality on real projects. Passing means satisfying the
+          prewritten task check; human acceptance and correction time are not measured.
         </p>
         <p className="benchmark-caption">
           Prewritten fixture checks score outputs outside the agent’s workspace. These are self-run

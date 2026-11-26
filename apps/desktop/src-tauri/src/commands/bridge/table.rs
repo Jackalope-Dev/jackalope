@@ -554,7 +554,7 @@ pub(super) fn tools() -> Vec<Tool> {
         .help("Record validation steps: POST $env:JACKALOPE_BRIDGE_URL/v1/validation-step (JSON {\"step\":\"...\",\"status\":\"passed\"|\"failed\"|\"in_progress\",\"notes\":\"...\"}; optional requirements with level and safety_fact)."),
         Tool::new(
             "restate_goal",
-            "Record, once and in your first message, your own short restatement of the goal, the problem and the smallest change you expect to make. Shown to the person as \"Understood as\"; continue without waiting for confirmation.",
+            "When the task's reporting contract asks for it, record once, in your first message, your own short restatement of the goal, the problem and the smallest change you expect to make. Shown to the person as \"Understood as\"; continue without waiting for confirmation.",
             h::restate_goal,
         )
         .read_only(false)
