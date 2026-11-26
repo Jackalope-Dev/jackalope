@@ -4,6 +4,7 @@ import {
   type OperationOutcome,
   OPERATIONS as operations,
 } from '@jackalope/contracts/telemetry';
+import { errorKind } from './error-kind.ts';
 
 const allowed = new Set<string>(operations);
 export function telemetryOperation(
@@ -48,11 +49,17 @@ export async function observeOperation<T>(
   run: () => Promise<T>,
   track: (metric: Metric) => void,
 ): Promise<T> {
-  const report = (result: OperationOutcome) => {
+  const report = (result: OperationOutcome, error?: unknown) => {
     if (!operation) return;
     try {
       track({ name: 'operation_result', operation, outcome: result });
-      if (result === 'failed') track({ name: 'app_error', code: 'operation_failed', operation });
+      if (result === 'failed')
+        track({
+          name: 'app_error',
+          code: 'operation_failed',
+          operation,
+          ...(error === undefined ? {} : { kind: errorKind(error) }),
+        });
     } catch {
       // Reporting must never change the result of a native operation.
     }
@@ -61,7 +68,7 @@ export async function observeOperation<T>(
   try {
     result = await run();
   } catch (error) {
-    report('failed');
+    report('failed', error);
     throw error;
   }
   if (operation) report(outcome(operation, result));

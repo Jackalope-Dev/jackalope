@@ -88,6 +88,7 @@ import './bots.css';
 import { describeError } from '@jackalope/contracts/errors';
 import { agentAdapter } from '../../lib/agent-catalog';
 import { listSchedules, type ScheduleLedger } from '../../lib/schedules';
+import { trackAction } from '../../lib/usage-events';
 import { ActionError } from '../ui/ActionError';
 
 function randomStyle() {
@@ -555,6 +556,7 @@ export function BotsWorkspace() {
             if (editing.bot) store.update(editing.bot.id, draft);
             else {
               const id = store.create(draft);
+              trackAction('bot_created');
               if (editing.proposalId) void resolveProposal(editing.proposalId, 'accept', id);
               setHello(useBotStore.getState().bots.find((bot) => bot.id === id) ?? null);
             }

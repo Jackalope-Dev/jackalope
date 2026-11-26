@@ -35,6 +35,7 @@ import { OptionsMenu } from '../ui/OptionsMenu';
 import { TailscaleSetup } from './TailscaleSetup';
 import '../remote/remote.css';
 import { describeError } from '@jackalope/contracts/errors';
+import { trackAction } from '../../lib/usage-events';
 
 interface Status {
   enabled: boolean;
@@ -97,7 +98,13 @@ export function RemoteAccess() {
     setWaiting(Boolean(pair));
     return () => setWaiting(false);
   }, [pair, setWaiting]);
+  // Device ids already seen, so a newly paired one is counted once; the first load only records.
+  const known = useRef<Set<string> | null>(null);
   const apply = useCallback((next: Status) => {
+    const ids = next.devices.map((device) => device.id);
+    if (known.current)
+      for (const id of ids) if (!known.current.has(id)) trackAction('device_paired');
+    known.current = new Set(ids);
     setStatus(next);
     // Before remote access is first turned on, every project starts selected.
     setSelected(

@@ -24,7 +24,7 @@ import { type SessionLimits as Limits, sessionCommand } from '../../lib/live-ses
 import { isTauriEnvironment } from '../../lib/native/env';
 import { planCommands } from '../../lib/plan-mode';
 import { checksAutomatically } from '../../lib/project-automation';
-import { appendAttachments } from '../../lib/prompt-attachments';
+import { appendAttachments, draftAttachments } from '../../lib/prompt-attachments';
 import { rememberPrompt, storedPrompts } from '../../lib/prompt-history';
 import { isQuestionOnly, nonCodeReason } from '../../lib/question-intent';
 import { type ReasoningEffort, savedEffort, saveEffort } from '../../lib/reasoning-effort';
@@ -70,6 +70,9 @@ import { WindowGlob } from './WindowGlob';
 import { WorkflowStarter } from './WorkflowStarter';
 import './live-session.css';
 import { describeError } from '@jackalope/contracts/errors';
+import { countBucket, type WorkShape } from '@jackalope/contracts/telemetry';
+import { telemetryAgent } from '../../lib/task-telemetry';
+import { telemetry } from '../../lib/telemetry-client';
 import { selectWork } from '../../lib/work-selection';
 
 /** Saved work handed to the composer: a draft, an idea or an agent choice. */
@@ -431,6 +434,16 @@ ${incoming}`
     setError('');
     setAttachNotice('');
     const wave = waveFromSend();
+    // Counted under usage sharing: the shape of the work and how many files were attached,
+    // never the text or the files.
+    const counted = (shape: WorkShape) =>
+      telemetry.track({
+        name: 'work_sent',
+        shape,
+        agent: shape === 'comparison' ? undefined : telemetryAgent(chosen[0]?.adapter),
+        attachments: countBucket(draftAttachments(value).length),
+        window: !!attachedRef.current,
+      });
     let handedOff = false;
     try {
       if (comparing && choice !== 'interview') {
@@ -455,6 +468,7 @@ ${incoming}`
         const first = useExecutionStore
           .getState()
           .runs.find((run) => run.taskId === comparison.taskIds[0]);
+        counted('comparison');
         if (first) {
           wave();
           selectWork({ task: first.id });
@@ -505,6 +519,7 @@ ${incoming}`
           setText('');
           setPlanning(false);
         }
+        counted('plan');
         wave();
         usePlanStore.getState().select(plan.id);
         navigateWorkspace('plans');
@@ -527,6 +542,7 @@ ${incoming}`
       }
       if (choice === 'plan' || autoStart) {
         await assessment.create(withEffort, value, autoStart);
+        counted('planned');
         wave();
         await skipAttached();
         finishOrigin(value);
@@ -544,6 +560,7 @@ ${incoming}`
         limits,
       });
       await useLiveSessionStore.getState().refresh(attempt.id);
+      counted('conversation');
       finishOrigin(value);
       const next = latest.current.trim() === value ? '' : latest.current;
       if (next) localStorage.setItem(`jackalope-live-draft:main:${attempt.id}`, next);

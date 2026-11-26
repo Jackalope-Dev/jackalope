@@ -10,6 +10,7 @@ import { useSettingsStore } from '../../stores/settingsStore';
 import { ActionError } from '../ui/ActionError';
 import { VoiceSetupDialog } from './VoiceSetupDialog';
 import './voice.css';
+import { trackAction } from '../../lib/usage-events';
 
 const LIMIT_MS = 59_000;
 
@@ -132,6 +133,7 @@ export function VoiceButton({
     }
     const media = new MediaRecorder(stream);
     recorder.current = media;
+    trackAction('voice_dictation');
     stopMeter.current = meter(stream);
     const chunks: Blob[] = [];
     media.ondataavailable = (event) => {

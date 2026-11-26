@@ -649,6 +649,42 @@
   color: var(--color-accent-ink);
 }
 
+/* The session's usage reports, one row each, scrolling within a fixed height. */
+.privacy-events {
+  display: grid;
+  gap: 6px;
+  max-height: 280px;
+  margin: 8px 0 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+.privacy-event {
+  display: grid;
+  grid-template-columns: minmax(8rem, auto) 1fr auto;
+  align-items: baseline;
+  gap: 10px;
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-sunken);
+  font-size: var(--text-xs);
+}
+.privacy-event-name {
+  font-weight: 600;
+}
+.privacy-event code {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-text-secondary);
+}
+@media (max-width: 560px) {
+  .privacy-event {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* Reset spells out what it erases and what survives, side by side on wide panes. */
 .settings-reset-scope {
   display: grid;

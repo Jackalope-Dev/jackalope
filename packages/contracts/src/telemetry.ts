@@ -109,12 +109,88 @@ export const ERROR_CODES = [
 ] as const;
 export type ErrorCode = (typeof ERROR_CODES)[number];
 
+/** The broad class of an error, from its type or native code; never its message. */
+export const ERROR_KINDS = [
+  'type',
+  'reference',
+  'range',
+  'syntax',
+  'network',
+  'timeout',
+  'permission',
+  'not_found',
+  'aborted',
+  'other',
+] as const;
+export type ErrorKind = (typeof ERROR_KINDS)[number];
+
+/** What a Send on the new-work composer started. */
+export const WORK_SHAPES = ['conversation', 'plan', 'comparison', 'planned'] as const;
+export type WorkShape = (typeof WORK_SHAPES)[number];
+
+/** How many files were attached, never which. */
+export const COUNT_BUCKETS = ['0', '1', '2_plus'] as const;
+export type CountBucket = (typeof COUNT_BUCKETS)[number];
+
+export function countBucket(count: number): CountBucket {
+  return count <= 0 ? '0' : count === 1 ? '1' : '2_plus';
+}
+
+/** Feature moments that are not a page visit or a native operation. */
+export const ACTIONS = [
+  'window_attached',
+  'voice_dictation',
+  'read_aloud',
+  'device_paired',
+  'computer_connected',
+  'cloud_machine_paired',
+  'bot_created',
+] as const;
+export type Action = (typeof ACTIONS)[number];
+
+/** Preferences whose change is counted, by name only; values are never sent. */
+export const SETTING_NAMES = [
+  'mascot_reactions',
+  'frosted_window',
+  'theme_picker_in_toolbar',
+  'notifications',
+  'os_notifications',
+  'interface_zoom',
+  'terminal_font_size',
+  'terminal_shell',
+  'preferred_editor',
+  'terminal_links',
+  'retain_terminal_output',
+  'shortcuts',
+  'voice_model',
+  'default_runner',
+  'concurrency_limit',
+  'task_timeout',
+  'mcp_marketplace',
+] as const;
+export type SettingName = (typeof SETTING_NAMES)[number];
+
 export type Metric =
   | { name: 'app_opened' }
   | { name: 'feature_used'; feature: Feature }
-  | { name: 'app_error'; code: ErrorCode; operation?: Operation; feature?: Feature }
+  | {
+      name: 'app_error';
+      code: ErrorCode;
+      operation?: Operation;
+      feature?: Feature;
+      kind?: ErrorKind;
+    }
   | { name: 'operation_result'; operation: Operation; outcome: OperationOutcome }
-  | { name: 'task_state'; state: TaskState; agent?: TelemetryAgent; workflow?: Workflow };
+  | { name: 'task_state'; state: TaskState; agent?: TelemetryAgent; workflow?: Workflow }
+  | {
+      name: 'work_sent';
+      shape: WorkShape;
+      agent?: TelemetryAgent;
+      attachments: CountBucket;
+      window: boolean;
+    }
+  | { name: 'action_used'; action: Action }
+  | { name: 'setting_changed'; setting: SettingName };
 
 export type MetricName = Metric['name'];
 
@@ -133,9 +209,23 @@ export function metricDimension(metric: Metric): string {
     case 'feature_used':
       return metric.feature;
     case 'app_error':
+      // Reports without a kind keep the older one- and three-part encodings.
+      if (metric.kind)
+        return [metric.code, metric.operation ?? '', metric.feature ?? '', metric.kind].join('|');
       return metric.operation || metric.feature
         ? [metric.code, metric.operation ?? '', metric.feature ?? ''].join('|')
         : metric.code;
+    case 'work_sent':
+      return [
+        metric.shape,
+        metric.agent ?? 'unknown',
+        metric.attachments,
+        metric.window ? 'window' : 'no_window',
+      ].join('|');
+    case 'action_used':
+      return metric.action;
+    case 'setting_changed':
+      return metric.setting;
     case 'app_opened':
       return '';
   }

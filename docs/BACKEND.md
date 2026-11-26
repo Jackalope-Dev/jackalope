@@ -31,8 +31,11 @@ sending immediately. Enabled telemetry sends automatically without a per-event a
 Telemetry contains metadata only:
 
 - Allowed: fixed view/operation names and outcomes, task status transitions with
-  allowlisted agent and task/Chat workflow, fixed error categories and page/operation context,
-  installed app version, installed channel and OS. Each event gets a random UUID
+  allowlisted agent and task/Chat workflow, the shape of work sent from the composer
+  (conversation, plan, comparison or planned work) with its allowlisted agent, an attached-file
+  count bucket (0, 1, 2+) and whether a window was attached, fixed feature actions, the names
+  of allowlisted preferences that changed (never their values), fixed error categories with
+  page/operation context and a broad error kind, installed app version, installed channel and OS. Each event gets a random UUID
   for bounded retry deduplication; it is never an installation identifier.
 - Never: installation/account/device IDs, prompts, agent output, source, paths,
   project/repository names, diffs, environment variables, raw exceptions or stacks.

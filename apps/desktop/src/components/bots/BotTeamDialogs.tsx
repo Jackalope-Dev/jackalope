@@ -21,6 +21,7 @@ import {
   teamFileName,
   uniqueBotNames,
 } from '../../lib/bot-team';
+import { trackAction } from '../../lib/usage-events';
 import { type Bot, useBotStore } from '../../stores/botStore';
 import type { Project } from '../../stores/projectStore';
 import { ActionError } from '../ui/ActionError';
@@ -166,6 +167,7 @@ export function ImportBotsDialog({ project, onClose }: { project: Project; onClo
       let first: string | undefined;
       team.bots.forEach((bot, index) => {
         const id = store.create({ ...bot, name: names[index], projectId: project.id });
+        trackAction('bot_created');
         first ??= id;
       });
       if (first) useBotStore.getState().openConversation(null, first);

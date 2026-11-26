@@ -36,7 +36,7 @@ test('operation reporting preserves results and errors and excludes arguments an
   assert.deepEqual(events, [
     { name: 'operation_result', operation: 'task_start', outcome: 'accepted' },
     { name: 'operation_result', operation: 'task_start', outcome: 'failed' },
-    { name: 'app_error', code: 'operation_failed', operation: 'task_start' },
+    { name: 'app_error', code: 'operation_failed', operation: 'task_start', kind: 'other' },
   ]);
   assert.equal(
     await observeOperation(

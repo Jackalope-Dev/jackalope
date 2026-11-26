@@ -7,9 +7,10 @@ import {
   SettingRow,
   Switch,
 } from '@jackalope/ui';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useSyncExternalStore } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { isTauriEnvironment, openInBrowser } from '../../lib/native/env';
+import { telemetry } from '../../lib/telemetry-client';
 import { useCommunityStore } from '../../stores/communityStore';
 import { useLessonSyncStore } from '../../stores/lessonSyncStore';
 import { useSettingsStore } from '../../stores/settingsStore';
@@ -87,9 +88,13 @@ export function PrivacySettings() {
             </DisclosureSummary>
             <p className="settings-row-description">
               Counts of app opens, page visits, operation outcomes and task states by agent and task
-              or conversation workflow, plus known error categories if enabled. Grouped by app
-              version, release channel and operating system. Operation outcomes include failed
-              requests and checks.
+              or conversation workflow. Counts of the work you start (a conversation, plan,
+              comparison or planned work, its agent, how many files were attached and whether a
+              window was), of features you use (attaching a window, dictation, read aloud, pairing a
+              device, computer or cloud machine, creating a bot) and of preferences you change, by
+              name only. If enabled, known error categories and their broad kind, such as network or
+              permission. Grouped by app version, release channel and operating system. Operation
+              outcomes include failed requests and checks.
             </p>
             <p className="settings-row-description">
               No installation or account IDs, prompts, code, paths, command output, error messages
@@ -122,6 +127,7 @@ export function PrivacySettings() {
               Could not open your browser. Visit jackalope.dev/privacy/ to read the privacy notice.
             </p>
           )}
+          <SentEvents />
           {community.settings && !community.settings.configured && (
             <p className="settings-row-description">
               Reporting is unavailable in this build. Your choices are saved for supported releases.
@@ -185,5 +191,44 @@ function PrivacySummary({ usage, errors }: { usage: boolean; errors: boolean }) 
         </p>
       </SettingBody>
     </SettingGroup>
+  );
+}
+
+const STATUS_LABEL = { queued: 'Waiting to send', sent: 'Sent', dropped: 'Not sent' } as const;
+
+/**
+ * Every usage report from this session, exactly as it is queued: the switches above decide
+ * whether it is sent. The app version, release channel and operating system are added when a
+ * batch is sent. Kept in memory on this computer only.
+ */
+function SentEvents() {
+  const entries = useSyncExternalStore(telemetry.subscribe, telemetry.recent);
+  return (
+    <Disclosure>
+      <DisclosureSummary>See what’s sent</DisclosureSummary>
+      <p className="settings-row-description">
+        Reports from this session, newest first, exactly as they are queued. Each batch also carries
+        the app version, release channel and operating system. This list stays on this computer and
+        clears when Jackalope quits.
+      </p>
+      {entries.length ? (
+        <ol className="privacy-events" aria-label="Recent usage reports">
+          {[...entries].reverse().map(({ event, at, status }) => {
+            const { id: _id, name, ...fields } = event;
+            return (
+              <li key={event.id} className="privacy-event" data-status={status}>
+                <span className="privacy-event-name">{name}</span>
+                <code>{Object.keys(fields).length ? JSON.stringify(fields) : '{}'}</code>
+                <span className="settings-row-description">
+                  {STATUS_LABEL[status]} · {new Date(at).toLocaleTimeString()}
+                </span>
+              </li>
+            );
+          })}
+        </ol>
+      ) : (
+        <p className="settings-row-description">No reports yet this session.</p>
+      )}
+    </Disclosure>
   );
 }
