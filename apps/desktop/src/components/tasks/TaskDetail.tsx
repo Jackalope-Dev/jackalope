@@ -12,6 +12,7 @@ import {
   DropdownMenu as Menu,
   Select,
   SelectItem,
+  ThinkingOrb,
 } from '@jackalope/ui';
 import * as Dialog from '@radix-ui/react-dialog';
 import {
@@ -886,11 +887,15 @@ export function TaskDetail({
                   <TaskMarkdown content={run.result} active={active} onOpenLink={openLink} />
                 </Suspense>
               </div>
+            ) : active ? (
+              <p className="task-muted ui-thinking-status" role="status">
+                <ThinkingOrb state="breathing" size={20} aria-hidden="true" />
+                Waiting for the agent’s output…
+              </p>
             ) : (
               <p className="task-muted">
-                {active
-                  ? 'Waiting for the agent’s output…'
-                  : 'No final output recorded. Review the workspace or activity to see where this attempt ended.'}
+                No final output recorded. Review the workspace or activity to see where this attempt
+                ended.
               </p>
             )}
             <TurnAdvisorNotes review={run.advisor} />

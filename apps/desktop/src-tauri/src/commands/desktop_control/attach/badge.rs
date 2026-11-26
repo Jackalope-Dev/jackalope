@@ -401,6 +401,8 @@ pub struct BadgeState {
     pub provider: String,
     pub control: bool,
     pub minutes_left: u64,
+    /// Attached for the rest of the conversation, so it never stops waiting.
+    pub kept: bool,
     /// Control was paused when the agent's turn ended; Resume picks it back up.
     pub resumable: bool,
     /// The conversation's agent is working right now.
@@ -486,6 +488,7 @@ pub fn desktop_badge_state(
         provider: staged.provider,
         control: staged.control,
         minutes_left: attached.minutes_left,
+        kept: attached.kept,
     })
 }
 

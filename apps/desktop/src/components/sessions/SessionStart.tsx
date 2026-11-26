@@ -1,5 +1,14 @@
 import { AgentCharacter } from '@jackalope/brand/agent-character';
-import { Button, InlineNotice, Select, SelectItem, Textarea } from '@jackalope/ui';
+import {
+  BorderBeamLayer,
+  Button,
+  InlineNotice,
+  lastPressedControl,
+  playDistortionWave,
+  Select,
+  SelectItem,
+  Textarea,
+} from '@jackalope/ui';
 import { emit, listen } from '@tauri-apps/api/event';
 import { FolderOpen } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -15,7 +24,7 @@ import { type SessionLimits as Limits, sessionCommand } from '../../lib/live-ses
 import { isTauriEnvironment } from '../../lib/native/env';
 import { planCommands } from '../../lib/plan-mode';
 import { checksAutomatically } from '../../lib/project-automation';
-import { appendAttachments } from '../../lib/prompt-attachments';
+import { appendAttachments, draftAttachments } from '../../lib/prompt-attachments';
 import { rememberPrompt, storedPrompts } from '../../lib/prompt-history';
 import { isQuestionOnly, nonCodeReason } from '../../lib/question-intent';
 import { type ReasoningEffort, savedEffort, saveEffort } from '../../lib/reasoning-effort';
@@ -61,6 +70,9 @@ import { WindowGlob } from './WindowGlob';
 import { WorkflowStarter } from './WorkflowStarter';
 import './live-session.css';
 import { describeError } from '@jackalope/contracts/errors';
+import { countBucket, type WorkShape } from '@jackalope/contracts/telemetry';
+import { telemetryAgent } from '../../lib/task-telemetry';
+import { telemetry } from '../../lib/telemetry-client';
 import { selectWork } from '../../lib/work-selection';
 
 /** Saved work handed to the composer: a draft, an idea or an agent choice. */
@@ -153,6 +165,7 @@ export function SessionStart({
     chosen.length === 1 ? modelChoice?.id : undefined,
   );
   const [busy, setBusy] = useState(false);
+  const [recording, setRecording] = useState(false);
   const [limits, setLimits] = useState<Limits>(() => {
     try {
       const saved = JSON.parse(localStorage.getItem(`${draftKey}:limits`) ?? '{}');
@@ -382,6 +395,22 @@ ${incoming}`
   });
   /** Non-code work Jackalope inferred, which Options can switch back to code work. */
   const inferredNonCode = !general && !!nonCodeReason(text, { window: !!attached });
+  /**
+   * Sent work replaces this composer with its result, so a wave from the Send control carries
+   * that change across the pane. The source is measured before sending: the composer may be
+   * gone by the time the work exists.
+   */
+  const waveFromSend = () => {
+    const form = composer.current;
+    const pressed = lastPressedControl();
+    const control =
+      pressed && form?.contains(pressed) ? pressed : form?.querySelector('[type="submit"]');
+    const source = (control ?? form)?.getBoundingClientRect();
+    const within = form?.closest('.workspace-canvas') ?? form?.closest('.workspace-page-layout');
+    return () => {
+      if (source && within?.isConnected) playDistortionWave({ within, source });
+    };
+  };
   const send = async (
     requested: 'assess' | 'single' | 'plan' | 'interview' = 'assess',
     override?: string,
@@ -404,6 +433,17 @@ ${incoming}`
     setBusy(true);
     setError('');
     setAttachNotice('');
+    const wave = waveFromSend();
+    // Counted under usage sharing: the shape of the work and how many files were attached,
+    // never the text or the files.
+    const counted = (shape: WorkShape) =>
+      telemetry.track({
+        name: 'work_sent',
+        shape,
+        agent: shape === 'comparison' ? undefined : telemetryAgent(chosen[0]?.adapter),
+        attachments: countBucket(draftAttachments(value).length),
+        window: !!attachedRef.current,
+      });
     let handedOff = false;
     try {
       if (comparing && choice !== 'interview') {
@@ -428,7 +468,11 @@ ${incoming}`
         const first = useExecutionStore
           .getState()
           .runs.find((run) => run.taskId === comparison.taskIds[0]);
-        if (first) selectWork({ task: first.id });
+        counted('comparison');
+        if (first) {
+          wave();
+          selectWork({ task: first.id });
+        }
         return;
       }
       const lead = chosen[0];
@@ -475,6 +519,8 @@ ${incoming}`
           setText('');
           setPlanning(false);
         }
+        counted('plan');
+        wave();
         usePlanStore.getState().select(plan.id);
         navigateWorkspace('plans');
         return;
@@ -496,6 +542,8 @@ ${incoming}`
       }
       if (choice === 'plan' || autoStart) {
         await assessment.create(withEffort, value, autoStart);
+        counted('planned');
+        wave();
         await skipAttached();
         finishOrigin(value);
         localStorage.removeItem(draftKey);
@@ -512,6 +560,7 @@ ${incoming}`
         limits,
       });
       await useLiveSessionStore.getState().refresh(attempt.id);
+      counted('conversation');
       finishOrigin(value);
       const next = latest.current.trim() === value ? '' : latest.current;
       if (next) localStorage.setItem(`jackalope-live-draft:main:${attempt.id}`, next);
@@ -519,7 +568,10 @@ ${incoming}`
       localStorage.removeItem(draftKey);
       localStorage.removeItem(`${draftKey}:context`);
       if (handedOff) setAttachRefresh((value) => value + 1);
-      if (mounted.current) useLiveSessionStore.getState().select(attempt.id);
+      if (mounted.current) {
+        wave();
+        useLiveSessionStore.getState().select(attempt.id);
+      }
       return attempt.id;
     } catch (cause) {
       if (handedOff) {
@@ -581,6 +633,11 @@ ${incoming}`
             void send();
           }}
         >
+          <BorderBeamLayer
+            variant={recording ? 'pulse' : 'line'}
+            active={recording || busy || sharpen.busy}
+            level={recording ? 'var(--voice-level, 0)' : undefined}
+          />
           {assist.menu}
           <Textarea
             ref={input}
@@ -685,6 +742,7 @@ ${incoming}`
               )}
               <VoiceButton
                 disabled={busy}
+                onRecordingChange={setRecording}
                 onText={(value) => {
                   assessment.clear();
                   const next = insertDictation(text, value, input.current);
@@ -744,11 +802,16 @@ ${incoming}`
                   ...(general
                     ? []
                     : [
+                        // With a request written, planning starts now; with an empty box
+                        // it switches the composer to plan mode, and Send starts it.
                         {
                           id: 'plan-with-me',
-                          label: 'Plan with me',
-                          disabled: !text.trim() || busy || !isTauriEnvironment(),
-                          onSelect: () => void send('interview'),
+                          label: planning && !text.trim() ? 'Stop planning' : 'Plan with me',
+                          disabled: busy || !isTauriEnvironment(),
+                          onSelect: () => {
+                            if (text.trim()) void send('interview');
+                            else setPlanning((current) => !current);
+                          },
                         },
                       ]),
                   ...(inferredNonCode

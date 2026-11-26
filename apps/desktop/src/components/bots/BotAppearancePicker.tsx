@@ -94,6 +94,7 @@ export function BotAppearancePicker({
                   provider={item.id}
                   state={centred && bouncing ? 'working' : 'idle'}
                   gaze={centred ? gaze : undefined}
+                  interactive={centred}
                 />
               </button>
             );

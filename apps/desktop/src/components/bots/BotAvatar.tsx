@@ -25,6 +25,7 @@ export function BotAvatar({
   state = 'idle',
   gaze,
   unread = false,
+  interactive = false,
 }: {
   appearance?: BotAppearance;
   agent?: string;
@@ -33,6 +34,8 @@ export function BotAvatar({
   gaze?: AgentGaze;
   /** A real unread reply: a small speech bubble on the character. */
   unread?: boolean;
+  /** A click makes the character hop. Leave off inside buttons and clickable rows. */
+  interactive?: boolean;
 }) {
   const style = botStyle(appearance, agent);
   const color = botColor(appearance);
@@ -43,7 +46,7 @@ export function BotAvatar({
       style={color ? ({ '--agent-color': color } as CSSProperties) : undefined}
       aria-hidden="true"
     >
-      <AgentCharacter provider={style} state={state} gaze={gaze} />
+      <AgentCharacter provider={style} state={state} gaze={gaze} interactive={interactive} />
       {unread && <span className="bots-avatar-bubble" />}
     </span>
   );

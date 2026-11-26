@@ -1,0 +1,245 @@
+@import "./foundation.css";
+
+/* Registered so the beam's position interpolates; unregistered properties would step. */
+@property --beam-angle {
+  syntax: "<angle>";
+  inherits: true;
+  initial-value: 0deg;
+}
+@property --beam-x {
+  syntax: "<percentage>";
+  inherits: true;
+  initial-value: 50%;
+}
+@property --beam-intensity {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0.6;
+}
+
+@layer components {
+  .ui-border-beam {
+    position: relative;
+  }
+  /* --brand-brightness is 1 in dark themes and 0.2 in light ones: dark gets a hot white core
+     and a brighter bloom, light keeps the colour dense so it isn't washed out. */
+  .ui-beam {
+    --beam-width: 1.5px;
+    --beam-hue-a: var(--color-accent-secondary);
+    --beam-hue-b: var(--color-accent-tertiary);
+    --beam-core: color-mix(
+      in oklab,
+      var(--color-accent),
+      white calc(var(--brand-brightness, 1) * 60%)
+    );
+    /* A comet with a long coloured tail, and a fainter one opposite it. */
+    --beam-arc: conic-gradient(
+      from var(--beam-angle),
+      transparent 0 30%,
+      color-mix(in oklab, var(--beam-hue-a) 40%, transparent) 42%,
+      color-mix(in oklab, var(--color-accent) 70%, transparent) 48%,
+      transparent 50% 62%,
+      color-mix(in oklab, var(--beam-hue-b) 70%, transparent) 74%,
+      var(--beam-hue-a) 86%,
+      var(--color-accent) 94%,
+      var(--beam-core) 99.2%,
+      transparent 100%
+    );
+    --beam-sweep: radial-gradient(
+      30% 56px at var(--beam-x) 100%,
+      var(--beam-core),
+      var(--color-accent) 30%,
+      color-mix(in oklab, var(--beam-hue-a) 60%, transparent) 58%,
+      transparent 80%
+    );
+    --beam-paint: var(--beam-arc);
+    position: absolute;
+    inset: calc(-1 * var(--beam-edge, 1px));
+    border-radius: inherit;
+    pointer-events: none;
+    opacity: var(--beam-strength, 1);
+    animation: ui-beam-in 600ms var(--ease-out, ease-out) backwards;
+  }
+  /* Travel settles in after whatever started the work, rides two laps and lets go; the
+     work's own status keeps showing that it continues. */
+  .ui-beam[data-variant="travel"][data-state="in"] {
+    animation:
+      ui-beam-in 1400ms var(--ease-out, ease-out) 500ms backwards,
+      ui-beam-orbit 6s linear 2,
+      ui-beam-out 1s var(--ease-in, ease-in) 11s forwards;
+  }
+  /* Pulse breathes three times, then fades. */
+  .ui-beam[data-variant="pulse"][data-state="in"] {
+    animation:
+      ui-beam-in 600ms var(--ease-out, ease-out) backwards,
+      ui-beam-breathe 3.4s ease-in-out 6 alternate,
+      ui-beam-out 1s var(--ease-in, ease-in) 19.4s forwards;
+  }
+  .ui-beam[data-state="out"] {
+    animation: ui-beam-out 500ms var(--ease-in, ease-in) forwards;
+  }
+  /* Neighbouring hues around the accent, so a single-colour theme still gets a spectrum. */
+  @supports (color: oklch(from red l c h)) {
+    .ui-beam {
+      --beam-hue-a: oklch(from var(--color-accent) l c calc(h - 55));
+      --beam-hue-b: oklch(from var(--color-accent) calc(l + 0.06) c calc(h + 70));
+    }
+  }
+  .ui-border-beam > .ui-beam {
+    --beam-edge: 0px;
+  }
+  .ui-beam[data-variant="travel"] {
+    animation:
+      ui-beam-in 600ms var(--ease-out, ease-out) backwards,
+      ui-beam-orbit 6s linear infinite;
+  }
+  .ui-beam[data-variant="travel"][data-state="out"] {
+    animation:
+      ui-beam-out 500ms var(--ease-in, ease-in) forwards,
+      ui-beam-orbit 6s linear infinite;
+  }
+  .ui-beam[data-variant="line"] {
+    --beam-paint: var(--beam-sweep);
+    animation:
+      ui-beam-in 600ms var(--ease-out, ease-out) backwards,
+      ui-beam-sweep 3s ease-in-out infinite alternate;
+  }
+  .ui-beam[data-variant="line"][data-state="out"] {
+    animation:
+      ui-beam-out 500ms var(--ease-in, ease-in) forwards,
+      ui-beam-sweep 3s ease-in-out infinite alternate;
+  }
+  .ui-beam[data-variant="pulse"] {
+    --beam-paint: conic-gradient(
+      from 200deg,
+      var(--color-accent),
+      var(--beam-hue-a),
+      var(--beam-hue-b),
+      var(--color-accent)
+    );
+    animation:
+      ui-beam-in 600ms var(--ease-out, ease-out) backwards,
+      ui-beam-breathe 3.4s ease-in-out infinite alternate;
+  }
+  .ui-beam[data-variant="pulse"][data-state="out"] {
+    animation:
+      ui-beam-out 500ms var(--ease-in, ease-in) forwards,
+      ui-beam-breathe 3.4s ease-in-out infinite alternate;
+  }
+  /* A level (such as a microphone's) replaces the breathing; the short transition smooths
+     frame-to-frame jitter. */
+  .ui-beam[data-variant="pulse"][data-level] {
+    --beam-intensity: calc(0.2 + 0.8 * var(--beam-level, 0));
+    transition: --beam-intensity 90ms linear;
+  }
+  .ui-beam[data-variant="pulse"][data-level][data-state="in"] {
+    animation: ui-beam-in 600ms var(--ease-out, ease-out) backwards;
+  }
+  .ui-beam[data-variant="pulse"][data-level][data-state="out"] {
+    animation: ui-beam-out 500ms var(--ease-in, ease-in) forwards;
+  }
+
+  /* The crisp edge: the paint masked down to a ring the width of the border. */
+  .ui-beam::before,
+  .ui-beam-bloom::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    padding: var(--beam-width);
+    border-radius: inherit;
+    background: var(--beam-paint);
+    mask:
+      linear-gradient(black 0 0) content-box,
+      linear-gradient(black 0 0);
+    mask-composite: exclude;
+    -webkit-mask-composite: xor;
+  }
+  .ui-beam[data-variant="pulse"]::before {
+    opacity: calc(0.25 + 0.75 * var(--beam-intensity));
+  }
+  /* Pulse: a glow that breathes inward from the edge. */
+  .ui-beam[data-variant="pulse"]::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    box-shadow:
+      inset 0 0 calc(4px + 22px * var(--beam-intensity))
+      color-mix(in oklab, var(--color-accent) calc(20% + 30% * var(--beam-intensity)), transparent),
+      inset 0 0 calc(2px + 8px * var(--beam-intensity))
+      color-mix(in oklab, var(--color-accent-secondary) 35%, transparent);
+  }
+  /* The soft light the beam throws past the edge. */
+  /* A wide blurred ring lights both sides of the edge: a halo outside and a wash inside. */
+  .ui-beam-bloom {
+    position: absolute;
+    inset: -3px;
+    border-radius: inherit;
+    --beam-width: 9px;
+    filter: blur(12px) saturate(1.3);
+    opacity: calc(0.3 + 0.3 * var(--brand-brightness, 1));
+  }
+
+  @keyframes ui-beam-in {
+    from {
+      opacity: 0;
+    }
+  }
+  @keyframes ui-beam-out {
+    to {
+      opacity: 0;
+    }
+  }
+  @keyframes ui-beam-orbit {
+    to {
+      --beam-angle: 360deg;
+    }
+  }
+  @keyframes ui-beam-sweep {
+    from {
+      --beam-x: 6%;
+    }
+    to {
+      --beam-x: 94%;
+    }
+  }
+  @keyframes ui-beam-breathe {
+    from {
+      --beam-intensity: 0.25;
+    }
+    to {
+      --beam-intensity: 1;
+    }
+  }
+
+  .ui-beam[data-paused] {
+    animation-play-state: paused;
+  }
+
+  /* No travel or breathing: a still accent edge keeps the state visible. */
+  @media (prefers-reduced-motion: reduce) {
+    .ui-beam,
+    .ui-beam[data-state],
+    .ui-beam[data-variant],
+    .ui-beam[data-variant][data-state],
+    .ui-beam[data-variant][data-level][data-state] {
+      --beam-paint: color-mix(in oklab, var(--color-accent) 75%, transparent);
+      --beam-intensity: 0.6;
+      animation: none;
+      transition: none;
+    }
+    .ui-beam[data-state="out"] {
+      opacity: 0;
+    }
+    .ui-beam-bloom {
+      display: none;
+    }
+  }
+}
+
+/* Dark surfaces take the light additively, like a glow; light ones keep normal blending. */
+@container style(--brand-brightness: 1) {
+  .ui-beam-bloom {
+    mix-blend-mode: screen;
+  }
+}

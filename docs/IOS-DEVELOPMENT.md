@@ -754,7 +754,7 @@ upload's own archive command, and changes its build number through XcodeGen's
 A Mac the person owns, such as a Mac mini or a cloud Mac from MacStadium, AWS EC2 Mac
 or Scaleway, pairs as a Jackalope computer so iOS builds, tests, simulators and agents
 run there. It runs the same computer agent as the Linux image, natively and without
-Docker: Settings → Computers → **Pair machine** → **Mac** saves a setup script carrying
+Docker: Devices → Cloud machines → **Pair a machine** → **Mac** saves a setup script carrying
 this app version's agent and shows the command to run on the Mac. Setup, the
 LaunchAgent, HTTPS and what a Mac computer does and does not offer are in
 [bot computers](BOT-COMPUTERS.md#a-mac).
@@ -765,7 +765,7 @@ this device does (see [Xcode toolchain and project detection](#xcode-toolchain-a
 an explicit `DEVELOPER_DIR` or a full Xcode selection is used as is, and when
 `xcode-select` names the Command Line Tools it sets `DEVELOPER_DIR` to the installed
 Xcode for every run, check and command it starts. The paired machine's record keeps
-what it reported, and Settings → Computers shows it (`macOS · arm64 · Xcode 27.2 · iOS 27.2, iOS 27.0`).
+what it reported, and Devices → Cloud machines shows it (`macOS · arm64 · Xcode 27.2 · iOS 27.2, iOS 27.0`).
 A Mac computer has no desktop control, viewer or browser tools.
 
 A project builds with Xcode when its folder holds an `.xcodeproj` or `.xcworkspace`, or

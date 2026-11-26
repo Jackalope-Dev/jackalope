@@ -1,5 +1,26 @@
 @import "./foundation.css";
 @import "./motion.css";
+/* Registered so each edge of the sliding highlight can transition on its own. */
+@property --segment-start {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+@property --segment-end {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+@property --segment-y {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+@property --segment-h {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
 @layer components {
   /* One recessed track shared by filters, view navigation and segmented tab lists.
      The whole track is one control height, so it lines up with fields and buttons beside it;
@@ -27,16 +48,17 @@
     position: relative;
     isolation: isolate;
   }
-  /* The selected fill slides between items once the track has measured them. */
+  /* The selected fill slides between items once the track has measured them. Clamped so a
+     springy trailing edge can never turn the width negative. */
   .ui-segmented-indicator {
     position: absolute;
     top: 0;
     left: 0;
     z-index: -1;
     display: none;
-    width: var(--segment-w, 0);
-    height: var(--segment-h, 0);
-    translate: var(--segment-x, 0) var(--segment-y, 0);
+    width: max(calc(var(--segment-end) - var(--segment-start)), 0px);
+    height: var(--segment-h);
+    translate: var(--segment-start) var(--segment-y);
     border: 1px solid var(--color-border);
     border-radius: calc(var(--radius-lg) - 3px);
     background: var(--color-surface-elevated);
@@ -46,10 +68,48 @@
   .ui-segmented[data-indicator] > .ui-segmented-indicator {
     display: block;
   }
-  .ui-segmented[data-indicator="ready"] > .ui-segmented-indicator {
-    transition:
-      translate var(--motion-slow, 240ms) var(--ease-out, ease-out),
-      width var(--motion-slow, 240ms) var(--ease-out, ease-out);
+  /* A droplet: the edge facing the travel leads quickly and the other follows a little later
+     with a springy settle, stretching the fill across the gap; it squashes mid-flight. */
+  @media (prefers-reduced-motion: no-preference) {
+    .ui-segmented[data-indicator="ready"] > .ui-segmented-indicator {
+      --segment-lead: var(--motion-base, 180ms) var(--ease-out, ease-out);
+      --segment-follow: calc(var(--motion-slow, 240ms) * 1.6) cubic-bezier(0.34, 1.4, 0.64, 1);
+      transition:
+        --segment-start var(--segment-follow),
+        --segment-end var(--segment-lead),
+        --segment-y var(--motion-slow, 240ms) var(--ease-out, ease-out),
+        --segment-h var(--motion-slow, 240ms) var(--ease-out, ease-out);
+    }
+    .ui-segmented[data-indicator="ready"][data-direction="back"] > .ui-segmented-indicator {
+      transition:
+        --segment-start var(--segment-lead),
+        --segment-end var(--segment-follow),
+        --segment-y var(--motion-slow, 240ms) var(--ease-out, ease-out),
+        --segment-h var(--motion-slow, 240ms) var(--ease-out, ease-out);
+    }
+    .ui-segmented[data-indicator="ready"][data-moving="a"] > .ui-segmented-indicator {
+      animation: ui-segment-squash-a calc(var(--motion-slow, 240ms) * 1.6) var(--ease-out, ease-out);
+    }
+    .ui-segmented[data-indicator="ready"][data-moving="b"] > .ui-segmented-indicator {
+      animation: ui-segment-squash-b calc(var(--motion-slow, 240ms) * 1.6) var(--ease-out, ease-out);
+    }
+  }
+  /* Two identical keyframes: alternating the name restarts the squash on every move. */
+  @keyframes ui-segment-squash-a {
+    35% {
+      scale: 1 0.86;
+    }
+    70% {
+      scale: 1 1.03;
+    }
+  }
+  @keyframes ui-segment-squash-b {
+    35% {
+      scale: 1 0.86;
+    }
+    70% {
+      scale: 1 1.03;
+    }
   }
   :is(.ui-segment, .ui-segmented > .ui-tabs-trigger) {
     display: inline-flex;

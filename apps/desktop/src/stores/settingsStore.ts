@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { BuiltinAgentId } from '../lib/agent-catalog';
 import { createPersistStorage } from '../lib/persist-storage.ts';
+import { trackSettingChanges } from '../lib/setting-telemetry.ts';
 
 type DefaultRunnerId = BuiltinAgentId;
 export type NotificationLevel = 'all' | 'failures-only' | 'none';
@@ -105,9 +106,13 @@ export const useSettingsStore = create<SettingsState>()(
     (set, get) => ({
       ...DEFAULT_SETTINGS,
 
-      setUseMcpMarketplace: (enabled: boolean) => set({ useMcpMarketplace: enabled }),
+      setUseMcpMarketplace: (enabled: boolean) => {
+        trackSettingChanges(get(), { useMcpMarketplace: enabled });
+        set({ useMcpMarketplace: enabled });
+      },
 
       updateSettings: (partial) => {
+        trackSettingChanges(get(), partial);
         set((state) => ({ ...state, ...partial }));
       },
 

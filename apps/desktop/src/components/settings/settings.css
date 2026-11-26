@@ -165,21 +165,24 @@
   overscroll-behavior: contain;
   overflow-wrap: anywhere;
 }
-/* Toggle groups marked data-settings-tile sit two to a row on wide panes, so short cards use
-   the width instead of stacking into one long column; anything unmarked spans the row. The
-   grid gap replaces the stacked margins. */
+/* Groups marked data-settings-tile sit two to a row on wide panes, packed like masonry:
+   useSettingsMasonry gives each card a span of small rows from its height, so the next card
+   starts right under it instead of below the taller neighbour. Anything unmarked spans
+   both columns. Order still follows the page. */
 @container (min-width: 52rem) {
   .settings-section:has(> [data-settings-tile]) {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 16px;
+    grid-auto-rows: 4px;
+    column-gap: 16px;
     align-items: start;
+  }
+  .settings-section:has(> [data-settings-tile]) > * {
+    grid-row-end: span var(--settings-span, 1);
+    margin-top: 0;
   }
   .settings-section:has(> [data-settings-tile]) > :not([data-settings-tile]) {
     grid-column: 1 / -1;
-  }
-  .settings-section:has(> [data-settings-tile]) > * {
-    margin-top: 0;
   }
 }
 .settings-input {
@@ -643,6 +646,42 @@
 .privacy-summary-item[data-on] .privacy-summary-state {
   background: var(--color-accent-subtle);
   color: var(--color-accent-ink);
+}
+
+/* The session's usage reports, one row each, scrolling within a fixed height. */
+.privacy-events {
+  display: grid;
+  gap: 6px;
+  max-height: 280px;
+  margin: 8px 0 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+.privacy-event {
+  display: grid;
+  grid-template-columns: minmax(8rem, auto) 1fr auto;
+  align-items: baseline;
+  gap: 10px;
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-sunken);
+  font-size: var(--text-xs);
+}
+.privacy-event-name {
+  font-weight: 600;
+}
+.privacy-event code {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-text-secondary);
+}
+@media (max-width: 560px) {
+  .privacy-event {
+    grid-template-columns: 1fr;
+  }
 }
 
 /* Reset spells out what it erases and what survives, side by side on wide panes. */

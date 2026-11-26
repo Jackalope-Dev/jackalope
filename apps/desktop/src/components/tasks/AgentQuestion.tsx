@@ -1,5 +1,5 @@
 import type { PendingUserPrompt } from '@jackalope/contracts/runs';
-import { Button, Textarea } from '@jackalope/ui';
+import { BorderBeamLayer, Button, Textarea } from '@jackalope/ui';
 import { Check, MessageCircle, Send } from 'lucide-react';
 import { useEffect, useId, useRef, useState } from 'react';
 import {
@@ -24,6 +24,8 @@ export function AgentQuestion(props: {
   /** Replaces an agent's answer with the person's; omitted where overriding is unavailable. */
   onOverride?: (answer: string) => Promise<void>;
   onOpenLink?: (url: string) => void;
+  /** Breathes a soft edge while the question waits on the person. */
+  highlight?: boolean;
 }) {
   if (props.prompt.humanAction)
     return (
@@ -46,6 +48,7 @@ function QuestionCard({
   onAnswer,
   onContinue,
   onOverride,
+  highlight,
 }: Parameters<typeof AgentQuestion>[0]) {
   const id = useId();
   const multiple = prompt.inputType === 'multiChoice';
@@ -111,6 +114,11 @@ function QuestionCard({
       data-answered={answered || undefined}
       aria-labelledby={`${id}-question`}
     >
+      <BorderBeamLayer
+        variant="pulse"
+        strength={0.55}
+        active={!!highlight && active && !answered && !deciding}
+      />
       <div className="task-experience-heading">
         <span className="task-experience-icon">
           <MessageCircle size={18} aria-hidden="true" />

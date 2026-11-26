@@ -6,6 +6,12 @@ import {
 } from '@jackalope/contracts/telemetry';
 import type { TaskRun } from './run-types';
 
+/** The reported agent: a known provider, else 'other' so account and custom names stay here. */
+export function telemetryAgent(agent: string | undefined): TelemetryAgent | undefined {
+  if (!agent) return undefined;
+  return agents.includes(agent as TelemetryAgent) ? (agent as TelemetryAgent) : 'other';
+}
+
 interface Snapshot {
   status: TaskRun['status'];
   persistenceError: boolean;
@@ -27,9 +33,7 @@ export function createTaskTelemetry(track: (metric: Metric) => void, startedAt =
         verificationAt: run.verification?.checkedAt,
       });
       if (!enabled || (!old && !recent)) continue;
-      const agent: TelemetryAgent = agents.includes(run.agent as TelemetryAgent)
-        ? (run.agent as TelemetryAgent)
-        : 'other';
+      const agent = telemetryAgent(run.agent) ?? 'other';
       const workflow = run.liveSessionId ? 'chat' : 'task';
       if (!old) track({ name: 'task_state', state: 'starting', agent, workflow });
       if (old?.status !== run.status && run.status !== 'starting' && run.status !== 'stopping')

@@ -1,8 +1,10 @@
 import { describeError } from '@jackalope/contracts/errors';
 import type { RemoteAction } from '@jackalope/contracts/remote';
 import {
+  BorderBeamLayer,
   Button,
   ChoiceCards,
+  ConfirmDialog,
   Disclosure,
   DisclosureSummary,
   FieldCheck,
@@ -10,6 +12,7 @@ import {
   FormField,
   InlineNotice,
   Input,
+  DropdownMenu as Menu,
   Popover,
   Select,
   SelectItem,
@@ -48,7 +51,9 @@ import {
   remoteHosts,
   removeRemoteHost,
 } from '../../lib/remote-hosts';
+import { useDevicesStore } from '../../stores/devicesStore';
 import { useHostContextStore } from '../../stores/hostContextStore';
+import { OptionsMenu } from '../ui/OptionsMenu';
 import { InvitePhone } from './InvitePhone';
 import { RemoteWorkspace } from './RemoteWorkspace';
 
@@ -138,6 +143,9 @@ export function RemoteHosts() {
   const [loaded, setLoaded] = useState(false);
   const [selected, setSelected] = useState('');
   const [adding, setAdding] = useState(false);
+  const [forgetting, setForgetting] = useState(false);
+  const intent = useDevicesStore((state) => state.intent);
+  const changed = useDevicesStore((state) => state.changed);
   const [name, setName] = useState('');
   const [address, setAddress] = useState('');
   const [method, setMethod] = useState('ssh');
@@ -154,6 +162,16 @@ export function RemoteHosts() {
   const addressCheckId = useId();
   const codeCheckId = useId();
   const host = hosts.find((item) => item.id === selected) ?? hosts[0];
+  useEffect(() => {
+    if (intent === 'connect-host' && useDevicesStore.getState().consume('connect-host')) {
+      setAdding(true);
+      setPairError('');
+    }
+  }, [intent]);
+  useEffect(() => {
+    useDevicesStore.getState().setConnectingHost(busy && (adding || !hosts.length));
+  }, [busy, adding, hosts.length]);
+  useEffect(() => () => useDevicesStore.getState().setConnectingHost(false), []);
   useEffect(() => {
     useHostContextStore.setState({
       host: host && !adding ? { name: host.name, wsl: !!host.wsl, address: host.address } : null,
@@ -446,24 +464,11 @@ export function RemoteHosts() {
             </Select>
             {host && <PhoneAccess id={host.id} name={host.name} />}
             {host && (
-              <Button
-                variant="ghost"
-                disabled={busy}
-                onClick={async () => {
-                  setBusy(true);
-                  setError('');
-                  try {
-                    await removeRemoteHost(host.id);
-                    setHosts(await remoteHosts());
-                  } catch (cause) {
-                    setError(describeError(cause));
-                  } finally {
-                    setBusy(false);
-                  }
-                }}
-              >
-                Forget host
-              </Button>
+              <OptionsMenu label={`${host.name} options`} disabled={busy}>
+                <Menu.Item className="workspace-menu-item" onSelect={() => setForgetting(true)}>
+                  Forget host…
+                </Menu.Item>
+              </OptionsMenu>
             )}
           </div>
         )}
@@ -520,7 +525,7 @@ export function RemoteHosts() {
               }
             >
               <form
-                className="remote-setup remote-connect"
+                className="remote-setup remote-connect devices-connect-form"
                 onSubmit={async (event) => {
                   event.preventDefault();
                   if (busy) return;
@@ -539,6 +544,7 @@ export function RemoteHosts() {
                     setHosts(await remoteHosts());
                     setSelected(paired.id);
                     setAdding(false);
+                    changed();
                     setCode('');
                     setReached(0);
                   } catch (cause) {
@@ -548,10 +554,27 @@ export function RemoteHosts() {
                   }
                 }}
               >
+                <BorderBeamLayer variant="travel" active={busy} strength={0.8} />
                 <SetupSteps label="Connect a host" steps={connectSteps()} />
               </form>
             </SetupLayout>
           </>
+        )}
+        {host && (
+          <ConfirmDialog
+            open={forgetting}
+            onOpenChange={setForgetting}
+            title={`Forget ${host.name}?`}
+            description="This computer stops reaching it. Its tasks keep running there, and you can pair again with a new code."
+            label="Forget host"
+            busyLabel="Forgetting…"
+            onConfirm={async () => {
+              await removeRemoteHost(host.id);
+              setForgetting(false);
+              setHosts(await remoteHosts());
+              changed();
+            }}
+          />
         )}
         {host && !adding && (
           <RemoteWorkspace

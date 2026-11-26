@@ -38,7 +38,9 @@ separate acceptance; smaller responses do not establish general cost or speed ga
   recent results. Library
   shows task screenshots, files agents saved under `.jackalope/artifacts`, pasted
   attachments and images or PDFs a task's latest workspace changed, filtered by project
-  and kind. The title bar holds command search; the bottom bar shows the focused project,
+  and kind. Items Jackalope saved can be moved to the system Trash one at a time or
+  selected in bulk; images and PDFs a task changed stay with the repository.
+  The title bar holds command search; the bottom bar shows the focused project,
   branch, local activity and visual account allowances with freshness and reset times.
   The branch menu switches the project checkout to a local or remote branch or creates
   one at the current commit; switching needs a clean checkout and waits for tasks working
@@ -920,6 +922,8 @@ Which product scopes Connect Cloudflare grants, and provisioning against a live 
 not yet accepted.
 
 Trusted hosts and a responsive phone companion are implemented for native validation.
+Devices opens on a map of this computer with the phones and computers paired to use it, the
+computers it uses and its cloud machines, each leading to its setup below.
 Devices → Let devices use this one scopes paired devices to selected projects. Before it is on, every
 project starts selected and Pair a phone turns access on and creates the code in one step. A separate loopback
 API supports task status, questions, follow-ups, new isolated sessions and change review.
@@ -956,8 +960,8 @@ does not pause control there, and wlroots desktops without RemoteDesktop remain
 unavailable. The portal client compiles only in Linux CI and has no real-portal
 fixture. XWayland alone is insufficient. A person can attach a window to a conversation, or
 to new work before Send, by dragging its agent onto it (Windows and macOS) or picking it
-from a list, choosing see-only or see-and-control; the agent's next window request uses it
-without asking. On Windows and macOS the window wears a badge and edge while it waits, and a
+from a list, choosing see-only or see-and-control; the agent's window requests use it without asking
+for the rest of the conversation, until it is detached. On Windows and macOS the window wears a badge and edge while it waits, and a
 turn that ends while its grant is paused leaves a Resume button there that continues the
 conversation. Pointer and keyboard input reach a granted window in the background on
 Windows and macOS, except Safari, Firefox-family and UWP/WinUI windows and, on Windows,

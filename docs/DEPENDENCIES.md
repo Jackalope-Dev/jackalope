@@ -151,6 +151,7 @@ keep their own copyright files inside it; see [BOT-COMPUTERS.md](BOT-COMPUTERS.m
 | assertion-error | 2.0.1 | MIT |
 | bail | 2.0.2 | MIT |
 | blake3-wasm | 2.1.5 | MIT |
+| boolbase | 1.0.0 | ISC |
 | ccount | 2.0.1 | MIT |
 | chai | 6.3.0 | MIT |
 | character-entities | 2.0.2 | MIT |
@@ -162,6 +163,8 @@ keep their own copyright files inside it; see [BOT-COMPUTERS.md](BOT-COMPUTERS.m
 | clsx | 2.1.1 | MIT |
 | comma-separated-tokens | 2.0.3 | MIT |
 | cookie | 1.1.1 | MIT |
+| css-select | 5.2.2 | BSD-2-Clause |
+| css-what | 6.2.2 | BSD-2-Clause |
 | csstype | 3.2.3 | MIT |
 | d3-color | 3.1.1 | ISC |
 | d3-dispatch | 3.0.2 | ISC |
@@ -179,8 +182,12 @@ keep their own copyright files inside it; see [BOT-COMPUTERS.md](BOT-COMPUTERS.m
 | detect-node-es | 1.1.0 | MIT |
 | devlop | 1.1.0 | MIT |
 | diff | 9.0.0 | BSD-3-Clause |
+| dom-serializer | 2.0.0 | MIT |
+| domelementtype | 2.3.0 | BSD-2-Clause |
+| domhandler | 5.0.3 | BSD-2-Clause |
+| domutils | 3.2.2 | BSD-2-Clause |
 | enhanced-resolve | 5.26.1 | MIT |
-| entities | 6.0.1 | BSD-2-Clause |
+| entities | 4.5.0, 6.0.1 | BSD-2-Clause |
 | error-stack-parser-es | 1.0.5 | MIT |
 | es-module-lexer | 2.3.2 | MIT |
 | esbuild | 0.28.2 | MIT |
@@ -206,6 +213,7 @@ keep their own copyright files inside it; see [BOT-COMPUTERS.md](BOT-COMPUTERS.m
 | hast-util-to-parse5 | 8.0.1 | MIT |
 | hast-util-whitespace | 3.0.0 | MIT |
 | hastscript | 9.0.1 | MIT |
+| he | 1.2.0 | MIT |
 | html-url-attributes | 3.0.1 | MIT |
 | html-void-elements | 3.0.0 | MIT |
 | inline-style-parser | 0.2.7 | MIT |
@@ -277,6 +285,9 @@ keep their own copyright files inside it; see [BOT-COMPUTERS.md](BOT-COMPUTERS.m
 | motion-utils | 13.5.0 | MIT |
 | ms | 2.1.3 | MIT |
 | nanoid | 3.3.20 | MIT |
+| node-html-markdown | 2.0.0 | MIT |
+| node-html-parser | 6.1.13 | MIT |
+| nth-check | 2.1.1 | BSD-2-Clause |
 | obug | 3.0.0 | MIT |
 | oniguruma-parser | 0.12.2 | MIT |
 | oniguruma-to-es | 4.3.6 | MIT |
@@ -328,6 +339,7 @@ keep their own copyright files inside it; see [BOT-COMPUTERS.md](BOT-COMPUTERS.m
 | tailwind-merge | 3.7.0 | MIT |
 | tailwindcss | 4.3.4 | MIT |
 | tapable | 2.3.3 | MIT |
+| thinking-orbs | 0.3.2 | MIT |
 | tinybench | 6.2.3 | MIT |
 | tinyexec | 1.3.1 | MIT |
 | tinyglobby | 0.2.17 | MIT |
@@ -455,7 +467,7 @@ keep their own copyright files inside it; see [BOT-COMPUTERS.md](BOT-COMPUTERS.m
 | concurrent-queue | 2.5.0 | Apache-2.0 OR MIT |
 | const-oid | 0.10.2 | Apache-2.0 OR MIT |
 | convert_case | 0.10.0 | MIT |
-| cookie | 0.18.2 | MIT OR Apache-2.0 |
+| cookie | 0.18.3 | MIT OR Apache-2.0 |
 | core-foundation | 0.9.4 | MIT OR Apache-2.0 |
 | core-foundation | 0.10.1 | MIT OR Apache-2.0 |
 | core-foundation-sys | 0.8.7 | MIT OR Apache-2.0 |
@@ -544,7 +556,7 @@ keep their own copyright files inside it; see [BOT-COMPUTERS.md](BOT-COMPUTERS.m
 | foreign-types | 0.5.0 | MIT/Apache-2.0 |
 | foreign-types-macros | 0.2.4 | MIT/Apache-2.0 |
 | foreign-types-shared | 0.3.1 | MIT/Apache-2.0 |
-| form_urlencoded | 1.2.2 | MIT OR Apache-2.0 |
+| form_urlencoded | 1.2.3 | MIT OR Apache-2.0 |
 | fs_extra | 1.3.0 | MIT |
 | fsevent-sys | 4.1.0 | MIT |
 | futures | 0.3.34 | MIT OR Apache-2.0 |
@@ -676,8 +688,11 @@ keep their own copyright files inside it; see [BOT-COMPUTERS.md](BOT-COMPUTERS.m
 | javascriptcore-rs | 1.1.2 | MIT |
 | javascriptcore-rs-sys | 1.1.1 | MIT |
 | jiff | 0.2.35 | Unlicense OR MIT |
+| jiff | 1.0.3 | Unlicense OR MIT |
 | jiff-core | 0.1.0 | Unlicense OR MIT |
+| jiff-core | 1.0.2 | Unlicense OR MIT |
 | jiff-static | 0.2.35 | Unlicense OR MIT |
+| jiff-static | 1.0.3 | Unlicense OR MIT |
 | jiff-tzdb | 0.1.8 | Unlicense OR MIT |
 | jiff-tzdb-platform | 0.1.3 | Unlicense OR MIT |
 | jni | 0.21.1 | MIT/Apache-2.0 |
@@ -1012,6 +1027,7 @@ keep their own copyright files inside it; see [BOT-COMPUTERS.md](BOT-COMPUTERS.m
 | tracing | 0.1.44 | MIT |
 | tracing-attributes | 0.1.31 | MIT |
 | tracing-core | 0.1.36 | MIT |
+| trash | 5.4.0 | MIT |
 | tray-icon | 0.25.1 | MIT OR Apache-2.0 |
 | tree-sitter | 0.27.1 | MIT |
 | tree-sitter-javascript | 0.25.0 | MIT |
@@ -1030,7 +1046,8 @@ keep their own copyright files inside it; see [BOT-COMPUTERS.md](BOT-COMPUTERS.m
 | unicode-truncate | 2.0.1 | MIT OR Apache-2.0 |
 | unicode-width | 0.2.3 | MIT OR Apache-2.0 |
 | untrusted | 0.9.0 | ISC |
-| url | 2.5.8 | MIT OR Apache-2.0 |
+| url | 2.5.9 | MIT OR Apache-2.0 |
+| urlencoding | 2.1.3 | MIT |
 | urlpattern | 0.6.0 | MIT |
 | utf8_iter | 1.0.4 | Apache-2.0 OR MIT |
 | utf8parse | 0.2.2 | Apache-2.0 OR MIT |

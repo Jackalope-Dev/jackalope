@@ -232,7 +232,8 @@ import offer the same **Keep out of commits** choice, on by default, and an untr
 project skill offers it from its menu.
 
 The page shows which of the account's computers hold each synced skill and whether they
-have the newest revision.
+have the newest revision. It counts this computer and the computers holding a synced
+skill, so connections that never synced anything are not counted.
 
 ### Stopping and deleting
 
@@ -258,8 +259,12 @@ except deletion:
   returns `stored` with the new revision and update time, or `conflict` with the
   current revision. `baseRevision` is 0 for a new skill; a removal omits `skill`.
 - `POST /v1/desktop/skills/have` with `{epoch, have}` records the revision this device
-  holds of each skill and returns up to 10 of the account's devices and which revision
-  each holds.
+  holds of each skill and returns up to 10 of the account's computers and which revision
+  each holds. Connections sharing a machine key are one computer, shown as the calling
+  connection or its most recently seen one, with their holdings moved to it. A computer
+  is listed when it is the caller's, holds a synced skill, or has settings sync on and
+  checked in within 30 days. Entries keep the `{id, name, platform, here}` shape older
+  desktops parse strictly.
 - `DELETE /v1/desktop/skills` deletes every synced skill and advances the epoch.
 
 A stale epoch receives `409 skills_reset`; missing consent receives

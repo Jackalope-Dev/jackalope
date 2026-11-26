@@ -7,7 +7,10 @@ import {
   DialogHeader,
   InlineNotice,
   LinkButton,
+  type LiquidAction,
+  LiquidActions,
   DropdownMenu as Menu,
+  Popover,
   SearchField,
   SegmentedNav,
   Switch,
@@ -20,10 +23,12 @@ import {
   ArrowRight,
   ArrowRightLeft,
   Bot as BotIcon,
+  Download,
   MessageSquare,
   MoreHorizontal,
   Plus,
   Sparkles,
+  UserPlus,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
@@ -83,6 +88,7 @@ import './bots.css';
 import { describeError } from '@jackalope/contracts/errors';
 import { agentAdapter } from '../../lib/agent-catalog';
 import { listSchedules, type ScheduleLedger } from '../../lib/schedules';
+import { trackAction } from '../../lib/usage-events';
 import { ActionError } from '../ui/ActionError';
 
 function randomStyle() {
@@ -187,6 +193,8 @@ export function BotsWorkspace() {
   );
   const [pickingTemplate, setPickingTemplate] = useState(false);
   const [team, setTeam] = useState<'share' | 'import' | null>(null);
+  const [addingExisting, setAddingExisting] = useState(false);
+  const newBot = useRef<HTMLDivElement>(null);
   const open = sessions.find((session) => session.id === openId && session.persona);
   useEffect(observeLiveSessions, []);
   // Reading a conversation, including replies that arrive while it is open, marks it read.
@@ -236,6 +244,42 @@ export function BotsWorkspace() {
   };
   // The tab above already says Bots, so the overview's heading names what is on the page.
   const overviewTitle = bots.length === 0 ? 'Start from a template' : 'Your bots';
+  // Every way to bring a bot onto the page lives on the one New bot control.
+  const creation: LiquidAction[] = [
+    {
+      id: 'blank',
+      label: 'Blank bot',
+      icon: <BotIcon size={16} aria-hidden="true" />,
+      onSelect: () => startNew(),
+    },
+    {
+      id: 'template',
+      label: 'From a template…',
+      icon: <Sparkles size={16} aria-hidden="true" />,
+      onSelect: () => setPickingTemplate(true),
+    },
+    ...(scope
+      ? [
+          {
+            id: 'import',
+            label: 'Import bots…',
+            icon: <Download size={16} aria-hidden="true" />,
+            onSelect: () => setTeam('import'),
+          },
+        ]
+      : []),
+    ...(scope && elsewhere.length > 0
+      ? [
+          {
+            id: 'existing',
+            label: 'Add an existing bot…',
+            icon: <UserPlus size={16} aria-hidden="true" />,
+            onSelect: () => setAddingExisting(true),
+          },
+        ]
+      : []),
+  ];
+  const sharing = scope && roster.length ? () => setTeam('share') : undefined;
   return (
     <WorkspacePage className="bots-page">
       <WorkspaceHeading
@@ -262,18 +306,39 @@ export function BotsWorkspace() {
         }
         action={
           <div className="bots-heading-actions">
-            {scope && elsewhere.length > 0 && (
-              <Menu.Root>
-                <Menu.Trigger asChild>
-                  <Button variant="outline">Add an existing bot</Button>
-                </Menu.Trigger>
-                <Menu.Portal>
-                  <Menu.Content className="workspace-menu" align="end" sideOffset={8}>
+            {(sharing || (!hub.paused && bots.length > 0)) && (
+              <HubMenu paused={hub.paused || bots.length === 0} onShare={sharing} />
+            )}
+            <Popover.Root open={addingExisting} onOpenChange={setAddingExisting}>
+              <Popover.Anchor asChild>
+                <LiquidActions
+                  ref={newBot}
+                  label="New bot"
+                  icon={<Plus size={16} aria-hidden="true" />}
+                  actions={creation}
+                  disabled={!projects.length}
+                />
+              </Popover.Anchor>
+              {scope && (
+                <Popover.Portal>
+                  <Popover.Content
+                    className="bots-existing"
+                    align="end"
+                    aria-label="Add an existing bot"
+                    onCloseAutoFocus={(event) => {
+                      event.preventDefault();
+                      newBot.current
+                        ?.querySelector<HTMLButtonElement>('.ui-liquid-actions-trigger')
+                        ?.focus();
+                    }}
+                  >
                     {elsewhere.map((bot) => (
-                      <Menu.Item
+                      <button
                         key={bot.id}
+                        type="button"
                         className="workspace-menu-item"
-                        onSelect={() => {
+                        onClick={() => {
+                          setAddingExisting(false);
                           useBotStore.getState().update(bot.id, {
                             projectIds: [...(bot.projectIds ?? []), scope.id],
                           });
@@ -282,25 +347,12 @@ export function BotsWorkspace() {
                       >
                         <BotAvatar appearance={bot.appearance} agent={bot.agent} />
                         {bot.name}
-                      </Menu.Item>
+                      </button>
                     ))}
-                  </Menu.Content>
-                </Menu.Portal>
-              </Menu.Root>
-            )}
-            {(bots.length > 0 || scope) && (
-              <HubMenu
-                paused={hub.paused || bots.length === 0}
-                disabled={!projects.length}
-                onTemplate={() => setPickingTemplate(true)}
-                onShare={scope && roster.length ? () => setTeam('share') : undefined}
-                onImport={scope ? () => setTeam('import') : undefined}
-              />
-            )}
-            <Button onClick={() => startNew()} disabled={!projects.length}>
-              <Plus size={16} aria-hidden="true" />
-              New bot
-            </Button>
+                  </Popover.Content>
+                </Popover.Portal>
+              )}
+            </Popover.Root>
           </div>
         }
       />
@@ -504,6 +556,7 @@ export function BotsWorkspace() {
             if (editing.bot) store.update(editing.bot.id, draft);
             else {
               const id = store.create(draft);
+              trackAction('bot_created');
               if (editing.proposalId) void resolveProposal(editing.proposalId, 'accept', id);
               setHello(useBotStore.getState().bots.find((bot) => bot.id === id) ?? null);
             }
@@ -611,20 +664,17 @@ function BotTemplates({
   );
 }
 
-/** Page options. Resuming lives on the paused notice, so the menu only offers pausing. */
+/**
+ * Page options. Creating and importing live on New bot, and resuming lives on the paused
+ * notice, so the menu only offers sharing and pausing.
+ */
 function HubMenu({
   paused,
-  disabled,
-  onTemplate,
   onShare,
-  onImport,
 }: {
   paused: boolean;
-  disabled: boolean;
-  onTemplate: () => void;
-  /** Sharing and importing work on one project's bots, so they appear inside a project. */
+  /** Sharing works on one project's bots, so it appears inside a project. */
   onShare?: () => void;
-  onImport?: () => void;
 }) {
   return (
     <Menu.Root>
@@ -635,14 +685,6 @@ function HubMenu({
       </Menu.Trigger>
       <Menu.Portal>
         <Menu.Content className="workspace-menu" align="end" sideOffset={6}>
-          <Menu.Item className="workspace-menu-item" disabled={disabled} onSelect={onTemplate}>
-            New bot from template…
-          </Menu.Item>
-          {onImport && (
-            <Menu.Item className="workspace-menu-item" onSelect={onImport}>
-              Import bots…
-            </Menu.Item>
-          )}
           {onShare && (
             <Menu.Item className="workspace-menu-item" onSelect={onShare}>
               Share these bots…
@@ -650,7 +692,7 @@ function HubMenu({
           )}
           {!paused && (
             <>
-              <Menu.Separator className="menu-separator" />
+              {onShare && <Menu.Separator className="menu-separator" />}
               <Menu.Item
                 className="workspace-menu-item"
                 onSelect={() => void setWakeUpsPaused(true)}
@@ -882,6 +924,7 @@ function BotProfile({
           agent={bot.agent}
           size="lg"
           state={botActivity(conversations, runs)}
+          interactive
         />
         <div className="bots-profile-identity">
           <h2>{bot.name}</h2>

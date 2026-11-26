@@ -828,7 +828,7 @@ export function ManagedTaskView({ task }: { task: ManagedTask }) {
                   </Button>
                 )}
               </div>
-              <TaskLiveActivity run={activityRun} />
+              <TaskLiveActivity run={activityRun} orb={false} />
               <TaskActivity entries={activityRun.activity} active={isActive(activityRun)} />
             </>
           ) : (

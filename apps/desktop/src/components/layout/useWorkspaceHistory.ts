@@ -24,10 +24,12 @@ export function useWorkspaceHistory(
   const { tab, projectId, category, settingsProjectId } = location;
   useEffect(() => {
     const current = { tab, projectId, category, settingsProjectId };
-    if (restoring.current) {
-      if (sameLocation(restoring.current, current)) restoring.current = null;
-      return;
-    }
+    // Only the first change after a step can be the step arriving. Anything else, including
+    // a step that landed somewhere slightly different, is a visit, or history would stop
+    // recording until the restored location happened to come round again.
+    const arriving = restoring.current;
+    restoring.current = null;
+    if (arriving && sameLocation(arriving, current)) return;
     setHistory((visited) => visitLocation(visited, current));
   }, [tab, projectId, category, settingsProjectId]);
   const go = (delta: -1 | 1) => {

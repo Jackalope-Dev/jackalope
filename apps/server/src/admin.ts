@@ -97,7 +97,7 @@ async function consoleRoutes(
     const version = url.searchParams.get('version') ?? '';
     const os = url.searchParams.get('os') ?? 'all';
     if (
-      ![7, 30].includes(days) ||
+      ![7, 14, 30].includes(days) ||
       !(channel === 'all' || isReleaseChannel(channel)) ||
       !(os === 'all' || isPlatform(os)) ||
       !(version === '' || SEMVER.test(version)) ||

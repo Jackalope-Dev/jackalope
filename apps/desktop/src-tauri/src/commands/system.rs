@@ -9,7 +9,95 @@ pub struct SystemInfo {
     pub desktop_control: super::desktop_control::platform::Readiness,
 }
 
+/// This computer's name for pairing and system info, falling back to "localhost".
 pub(super) fn device_name() -> String {
+    computer_name().unwrap_or_else(|| "localhost".into())
+}
+
+/// The name people know this computer by: the Computer Name in macOS Sharing settings, the
+/// Windows host name in its own case (not the upper-case NetBIOS name), or the Linux host
+/// name. `None` when nothing better than "localhost" is set. A rename is picked up within a
+/// few minutes.
+pub(super) fn computer_name() -> Option<String> {
+    const FRESH: std::time::Duration = std::time::Duration::from_secs(300);
+    static CACHE: std::sync::Mutex<Option<(std::time::Instant, Option<String>)>> =
+        std::sync::Mutex::new(None);
+    let mut cache = CACHE
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    if let Some((at, name)) = cache.as_ref() {
+        if at.elapsed() < FRESH {
+            return name.clone();
+        }
+    }
+    let name = platform_computer_name()
+        .and_then(|name| clean_name(&name))
+        .or_else(|| host_name().and_then(|name| clean_name(&name)));
+    *cache = Some((std::time::Instant::now(), name.clone()));
+    name
+}
+
+fn clean_name(name: &str) -> Option<String> {
+    let name: String = name
+        .trim()
+        .chars()
+        .filter(|character| !character.is_control())
+        .take(120)
+        .collect();
+    let lower = name.to_ascii_lowercase();
+    let placeholder = lower == "localhost" || lower.starts_with("localhost.");
+    (!name.is_empty() && !placeholder).then_some(name)
+}
+
+#[cfg(target_os = "macos")]
+fn platform_computer_name() -> Option<String> {
+    let output = std::process::Command::new("/usr/sbin/scutil")
+        .args(["--get", "ComputerName"])
+        .output()
+        .ok()?;
+    output
+        .status
+        .success()
+        .then(|| String::from_utf8_lossy(&output.stdout).into_owned())
+}
+
+#[cfg(windows)]
+fn platform_computer_name() -> Option<String> {
+    use windows_sys::Win32::System::SystemInformation::{
+        ComputerNamePhysicalDnsHostname, GetComputerNameExW,
+    };
+    let mut size: u32 = 0;
+    // The first call reports the buffer size the name needs, including its terminator.
+    unsafe {
+        GetComputerNameExW(
+            ComputerNamePhysicalDnsHostname,
+            std::ptr::null_mut(),
+            &mut size,
+        )
+    };
+    if size == 0 {
+        return None;
+    }
+    let mut buffer = vec![0u16; size as usize];
+    if unsafe {
+        GetComputerNameExW(
+            ComputerNamePhysicalDnsHostname,
+            buffer.as_mut_ptr(),
+            &mut size,
+        )
+    } == 0
+    {
+        return None;
+    }
+    Some(String::from_utf16_lossy(&buffer[..size as usize]))
+}
+
+#[cfg(all(unix, not(target_os = "macos")))]
+fn platform_computer_name() -> Option<String> {
+    std::fs::read_to_string("/etc/hostname").ok()
+}
+
+fn host_name() -> Option<String> {
     #[cfg(unix)]
     {
         let mut name = [0u8; 256];
@@ -19,15 +107,13 @@ pub(super) fn device_name() -> String {
                 .position(|&byte| byte == 0)
                 .unwrap_or(name.len());
             if length > 0 {
-                return String::from_utf8_lossy(&name[..length]).into_owned();
+                return Some(String::from_utf8_lossy(&name[..length]).into_owned());
             }
         }
     }
     std::env::var("COMPUTERNAME")
         .or_else(|_| std::env::var("HOSTNAME"))
         .ok()
-        .filter(|name| !name.trim().is_empty())
-        .unwrap_or_else(|| "localhost".into())
 }
 
 /// The first name of the person using this computer, for naming the devices they pair: the
@@ -109,7 +195,19 @@ pub async fn system_get_info() -> Result<SystemInfo, String> {
 
 #[cfg(test)]
 mod tests {
-    use super::first_name;
+    use super::{clean_name, first_name};
+
+    #[test]
+    fn computer_names_drop_placeholders_and_control_characters() {
+        assert_eq!(
+            clean_name("  Caden's MacBook Pro\n").unwrap(),
+            "Caden's MacBook Pro"
+        );
+        assert_eq!(clean_name("localhost"), None);
+        assert_eq!(clean_name("LocalHost.localdomain"), None);
+        assert_eq!(clean_name("   "), None);
+        assert_eq!(clean_name("desk\u{7}top").unwrap(), "desktop");
+    }
 
     #[test]
     fn owner_names_use_the_first_word_of_the_full_name_else_the_login() {

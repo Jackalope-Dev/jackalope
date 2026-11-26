@@ -700,6 +700,65 @@ it('counts one device slot per machine however often that machine reconnects', a
       .status,
   ).toBe(400);
 });
+it('replaces unused connections of a computer that connects again and keeps live profiles', async () => {
+  const owner = await member();
+  async function connect(deviceKey: string) {
+    const secret = randomToken();
+    const started = await call('/v1/desktop/start', 'POST', {
+      challenge: await tokenHash(secret),
+      deviceKey,
+    });
+    const { verification } = await started.json<{ verification: string }>();
+    await approve(owner.session, verification);
+    expect((await call('/v1/desktop/exchange', 'POST', undefined, secret)).status).toBe(200);
+    return secret;
+  }
+  const laptop = randomToken();
+  const desk = randomToken();
+  const stale = await connect(laptop);
+  const live = await connect(laptop);
+  const elsewhere = await connect(desk);
+  const old = Date.now() - 20 * 86400000;
+  for (const secret of [stale, elsewhere])
+    await env.DB.prepare('UPDATE access_devices SET last_seen_at=?,created_at=? WHERE hash=?')
+      .bind(old, old, await tokenHash(secret))
+      .run();
+  const again = await connect(laptop);
+  expect((await call('/v1/desktop/me', 'GET', undefined, stale)).status).toBe(401);
+  for (const secret of [live, again, elsewhere])
+    expect((await call('/v1/desktop/me', 'GET', undefined, secret)).status).toBe(200);
+  const devices = await (
+    await call('/v1/access/devices', 'GET', undefined, owner.session, true)
+  ).json<{ id: string; computer: string }[]>();
+  expect(devices).toHaveLength(3);
+  expect(new Set(devices.map((device) => device.computer)).size).toBe(2);
+  expect(JSON.stringify(devices)).not.toContain(laptop);
+  expect(JSON.stringify(devices)).not.toContain('machine');
+});
+it('extends the connection of an active desktop only as it nears expiry', async () => {
+  const owner = await member();
+  const soon = await connectedDevice(owner);
+  const later = await connectedDevice(owner);
+  const now = Date.now();
+  const expiry = (secret: string) =>
+    tokenHash(secret).then((hash) =>
+      env.DB.prepare('SELECT expires_at AS at FROM access_devices WHERE hash=?')
+        .bind(hash)
+        .first<{ at: number }>()
+        .then((row) => row?.at ?? 0),
+    );
+  for (const [secret, at] of [
+    [soon, now + 10 * 86400000],
+    [later, now + 60 * 86400000],
+  ] as const)
+    await env.DB.prepare('UPDATE access_devices SET expires_at=? WHERE hash=?')
+      .bind(at, await tokenHash(secret))
+      .run();
+  await call('/v1/desktop/me', 'GET', undefined, soon);
+  await call('/v1/desktop/me', 'GET', undefined, later);
+  expect(await expiry(soon)).toBeGreaterThan(now + 89 * 86400000);
+  expect(await expiry(later)).toBe(now + 60 * 86400000);
+});
 it('tracks one pending beta flight request per account through operator resolution', async () => {
   const owner = await member();
   const secret = await connectedDevice(owner);

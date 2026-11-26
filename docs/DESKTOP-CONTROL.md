@@ -108,10 +108,12 @@ action (one window's geometry, for the badge and edge) run without a grant, like
 
 Dropping or choosing asks whether the agent may see the window or see and control it.
 Confirming stages that window for the conversation for 30 minutes. The conversation's
-next window-scope `request_access` takes it once instead of asking, if the handle,
-process and process start time still match; app and desktop requests ignore it. A run
+next window-scope `request_access` takes it instead of asking, if the handle, process and
+process start time still match; app and desktop requests ignore it. When that turn ends
+the window goes back to the conversation with the same control and site, and from then on
+it stays attached for every later turn until the person detaches it or the window closes. A run
 outside a conversation looks for a window staged under its task id. The grant then
-starts through the same path as an answered question, with the visible bar, pause and
+starts at once through the same path as an answered question, with the visible bar, pause and
 cancel behavior and site checks above, and is recorded as an answered "Desktop control"
 question. A see-only grant allows `snapshot`, `screenshot`, `wait_for` and
 `list_windows` and refuses every other action.
@@ -198,8 +200,9 @@ status at once. After six paused replies in a row, further calls fail with an
 instruction to ask the person to click Resume. Waiting holds no operation lock, so the
 Screen view and Stop stay responsive.
 
-macOS and X11 use a native bar. Grants start paused; click Resume to activate the
-granted window or app and begin. A window that takes input in the background stays
+macOS and X11 use a native bar. On macOS a window the person attached or chose in the
+access question starts at once, activating it as Resume does; a remembered app grant, and
+every grant on X11, starts paused until Resume. A window that takes input in the background stays
 where it is on Resume, on macOS and Windows; other windows come forward. On macOS the
 bar carries the Jackalope mark, the status and Pause/Resume, Stop, Open in Jackalope
 and fold buttons, takes the app's theme colors and folds to a small chip until the

@@ -9,8 +9,8 @@ import {
   Switch,
 } from '@jackalope/ui';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { openSettings } from '../../lib/app-events';
 import {
-  type CloudMachine,
   type ComputerPreferences,
   type ComputerStatus,
   cloudMachines,
@@ -19,20 +19,17 @@ import {
   computerUsage,
   type DockerStatus,
   deleteComputer,
-  describePlatform,
   dockerStatus,
   listComputers,
   providerLabel,
-  removeCloudMachine,
   setComputerPreferences,
   stopComputer,
-  testCloudMachine,
 } from '../../lib/computers';
 import { isTauriEnvironment, openExternalUrl } from '../../lib/native/env';
+import { useViewTabStore } from '../../stores/viewTabStore';
 import { Agent37Settings } from '../computers/Agent37Connect';
 import { AgentSignIns } from '../computers/AgentSignIns';
 import { IdleStopSelect } from '../computers/IdleStopSelect';
-import { PairMachineForm } from '../computers/PairMachineForm';
 import { ActionError } from '../ui/ActionError';
 
 function dockerSummary(status: DockerStatus) {
@@ -45,11 +42,10 @@ function dockerSummary(status: DockerStatus) {
   return `${engine} ${status.serverVersion ?? ''}${status.arch ? ` · ${status.arch}` : ''}`.trim();
 }
 
-/** Docker readiness, paired cloud machines and every bot or task computer. */
+/** Docker readiness, where cloud machines live, and every bot or task computer. */
 export function ComputersSettings() {
   const [docker, setDocker] = useState<DockerStatus | null>(null);
-  const [machines, setMachines] = useState<CloudMachine[]>([]);
-  const [hosted, setHosted] = useState(false);
+  const [machineCount, setMachineCount] = useState<number | null>(null);
   const [computers, setComputers] = useState<ComputerStatus[]>([]);
   const [preferences, setPreferences] = useState<ComputerPreferences | null>(null);
   // The latest preferences, including changes still saving, and the save queue:
@@ -57,8 +53,6 @@ export function ComputersSettings() {
   const latestPreferences = useRef<ComputerPreferences | null>(null);
   const savedPreferences = useRef<ComputerPreferences | null>(null);
   const savingPreferences = useRef<Promise<void>>(Promise.resolve());
-  const [health, setHealth] = useState<Record<string, string>>({});
-  const [pairing, setPairing] = useState(false);
   const [busy, setBusy] = useState('');
   const [error, setError] = useState('');
 
@@ -74,8 +68,7 @@ export function ComputersSettings() {
     savedPreferences.current = nextPreferences;
     setPreferences(nextPreferences);
     setDocker(nextDocker);
-    setMachines(nextMachines.machines);
-    setHosted(nextMachines.hostedAvailable);
+    setMachineCount(nextMachines.machines.length);
     setComputers(nextComputers);
   }, []);
 
@@ -137,30 +130,6 @@ export function ComputersSettings() {
     }
   };
 
-  const test = (machine: CloudMachine) =>
-    run(`test:${machine.id}`, async () => {
-      const result = await testCloudMachine(machine.id);
-      setHealth((current) => ({
-        ...current,
-        [machine.id]: result.reachable
-          ? [
-              'Connected',
-              result.platform && describePlatform(result.platform),
-              result.screen && `${result.screen[0]}×${result.screen[1]} screen`,
-            ]
-              .filter(Boolean)
-              .join(' · ')
-          : (result.message ?? 'Not reachable'),
-      }));
-      if (result.platform) {
-        setMachines((current) =>
-          current.map((saved) =>
-            saved.id === machine.id ? { ...saved, ...result.platform } : saved,
-          ),
-        );
-      }
-    });
-
   return (
     <>
       <ActionError error={error} />
@@ -213,67 +182,25 @@ export function ComputersSettings() {
         </SettingRow>
       </SettingGroup>
 
-      <SettingGroup
-        title="Cloud machines"
-        description="Run the Jackalope computer on any machine you own behind HTTPS. Jackalope never stops it; your provider’s schedule applies."
-      >
-        {machines.map((machine) => (
-          <SettingRow
-            key={machine.id}
-            title={machine.name}
-            description={health[machine.id] ?? `${describePlatform(machine)} · ${machine.url}`}
-          >
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                loading={busy === `test:${machine.id}`}
-                loadingLabel="Testing…"
-                disabled={!!busy}
-                onClick={() => void test(machine)}
-              >
-                Test connection
-              </Button>
-              <ConfirmDialog
-                trigger={
-                  <Button variant="outline" disabled={!!busy}>
-                    Remove…
-                  </Button>
-                }
-                title={`Remove ${machine.name}?`}
-                description="Jackalope forgets this machine and its pairing secret. The machine keeps running where it is."
-                label="Remove machine"
-                busyLabel="Removing…"
-                onConfirm={() => run(`remove:${machine.id}`, () => removeCloudMachine(machine.id))}
-              />
-            </div>
-          </SettingRow>
-        ))}
-        {pairing ? (
-          <SettingBody>
-            <PairMachineForm
-              defaultName={`Cloud machine ${machines.length + 1}`}
-              onCancel={() => setPairing(false)}
-              onPaired={() => {
-                setPairing(false);
-                void refresh().catch((cause) => setError(describeError(cause)));
-              }}
-            />
-          </SettingBody>
-        ) : (
-          <SettingRow title="Pair a cloud machine">
-            <Button variant="outline" disabled={!!busy} onClick={() => setPairing(true)}>
-              Pair machine
-            </Button>
-          </SettingRow>
-        )}
+      <SettingGroup title="Cloud machines">
         <SettingRow
           title={
-            <span className="inline-flex items-center gap-2">
-              Jackalope-hosted computers {!hosted && <Badge>Coming soon</Badge>}
-            </span>
+            machineCount
+              ? `${machineCount} paired ${machineCount === 1 ? 'machine' : 'machines'}`
+              : 'Pair and test cloud machines in Devices'
           }
-          description="Computers Jackalope runs for you, without Docker or your own cloud account."
-        />
+          description="Devices keeps your phone, other computers and cloud machines in one place."
+        >
+          <Button
+            variant="outline"
+            onClick={() => {
+              useViewTabStore.getState().setDevices('cloud');
+              openSettings('Devices');
+            }}
+          >
+            Open Devices
+          </Button>
+        </SettingRow>
       </SettingGroup>
 
       <Agent37Settings />

@@ -212,12 +212,93 @@ pub enum Metric {
         operation: Option<Operation>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         feature: Option<Feature>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        kind: Option<ErrorKind>,
     },
     OperationResult {
         id: String,
         operation: Operation,
         outcome: OperationOutcome,
     },
+    WorkSent {
+        id: String,
+        shape: WorkShape,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        agent: Option<TelemetryAgent>,
+        attachments: CountBucket,
+        window: bool,
+    },
+    ActionUsed {
+        id: String,
+        action: Action,
+    },
+    SettingChanged {
+        id: String,
+        setting: SettingName,
+    },
+}
+#[derive(Clone, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ErrorKind {
+    Type,
+    Reference,
+    Range,
+    Syntax,
+    Network,
+    Timeout,
+    Permission,
+    NotFound,
+    Aborted,
+    Other,
+}
+#[derive(Clone, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum WorkShape {
+    Conversation,
+    Plan,
+    Comparison,
+    Planned,
+}
+#[derive(Clone, Deserialize, Serialize)]
+pub enum CountBucket {
+    #[serde(rename = "0")]
+    Zero,
+    #[serde(rename = "1")]
+    One,
+    #[serde(rename = "2_plus")]
+    TwoPlus,
+}
+#[derive(Clone, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Action {
+    WindowAttached,
+    VoiceDictation,
+    ReadAloud,
+    DevicePaired,
+    ComputerConnected,
+    CloudMachinePaired,
+    BotCreated,
+}
+#[derive(Clone, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SettingName {
+    MascotReactions,
+    FrostedWindow,
+    ThemePickerInToolbar,
+    Notifications,
+    OsNotifications,
+    InterfaceZoom,
+    TerminalFontSize,
+    TerminalShell,
+    PreferredEditor,
+    TerminalLinks,
+    RetainTerminalOutput,
+    Shortcuts,
+    VoiceModel,
+    DefaultRunner,
+    ConcurrencyLimit,
+    TaskTimeout,
+    McpMarketplace,
 }
 #[derive(Clone, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -344,7 +425,10 @@ impl Metric {
             | Self::TaskState { id, .. }
             | Self::FeatureUsed { id, .. }
             | Self::OperationResult { id, .. }
-            | Self::AppError { id, .. } => id,
+            | Self::AppError { id, .. }
+            | Self::WorkSent { id, .. }
+            | Self::ActionUsed { id, .. }
+            | Self::SettingChanged { id, .. } => id,
         }
     }
 }
@@ -508,6 +592,12 @@ mod tests {
             serde_json::json!({"name":"operation_result","id":"x","operation":"private_command","outcome":"accepted"}),
             serde_json::json!({"name":"task_state","id":"x","state":"running","agent":"private_account"}),
             serde_json::json!({"name":"app_error","id":"x","code":"ui_render_error","feature":"private_project"}),
+            serde_json::json!({"name":"app_error","id":"x","code":"ui_error","message":"/Users/me/secret"}),
+            serde_json::json!({"name":"setting_changed","id":"x","setting":"dictation_endpoint"}),
+            serde_json::json!({"name":"action_used","id":"x","action":"private_action"}),
+            serde_json::json!({"name":"work_sent","id":"x","shape":"plan","attachments":"3","window":false}),
+            serde_json::json!({"name":"work_sent","id":"x","shape":"plan","attachments":"1","window":false,"prompt":"hi"}),
+            serde_json::json!({"name":"work_sent","id":"x","shape":"task","attachments":"1","window":false}),
         ] {
             assert!(serde_json::from_value::<Metric>(private).is_err());
         }

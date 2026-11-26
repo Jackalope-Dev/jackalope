@@ -269,9 +269,23 @@ Use motion to explain changes, acknowledge input or express the mascot's
 personality. Avoid competing animation, ambient pulses and unnecessary delays.
 `@jackalope/ui` owns shared motion: dialogs, menus, popovers, selects and tooltips
 animate in and out, tab panels and opened pages settle into place, and segmented
-controls slide their selection. Reuse its `--motion-*` durations and `--ease-*` curves
+controls stretch their selection like a droplet. Reuse its `--motion-*` durations and `--ease-*` curves
 instead of adding feature keyframes, and keep reduced motion static.
 Maintain the existing setup acknowledgment and workspace-entry behavior.
+
+`@jackalope/ui` also owns the activity effects, and each one runs only while its state is
+real. `BorderBeam` rides the edge of the element doing the work: a travelling beam on a
+composer while its agent works, a bottom line on a field while it searches or sends, and a
+pulse that follows the voice level while dictating. Keep a handful per screen, never on
+list rows, and never two on one element. `ThinkingOrb` replaces spinners where an agent or
+other long AI wait is behind them, with the state that names the activity (searching,
+solving, composing, planning, connecting, working, breathing) beside a text label; it
+unmounts when the work ends. `playDistortionWave` carries a view into its result from the
+control that caused it, such as Send opening the new conversation, and never plays for a
+failed action or more than once at a time. `Liquid` and `LiquidActions` merge touching
+pieces into one surface for small groups such as a creation menu. Effects take their
+colours from the theme tokens, pause offscreen and in hidden windows, and fall back to a
+static cue under reduced motion.
 
 ## Components and verification
 

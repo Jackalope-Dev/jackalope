@@ -23,6 +23,7 @@ import './computers.css';
 import { describeError } from '@jackalope/contracts/errors';
 import { useNativeResource } from '../../hooks/useNativeResource';
 import '../settings/setup-screens.css';
+import { trackAction } from '../../lib/usage-events';
 
 /** The tag of an image built from resources/computer on the machine itself. */
 const LOCAL_IMAGE = 'jackalope-computer';
@@ -99,6 +100,7 @@ export function PairMachineForm({
             kind === 'linux' ? viewerUrl.trim() || null : null,
           );
           setPaired(true);
+          trackAction('cloud_machine_paired');
           onPaired(machine);
         } catch (cause) {
           setError(describeError(cause));

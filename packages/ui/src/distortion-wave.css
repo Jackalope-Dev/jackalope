@@ -1,0 +1,47 @@
+@layer components {
+  /* The wave layer sits over the view at document level, so it outlives a view that
+     unmounts under it. It never takes pointer events. */
+  .ui-distortion-wave-layer {
+    position: fixed;
+    z-index: 110;
+    overflow: hidden;
+    pointer-events: none;
+    contain: strict;
+  }
+  .ui-distortion-wave-layer > * {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+  }
+  .ui-distortion-wave-blur {
+    -webkit-backdrop-filter: blur(var(--wave-blur, 0px));
+    backdrop-filter: blur(var(--wave-blur, 0px));
+  }
+
+  /* Two views share one grid cell, so the element takes the size of the larger. */
+  .ui-distortion-wave {
+    position: relative;
+    display: grid;
+  }
+  .ui-distortion-wave > .ui-distortion-wave-view {
+    grid-area: 1 / 1;
+    min-width: 0;
+    transition: opacity var(--motion-base) var(--ease-out);
+  }
+  .ui-distortion-wave > .ui-distortion-wave-view[data-shown="false"] {
+    opacity: 0;
+    visibility: hidden;
+    transition:
+      opacity var(--motion-base) var(--ease-out),
+      visibility 0s linear var(--motion-base);
+  }
+  .ui-distortion-wave-overlay {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+  }
+  .ui-distortion-wave-overlay > * {
+    pointer-events: auto;
+  }
+}

@@ -6,6 +6,9 @@
   /* --agent-color lets a bot wear its chosen colour. */
   color: var(--agent-color, var(--color-text-primary));
 }
+.brand-agent-character[data-interactive] {
+  cursor: pointer;
+}
 .brand-agent-echo {
   stroke: currentColor;
   stroke-width: 0.75;
@@ -15,7 +18,6 @@
   stroke: var(--color-surface);
   transform-origin: 39px 39px;
   transform-box: view-box;
-  animation: brand-agent-blink 5.2s ease-in-out infinite;
 }
 .brand-agent-orbit {
   stroke: var(--color-surface);
@@ -31,24 +33,116 @@
   transform-box: view-box;
   transition: transform 80ms cubic-bezier(0.2, 0, 0.2, 1);
 }
-.brand-agent-character[data-state="waiting"] {
-  transform: rotate(-6deg);
+/* The rig, outermost first: body hops from the feet, lean tilts. */
+.brand-agent-body {
+  transform-origin: 40px 74px;
+  transform-box: view-box;
 }
-.brand-agent-character[data-state="working"] {
-  animation: brand-agent-working 2.8s ease-in-out infinite;
+.brand-agent-lean {
+  transform-origin: 40px 70px;
+  transform-box: view-box;
 }
-.brand-agent-character[data-state="working"] .brand-agent-face {
-  animation: none;
+/* Waiting tilts the head; the lean eases in and out of it. */
+.brand-agent-character[data-state="waiting"] .brand-agent-lean {
+  rotate: -6deg;
 }
-@keyframes brand-agent-working {
-  0%,
-  100% {
-    transform: translateY(0);
+.brand-agent-ground {
+  display: none;
+  fill: currentColor;
+  opacity: 0.14;
+  transform-origin: 42px 80px;
+  transform-box: view-box;
+}
+
+/* Plush: studio shading derived from the character's own colour. */
+.brand-agent-stop-light {
+  stop-color: color-mix(in oklab, currentColor, white 55%);
+  stop-opacity: 0.75;
+}
+.brand-agent-stop-clear {
+  stop-color: currentColor;
+  stop-opacity: 0;
+}
+.brand-agent-stop-dark {
+  stop-color: color-mix(in oklab, currentColor, black 45%);
+  stop-opacity: 0.55;
+}
+.brand-agent-stop-rim {
+  stop-color: color-mix(in oklab, currentColor, white 70%);
+  stop-opacity: 0.8;
+}
+.brand-agent-bead {
+  fill: var(--color-text-primary);
+  stroke: none;
+  opacity: 0.55;
+}
+/* Plush: the ground shadow only reads on larger characters. */
+.brand-agent-character[data-material="plush"][data-large] .brand-agent-ground {
+  display: inline;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .brand-agent-face {
+    animation: brand-agent-blink 5.2s ease-in-out var(--brand-agent-blink-delay, 0s) infinite;
   }
-  50% {
-    transform: translateY(-2px);
+  .brand-agent-lean {
+    transition: rotate 420ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+
+  /* Idle: now and then a small jump. */
+  .brand-agent-character[data-state="idle"] .brand-agent-body {
+    animation: brand-agent-jump var(--brand-agent-idle-period, 16s) linear
+      var(--brand-agent-idle-delay, 0s) infinite;
+  }
+  .brand-agent-character[data-state="idle"]
+    .brand-agent-character[data-state="idle"]
+    .brand-agent-ground {
+    animation: brand-agent-jump-ground var(--brand-agent-idle-period, 16s) linear
+      var(--brand-agent-idle-delay, 0s) infinite;
+  }
+
+  /* Working: a small hop every beat. */
+  .brand-agent-character[data-state="working"] .brand-agent-body {
+    animation: brand-agent-hop 4.4s linear var(--brand-agent-work-delay, 0s) infinite;
+  }
+  .brand-agent-character[data-state="working"]
+    .brand-agent-character[data-state="working"]
+    .brand-agent-ground {
+    animation: brand-agent-hop-ground 4.4s linear var(--brand-agent-work-delay, 0s) infinite;
+  }
+  .brand-agent-character[data-state="working"] .brand-agent-face {
+    animation: none;
+  }
+
+  /* Waiting: a slow, attentive lean on top of the head tilt. */
+  .brand-agent-character[data-state="waiting"] .brand-agent-lean {
+    animation: brand-agent-lean 4.8s ease-in-out infinite alternate;
+  }
+
+  /* A poke: a hop. Two names let a quick second click restart it. */
+  .brand-agent-character[data-poke="a"] .brand-agent-body {
+    animation: brand-agent-poke-a 700ms linear;
+  }
+  .brand-agent-character[data-poke="b"] .brand-agent-body {
+    animation: brand-agent-poke-b 700ms linear;
+  }
+  .brand-agent-character[data-poke="a"]
+    .brand-agent-character[data-poke="b"]
+    .brand-agent-character[data-poke]
+    .brand-agent-ground {
+    animation: none;
+  }
+
+  /* Without a gaze to follow, idle eyes glance from corner to corner. */
+  .brand-agent-character[data-state="idle"][data-glance] .brand-agent-glance {
+    animation: brand-agent-glance 11s ease-in-out var(--brand-agent-glance-delay, 0s) infinite;
+  }
+
+  .brand-agent-character:is([data-offscreen], [data-hidden]) * {
+    animation-play-state: paused;
   }
 }
+
 @keyframes brand-agent-blink {
   0%,
   93%,
@@ -60,9 +154,151 @@
     transform: scaleY(0.08);
   }
 }
-@media (prefers-reduced-motion: reduce) {
-  .brand-agent-character[data-state="working"],
-  .brand-agent-face {
-    animation: none;
+@keyframes brand-agent-glance {
+  0%,
+  16%,
+  40%,
+  50%,
+  70%,
+  78%,
+  100% {
+    transform: translate(0, 0);
+  }
+  20%,
+  34% {
+    transform: translate(-3px, -2px);
+  }
+  54%,
+  64% {
+    transform: translate(3px, 1.5px);
+  }
+  82%,
+  94% {
+    transform: translate(2.5px, -2px);
+  }
+}
+@keyframes brand-agent-jump {
+  0%,
+  88%,
+  100% {
+    transform: none;
+    animation-timing-function: ease-out;
+  }
+  90% {
+    transform: scale(1.06, 0.92);
+    animation-timing-function: ease-out;
+  }
+  92.5% {
+    transform: translateY(-9px) scale(0.95, 1.06);
+    animation-timing-function: ease-in-out;
+  }
+  95.5% {
+    transform: translateY(-8px) scale(0.98, 1.02);
+    animation-timing-function: ease-in;
+  }
+  97.5% {
+    transform: scale(1.08, 0.9);
+    animation-timing-function: ease-out;
+  }
+  99% {
+    transform: scale(0.98, 1.02);
+  }
+}
+@keyframes brand-agent-jump-ground {
+  0%,
+  90%,
+  98%,
+  100% {
+    transform: none;
+  }
+  92.5%,
+  95.5% {
+    transform: scale(0.72);
+    opacity: 0.08;
+  }
+}
+/* One small hop per beat with long rests between. */
+@keyframes brand-agent-hop {
+  0%,
+  22%,
+  100% {
+    transform: none;
+    animation-timing-function: ease-out;
+  }
+  4% {
+    transform: scale(1.03, 0.97);
+    animation-timing-function: ease-out;
+  }
+  10% {
+    transform: translateY(-4px) scale(0.98, 1.02);
+    animation-timing-function: ease-in;
+  }
+  16% {
+    transform: scale(1.03, 0.97);
+    animation-timing-function: ease-out;
+  }
+}
+@keyframes brand-agent-hop-ground {
+  0%,
+  4%,
+  16%,
+  100% {
+    transform: none;
+  }
+  10% {
+    transform: scale(0.86);
+    opacity: 0.1;
+  }
+}
+@keyframes brand-agent-lean {
+  from {
+    transform: none;
+  }
+  to {
+    transform: translateX(-1px) rotate(-3deg);
+  }
+}
+@keyframes brand-agent-poke-a {
+  0%,
+  100% {
+    transform: none;
+    animation-timing-function: ease-out;
+  }
+  12% {
+    transform: scale(1.1, 0.88);
+    animation-timing-function: ease-out;
+  }
+  40% {
+    transform: translateY(-14px) scale(0.94, 1.08);
+    animation-timing-function: ease-in;
+  }
+  78% {
+    transform: scale(1.1, 0.88);
+    animation-timing-function: ease-out;
+  }
+  90% {
+    transform: scale(0.97, 1.03);
+  }
+}
+@keyframes brand-agent-poke-b {
+  0%,
+  100% {
+    transform: none;
+    animation-timing-function: ease-out;
+  }
+  12% {
+    transform: scale(1.1, 0.88);
+    animation-timing-function: ease-out;
+  }
+  40% {
+    transform: translateY(-14px) scale(0.94, 1.08);
+    animation-timing-function: ease-in;
+  }
+  78% {
+    transform: scale(1.1, 0.88);
+    animation-timing-function: ease-out;
+  }
+  90% {
+    transform: scale(0.97, 1.03);
   }
 }

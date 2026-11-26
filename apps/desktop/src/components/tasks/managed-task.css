@@ -55,8 +55,7 @@
   height: 56px;
   flex: 0 0 56px;
 }
-.managed-agent:not([data-animated]) .brand-agent-character,
-.managed-agent:not([data-animated]) .brand-agent-face {
+.managed-agent:not([data-animated]) .brand-agent-character * {
   animation-play-state: paused;
 }
 .managed-agent-name {

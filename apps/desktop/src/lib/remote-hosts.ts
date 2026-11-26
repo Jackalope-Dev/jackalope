@@ -1,4 +1,5 @@
 import { invokeNative } from './native/transport.ts';
+import { trackAction } from './usage-events.ts';
 
 /** A paired computer this app can reach. */
 export interface RemoteHost {
@@ -19,6 +20,10 @@ export const pairRemoteHost = (pairing: {
   wsl: boolean;
   port: number;
   code: string;
-}) => invokeNative<RemoteHost>('remote_host_pair', pairing);
+}) =>
+  invokeNative<RemoteHost>('remote_host_pair', pairing).then((host) => {
+    trackAction('computer_connected');
+    return host;
+  });
 
 export const removeRemoteHost = (id: string) => invokeNative<void>('remote_host_remove', { id });

@@ -16,8 +16,9 @@ computer** or **Allow, and share this project read-only**; the computer then bel
 that task and is reused by its later attempts. A project can have one too, chosen in
 Project settings → Integrations under **Agents run on**; its task agents then run there (see
 [agents on a computer](#agents-on-a-computer)). Settings → Computers lists every
-computer, paired cloud machine, the Agent37 connection, agent sign-ins for computers and
-Docker's readiness.
+computer, the Agent37 connection, agent sign-ins for computers and Docker's readiness;
+cloud machines are paired, tested and removed in Devices → Cloud machines, which also
+shows them on the Devices map beside phones and other computers.
 
 When a run's agent runs on a computer (see [agents on a computer](#agents-on-a-computer)),
 belongs to a bot with a computer, or belongs to a task that was given one, in that order:
@@ -163,8 +164,8 @@ internet. The agent answers only `GET /v1/health` and `POST /v1/call` (one JSON-
 request per body, at most 1 MB) with `Authorization: Bearer <token>`, compared in
 constant time.
 
-In Settings → Computers, or from a bot's Computer settings when nothing is paired yet,
-**Pair machine** generates a 64-character secret in the app and shows the `docker run`
+In Devices → Cloud machines, or from a bot's Computer settings when nothing is paired yet,
+**Pair a machine** generates a 64-character secret in the app and shows the `docker run`
 command above with it and this version's image filled in (`PairMachineForm` keeps that
 command in step with this guide; it falls back to `jackalope-computer` when the app
 cannot read its image definition). It takes the HTTPS address (plain HTTP only for a `127.0.0.1` tunnel), a name that
@@ -181,7 +182,7 @@ The machine record (`machines.json`) keeps the system its agent last reported in
 `hello`: `os` (`linux` or `macos`), `arch` and, on a Mac, `xcode` (version, build and
 available simulator runtimes). It is saved when the machine is paired and updated when
 **Test connection**, a start or a state check gets a different answer; a record from
-before agents reported it reads as Linux. Settings → Computers shows it beside the
+before agents reported it reads as Linux. Devices → Cloud machines shows it beside the
 address (`macOS · arm64 · Xcode 27.2 · iOS 27.2, iOS 27.0`, `macOS · no Xcode` or
 `Linux`), and **Test connection** says it after `Connected`. Local sandboxes and Agent37
 computers run the Linux image.
@@ -190,7 +191,7 @@ computers run the Linux image.
 
 A Mac the person owns (a Mac mini, or a cloud Mac such as MacStadium, AWS EC2 Mac or
 Scaleway) pairs as a cloud machine without Docker, so iOS builds, tests, simulators and
-agents can run there. **Pair machine** → **Mac** offers **Save setup script**, which
+agents can run there. **Pair a machine** → **Mac** offers **Save setup script**, which
 writes `jackalope-mac-computer.sh` to `computers/mac-setup/` in Jackalope's data and
 shows it in Finder, and the command to run it on the Mac with the generated secret:
 

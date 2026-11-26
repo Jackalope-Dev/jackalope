@@ -83,7 +83,7 @@ export function SideQuestion({
           sessions read-only, so nothing was asked.
         </InlineNotice>
       ) : busy ? (
-        <LoadingState compact label={`Asking a read-only copy of ${agentName}…`} />
+        <LoadingState compact orb="breathing" label={`Asking a read-only copy of ${agentName}…`} />
       ) : error ? (
         <InlineNotice tone="error">{error}</InlineNotice>
       ) : answer ? (

@@ -104,6 +104,13 @@ describe('ingestion contract and privacy', () => {
       dimension: 'ui_render_error|task_start|chat',
     });
     expect(rows).toContainEqual({ name: 'task_state', dimension: 'starting' });
+    expect(rows).toContainEqual({ name: 'app_error', dimension: 'ui_error|||network' });
+    expect(rows).toContainEqual({
+      name: 'work_sent',
+      dimension: 'conversation|claude|1|window',
+    });
+    expect(rows).toContainEqual({ name: 'action_used', dimension: 'read_aloud' });
+    expect(rows).toContainEqual({ name: 'setting_changed', dimension: 'interface_zoom' });
   });
   it.each([
     { name: 'operation_result', operation: 'private-command', outcome: 'accepted' },
@@ -116,6 +123,13 @@ describe('ingestion contract and privacy', () => {
       outcome: 'accepted',
       args: { prompt: 'private' },
     },
+    { name: 'app_error', code: 'ui_error', kind: 'private-kind' },
+    { name: 'app_error', code: 'ui_error', message: '/Users/private/repo' },
+    { name: 'work_sent', shape: 'conversation', attachments: '3', window: false },
+    { name: 'work_sent', shape: 'conversation', attachments: '1', window: false, prompt: 'x' },
+    { name: 'action_used', action: 'private-action' },
+    { name: 'setting_changed', setting: 'dictation_endpoint' },
+    { name: 'setting_changed', setting: 'interface_zoom', value: 1.5 },
   ])('rejects unbounded launch-report dimensions', async (metric) => {
     expect(
       (await request('/v2/telemetry', { schemaVersion: 2, events: [{ ...event(), ...metric }] }))
@@ -603,6 +617,8 @@ describe('private monitoring and feedback delivery', () => {
       adminRoutes(new Request(`https://service.example${path}`, options), testEnv(), (r) =>
         r.json(),
       );
+    expect((await call('/admin/api/overview?days=14')).status).toBe(200);
+    expect((await call('/admin/api/overview?days=90')).status).toBe(400);
     const overview = (await (await call('/admin/api/overview?channel=beta&days=7')).json()) as {
       metrics: { channel: string }[];
     };

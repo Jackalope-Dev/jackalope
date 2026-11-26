@@ -1,5 +1,6 @@
 import { isTauriEnvironment } from './native/env.ts';
 import { invokeNative } from './native/transport.ts';
+import { trackAction } from './usage-events.ts';
 
 /** A window the person can attach to a conversation. */
 export interface AttachTarget {
@@ -16,6 +17,8 @@ export interface AttachedWindow {
   control: boolean;
   /** Minutes left before it stops waiting for the agent. */
   minutesLeft: number;
+  /** Used by a turn already, so it stays attached for the rest of the conversation. */
+  kept: boolean;
 }
 
 export interface AttachSupport {
@@ -103,6 +106,9 @@ export const confirmAttach = (
     agent,
     provider,
     site,
+  }).then((attached) => {
+    trackAction('window_attached');
+    return attached;
   });
 
 /** The website open in a browser window, which attaching it allows; null for other apps. */

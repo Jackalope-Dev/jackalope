@@ -453,6 +453,7 @@ export function KnowledgeLibrary({ project }: { project: Project }) {
             value={query}
             maxLength={200}
             placeholder="Search instructions and results…"
+            busy={searching}
             onValueChange={(value) => setQuery(value)}
             containerClassName="context-history-field"
           />

@@ -7,10 +7,14 @@
   font-size: var(--text-sm);
 }
 .agent-question {
+  position: relative;
   padding: 20px;
   border-radius: var(--radius-2xl);
   background: linear-gradient(150deg, var(--color-accent-subtle), var(--color-surface));
   box-shadow: var(--shadow-flat);
+}
+.agent-question > .ui-beam {
+  --beam-edge: 0px;
 }
 .agent-question[data-answered] {
   background: var(--color-surface-sunken);

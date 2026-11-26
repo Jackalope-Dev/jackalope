@@ -16,6 +16,7 @@ import { isTauriEnvironment } from '../../lib/native/env';
 import { invokeNative } from '../../lib/native/transport';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { useWorkViewStore } from '../../stores/workViewStore';
+import { ReadAloudSettings } from '../voice/ReadAloudSettings';
 import { VoiceSettings } from '../voice/VoiceSettings';
 import { CliCommandSetting } from './CliCommandSetting';
 
@@ -246,6 +247,9 @@ export function DesktopPreferences() {
             onChange={(event) => settings.updateSettings({ dictationModel: event.target.value })}
           />
         </SettingRow>
+      </SettingGroup>
+      <SettingGroup data-settings-tile title="Read aloud">
+        <ReadAloudSettings />
       </SettingGroup>
       {(error || activityError || activity?.error) && (
         <InlineNotice tone="error">{error || activityError || activity?.error}</InlineNotice>
