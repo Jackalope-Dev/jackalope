@@ -617,6 +617,7 @@ export function LiveSessionView({
             {!message.runId && !message.canceled && (
               <button
                 type="button"
+                className="live-cancel"
                 aria-label="Cancel queued message"
                 onClick={() =>
                   void act(() =>

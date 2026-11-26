@@ -220,6 +220,10 @@
 .live-sent > .live-receipt {
   margin-top: 4px;
 }
+/* The status stays flush with the bubble; actions revealed on hover sit before it. */
+.live-sent > .live-receipt > :not(.live-cancel) {
+  order: -1;
+}
 .live-reply {
   display: flex;
   align-items: flex-start;

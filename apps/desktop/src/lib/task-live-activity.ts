@@ -49,7 +49,8 @@ export function activityOrb(
   if (finishing || step === 'verification' || kind === 'check') return 'solving';
   if (kind === 'read' || kind === 'search') return 'searching';
   if (kind === 'edit') return 'composing';
-  return 'working';
+  // Between named steps the agent is thinking; the ring reads more calmly than scattered orbits.
+  return 'breathing';
 }
 
 export function liveActivity(run: TaskRun) {

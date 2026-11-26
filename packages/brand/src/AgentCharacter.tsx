@@ -276,14 +276,6 @@ export function AgentCharacter({
                     )}
                     {state === 'waiting' && <path d="M45 30l5-2" strokeWidth="2" />}
                   </g>
-                  {state === 'working' && (
-                    <path
-                      d="M34 46.5Q39 50.5 44 46.5"
-                      className="brand-agent-smile"
-                      strokeLinecap="round"
-                      strokeWidth="2.5"
-                    />
-                  )}
                 </g>
               </g>
             </g>
