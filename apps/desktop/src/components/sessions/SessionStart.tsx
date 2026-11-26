@@ -802,11 +802,16 @@ ${incoming}`
                   ...(general
                     ? []
                     : [
+                        // With a request written, planning starts now; with an empty box
+                        // it switches the composer to plan mode, and Send starts it.
                         {
                           id: 'plan-with-me',
-                          label: 'Plan with me',
-                          disabled: !text.trim() || busy || !isTauriEnvironment(),
-                          onSelect: () => void send('interview'),
+                          label: planning && !text.trim() ? 'Stop planning' : 'Plan with me',
+                          disabled: busy || !isTauriEnvironment(),
+                          onSelect: () => {
+                            if (text.trim()) void send('interview');
+                            else setPlanning((current) => !current);
+                          },
                         },
                       ]),
                   ...(inferredNonCode
