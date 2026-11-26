@@ -698,7 +698,9 @@ impl Call<'_> {
                 label,
             )?);
         }
-        self.activate(choice, None, false)?;
+        // The person just chose this window or app, so control begins without a second click
+        // on the bar's Resume.
+        self.activate(choice, None, true)?;
         if let Some(saved) = saved {
             self.activity(format!(
                 "You chose to always allow {} in this project. Remove it in project settings.",
@@ -717,7 +719,9 @@ impl Call<'_> {
             &staged,
         ))?;
         let title: String = staged.window.title.chars().take(80).collect();
-        self.activate(Choice::Window(staged.window), None, staged.resumed)?;
+        // Attaching the window, and choosing what the agent may do with it, was the person's
+        // answer, so control begins at once rather than waiting for Resume on the bar.
+        self.activate(Choice::Window(staged.window), None, true)?;
         if let Some(grant) = self.access.grant.as_mut() {
             grant.read_only = !staged.control;
         }
