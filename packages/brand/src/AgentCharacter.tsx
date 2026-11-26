@@ -110,7 +110,7 @@ export function AgentCharacter({
   gaze?: AgentGaze;
   /** Plush adds soft studio shading, bead eyes and, at larger sizes, a ground shadow. */
   material?: 'plush' | 'flat';
-  /** A click makes the character hop and turn round. Leave off inside clickable rows. */
+  /** A click makes the character hop. Leave off inside clickable rows. */
   interactive?: boolean;
   onClick?: (event: MouseEvent<SVGSVGElement>) => void;
 }) {
@@ -118,7 +118,6 @@ export function AgentCharacter({
   const id = `brand-agent-${useId().replace(/[^\w-]/g, '')}`;
   const root = useRef<SVGSVGElement>(null);
   const body = useRef<SVGGElement>(null);
-  const turn = useRef<SVGGElement>(null);
   // Per-instance timing, so a row of characters never blinks, glances or jumps in unison.
   const timing = useRef<Record<string, string> | undefined>(undefined);
   if (timing.current === undefined) {
@@ -140,30 +139,20 @@ export function AgentCharacter({
   // Changing state swaps CSS animations, which would snap mid-hop. Capture the pose the old
   // animation left on screen while the old DOM is still committed, then ease out of it.
   const previous = useRef(state);
-  const outgoing = useRef<{ body: string; turn: string } | null>(null);
+  const outgoing = useRef<string | null>(null);
   if (previous.current !== state) {
     previous.current = state;
     outgoing.current =
-      body.current && turn.current && !reducedMotion()
-        ? {
-            body: getComputedStyle(body.current).transform,
-            turn: getComputedStyle(turn.current).transform,
-          }
-        : null;
+      body.current && !reducedMotion() ? getComputedStyle(body.current).transform : null;
   }
   useLayoutEffect(() => {
-    const from = outgoing.current;
+    const transform = outgoing.current;
     outgoing.current = null;
-    if (!from || !body.current?.animate) return;
-    const settle = { duration: 320, easing: 'cubic-bezier(0.2, 0.8, 0.2, 1)' };
-    for (const [element, transform] of [
-      [body.current, from.body],
-      [turn.current, from.turn],
-    ] as const) {
-      if (element && transform && transform !== 'none') {
-        element.animate([{ transform }, { transform: 'none' }], settle);
-      }
-    }
+    if (!transform || transform === 'none' || !body.current?.animate) return;
+    body.current.animate([{ transform }, { transform: 'none' }], {
+      duration: 320,
+      easing: 'cubic-bezier(0.2, 0.8, 0.2, 1)',
+    });
   });
 
   useEffect(() => {
@@ -231,51 +220,49 @@ export function AgentCharacter({
       {plush && <ellipse className="brand-agent-ground" cx="42" cy="80" rx="22" ry="3" />}
       <g ref={body} className="brand-agent-body">
         <g className="brand-agent-lean">
-          <g ref={turn} className="brand-agent-turn">
-            <g
-              className="brand-agent-head"
-              style={headTransform ? { transform: headTransform } : undefined}
-            >
-              {[4, 3, 2, 1].map((layer) => (
-                <path
-                  key={layer}
-                  d={silhouette}
-                  transform={`translate(${layer * 3} ${layer * 1.5})`}
-                  className="brand-agent-echo"
-                />
-              ))}
-              <g className="brand-agent-fill">
-                <path d={silhouette} fill="currentColor" />
-                {plush && (
-                  <g clipPath={`url(#${id}-clip)`}>
-                    <path d={silhouette} fill={`url(#${id}-shade)`} />
-                    <path
-                      d={silhouette}
-                      stroke={`url(#${id}-rim)`}
-                      strokeWidth="5"
-                      className="brand-agent-rim"
-                    />
-                  </g>
-                )}
-              </g>
-              {provider === 'grok' && (
-                <path d="M12 57C26 54 51 33 64 20" className="brand-agent-orbit" />
+          <g
+            className="brand-agent-head"
+            style={headTransform ? { transform: headTransform } : undefined}
+          >
+            {[4, 3, 2, 1].map((layer) => (
+              <path
+                key={layer}
+                d={silhouette}
+                transform={`translate(${layer * 3} ${layer * 1.5})`}
+                className="brand-agent-echo"
+              />
+            ))}
+            <g className="brand-agent-fill">
+              <path d={silhouette} fill="currentColor" />
+              {plush && (
+                <g clipPath={`url(#${id}-clip)`}>
+                  <path d={silhouette} fill={`url(#${id}-shade)`} />
+                  <path
+                    d={silhouette}
+                    stroke={`url(#${id}-rim)`}
+                    strokeWidth="5"
+                    className="brand-agent-rim"
+                  />
+                </g>
               )}
-              <g
-                className="brand-agent-gaze"
-                style={gazeTransform ? { transform: gazeTransform } : undefined}
-              >
-                <g className="brand-agent-glance">
-                  <g className="brand-agent-face" strokeLinecap="round" strokeWidth="3.5">
-                    <path d={eyes} />
-                    {plush && state !== 'working' && (
-                      <g className="brand-agent-bead">
-                        <circle cx="31.6" cy="37.6" r="0.9" />
-                        <circle cx="47.6" cy="37.6" r="0.9" />
-                      </g>
-                    )}
-                    {state === 'waiting' && <path d="M45 30l5-2" strokeWidth="2" />}
-                  </g>
+            </g>
+            {provider === 'grok' && (
+              <path d="M12 57C26 54 51 33 64 20" className="brand-agent-orbit" />
+            )}
+            <g
+              className="brand-agent-gaze"
+              style={gazeTransform ? { transform: gazeTransform } : undefined}
+            >
+              <g className="brand-agent-glance">
+                <g className="brand-agent-face" strokeLinecap="round" strokeWidth="3.5">
+                  <path d={eyes} />
+                  {plush && state !== 'working' && (
+                    <g className="brand-agent-bead">
+                      <circle cx="31.6" cy="37.6" r="0.9" />
+                      <circle cx="47.6" cy="37.6" r="0.9" />
+                    </g>
+                  )}
+                  {state === 'waiting' && <path d="M45 30l5-2" strokeWidth="2" />}
                 </g>
               </g>
             </g>

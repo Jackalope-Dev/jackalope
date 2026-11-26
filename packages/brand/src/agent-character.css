@@ -33,7 +33,7 @@
   transform-box: view-box;
   transition: transform 80ms cubic-bezier(0.2, 0, 0.2, 1);
 }
-/* The rig, outermost first: body hops from the feet, lean tilts, turn flips round. */
+/* The rig, outermost first: body hops from the feet, lean tilts. */
 .brand-agent-body {
   transform-origin: 40px 74px;
   transform-box: view-box;
@@ -45,10 +45,6 @@
 /* Waiting tilts the head; the lean eases in and out of it. */
 .brand-agent-character[data-state="waiting"] .brand-agent-lean {
   rotate: -6deg;
-}
-.brand-agent-turn {
-  transform-origin: 40px 44px;
-  transform-box: view-box;
 }
 .brand-agent-ground {
   display: none;
@@ -93,28 +89,25 @@
     transition: rotate 420ms cubic-bezier(0.2, 0.8, 0.2, 1);
   }
 
-  /* Idle: now and then a jump with a full turn. */
+  /* Idle: now and then a small jump. */
   .brand-agent-character[data-state="idle"] .brand-agent-body {
     animation: brand-agent-jump var(--brand-agent-idle-period, 16s) linear
       var(--brand-agent-idle-delay, 0s) infinite;
   }
-  .brand-agent-character[data-state="idle"] .brand-agent-turn {
-    animation: brand-agent-jump-turn var(--brand-agent-idle-period, 16s) linear
-      var(--brand-agent-idle-delay, 0s) infinite;
-  }
-  .brand-agent-character[data-state="idle"] .brand-agent-ground {
+  .brand-agent-character[data-state="idle"]
+    .brand-agent-character[data-state="idle"]
+    .brand-agent-ground {
     animation: brand-agent-jump-ground var(--brand-agent-idle-period, 16s) linear
       var(--brand-agent-idle-delay, 0s) infinite;
   }
 
-  /* Working: a small hop every beat and a turn on every third. */
+  /* Working: a small hop every beat. */
   .brand-agent-character[data-state="working"] .brand-agent-body {
     animation: brand-agent-hop 4.4s linear var(--brand-agent-work-delay, 0s) infinite;
   }
-  .brand-agent-character[data-state="working"] .brand-agent-turn {
-    animation: brand-agent-hop-turn 13.2s linear var(--brand-agent-work-delay, 0s) infinite;
-  }
-  .brand-agent-character[data-state="working"] .brand-agent-ground {
+  .brand-agent-character[data-state="working"]
+    .brand-agent-character[data-state="working"]
+    .brand-agent-ground {
     animation: brand-agent-hop-ground 4.4s linear var(--brand-agent-work-delay, 0s) infinite;
   }
   .brand-agent-character[data-state="working"] .brand-agent-face {
@@ -126,20 +119,17 @@
     animation: brand-agent-lean 4.8s ease-in-out infinite alternate;
   }
 
-  /* A poke: hop and turn round. Two names let a quick second click restart it. */
+  /* A poke: a hop. Two names let a quick second click restart it. */
   .brand-agent-character[data-poke="a"] .brand-agent-body {
     animation: brand-agent-poke-a 700ms linear;
   }
   .brand-agent-character[data-poke="b"] .brand-agent-body {
     animation: brand-agent-poke-b 700ms linear;
   }
-  .brand-agent-character[data-poke="a"] .brand-agent-turn {
-    animation: brand-agent-poke-turn-a 700ms ease-in-out;
-  }
-  .brand-agent-character[data-poke="b"] .brand-agent-turn {
-    animation: brand-agent-poke-turn-b 700ms ease-in-out;
-  }
-  .brand-agent-character[data-poke] .brand-agent-ground {
+  .brand-agent-character[data-poke="a"]
+    .brand-agent-character[data-poke="b"]
+    .brand-agent-character[data-poke]
+    .brand-agent-ground {
     animation: none;
   }
 
@@ -214,19 +204,6 @@
     transform: scale(0.98, 1.02);
   }
 }
-@keyframes brand-agent-jump-turn {
-  0%,
-  91%,
-  100% {
-    transform: none;
-  }
-  94% {
-    transform: scaleX(-1);
-  }
-  97% {
-    transform: scaleX(1);
-  }
-}
 @keyframes brand-agent-jump-ground {
   0%,
   90%,
@@ -240,7 +217,7 @@
     opacity: 0.08;
   }
 }
-/* One small hop per beat with long rests between, and a turn on every third hop. */
+/* One small hop per beat with long rests between. */
 @keyframes brand-agent-hop {
   0%,
   22%,
@@ -259,17 +236,6 @@
   16% {
     transform: scale(1.03, 0.97);
     animation-timing-function: ease-out;
-  }
-}
-@keyframes brand-agent-hop-turn {
-  0%,
-  1.5%,
-  5.5%,
-  100% {
-    transform: none;
-  }
-  3.5% {
-    transform: scaleX(-1);
   }
 }
 @keyframes brand-agent-hop-ground {
@@ -334,27 +300,5 @@
   }
   90% {
     transform: scale(0.97, 1.03);
-  }
-}
-@keyframes brand-agent-poke-turn-a {
-  0%,
-  14%,
-  76%,
-  100% {
-    transform: none;
-  }
-  45% {
-    transform: scaleX(-1);
-  }
-}
-@keyframes brand-agent-poke-turn-b {
-  0%,
-  14%,
-  76%,
-  100% {
-    transform: none;
-  }
-  45% {
-    transform: scaleX(-1);
   }
 }
