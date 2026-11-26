@@ -56,6 +56,7 @@ import { DesktopPreferences } from './DesktopPreferences';
 import { IssueConnections } from './IssueConnections';
 import { SwarmSettings } from './SwarmConnection';
 import { UpdateSettings } from './UpdateSettings';
+import { useSettingsMasonry } from './useSettingsMasonry';
 
 interface SettingsPageProps {
   onClose: () => void;
@@ -112,6 +113,7 @@ export function SettingsPage({
   };
   const selectedSection = useRef<HTMLElement>(null);
   const content = useRef<HTMLDivElement>(null);
+  useSettingsMasonry(content);
   useEffect(() => {
     if (sidebarCategory(category) !== category)
       selectedSection.current?.scrollIntoView({ block: 'start' });

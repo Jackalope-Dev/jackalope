@@ -165,25 +165,24 @@
   overscroll-behavior: contain;
   overflow-wrap: anywhere;
 }
-/* Groups marked data-settings-tile flow into two columns on wide panes, each card stacking
-   straight under the one above, so cards of different heights leave no gaps; anything
-   unmarked spans both columns. Reading and focus order run down the first column, then the
-   second. */
+/* Groups marked data-settings-tile sit two to a row on wide panes, packed like masonry:
+   useSettingsMasonry gives each card a span of small rows from its height, so the next card
+   starts right under it instead of below the taller neighbour. Anything unmarked spans
+   both columns. Order still follows the page. */
 @container (min-width: 52rem) {
   .settings-section:has(> [data-settings-tile]) {
-    columns: 2;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-auto-rows: 4px;
     column-gap: 16px;
+    align-items: start;
   }
   .settings-section:has(> [data-settings-tile]) > * {
+    grid-row-end: span var(--settings-span, 1);
     margin-top: 0;
-    margin-bottom: 16px;
-    break-inside: avoid;
   }
   .settings-section:has(> [data-settings-tile]) > :not([data-settings-tile]) {
-    column-span: all;
-  }
-  .settings-section:has(> [data-settings-tile]) > :last-child {
-    margin-bottom: 0;
+    grid-column: 1 / -1;
   }
 }
 .settings-input {
